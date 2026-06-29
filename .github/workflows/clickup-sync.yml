@@ -1,0 +1,47 @@
+name: ClickUp → Dispatch daily sync
+
+# Runs every morning on GitHub's servers (no computer needed), pulls your ClickUp
+# tasks, rewrites js/pending-inject.js and pushes — GitHub Pages then redeploys.
+# You can also trigger it by hand from the Actions tab (Run workflow).
+
+on:
+  schedule:
+    - cron: '0 5 * * *'        # 05:00 UTC ≈ 08:00 МСК daily
+  workflow_dispatch: {}
+
+permissions:
+  contents: write              # lets the built-in token commit & push
+
+concurrency:
+  group: clickup-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Fetch ClickUp tasks → js/pending-inject.js
+        env:
+          CLICKUP_TOKEN: ${{ secrets.CLICKUP_TOKEN }}
+          CLICKUP_TEAM_ID: ${{ secrets.CLICKUP_TEAM_ID }}   # optional, defaults below
+          SYNC_DAYS_AHEAD: '12'                              # how far ahead to pull
+        run: node scripts/clickup-sync.mjs
+
+      - name: Commit & push if changed
+        run: |
+          git config user.name  "dispatch-bot"
+          git config user.email "dispatch-bot@users.noreply.github.com"
+          git add js/pending-inject.js
+          if git diff --cached --quiet; then
+            echo "No changes — nothing to deploy."
+          else
+            git commit -m "ClickUp sync $(date -u +%Y-%m-%d)"
+            git push
+            echo "Pushed — GitHub Pages will redeploy."
+          fi

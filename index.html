@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Dispatch">
+  <meta name="mobile-web-app-capable" content="yes">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dispatch</title>
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
+<link rel="shortcut icon" href="assets/icons/favicon-32.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#06060e">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+
+
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<!-- Liquid-glass refraction filter: warps the backdrop behind .month-bar like glass bending light -->
+<svg width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+  <filter id="liquidGlass" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.009 0.013" numOctaves="2" seed="11" result="noise"/>
+    <feGaussianBlur in="noise" stdDeviation="1.1" result="noiseBlur"/>
+    <feDisplacementMap in="SourceGraphic" in2="noiseBlur" scale="22" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
+<div class="app">
+  <div class="topbar">
+    <div class="topbar-title" onclick="setView('home')" style="cursor:pointer;display:flex;align-items:center;gap:7px" title="Главная">DISPATCH<span id="build-tag" style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:var(--green);background:rgba(52,199,89,.12);border:1px solid rgba(52,199,89,.3);border-radius:7px;padding:1px 6px;letter-spacing:.04em"></span></div>
+    <div class="topbar-date" id="topbar-date"></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--text3);display:flex;gap:10px">
+        <span title="Переключить вкладки">← →</span>
+        <span title="1-7 — вкладки">1-7</span>
+        <span title="Отменить">⌘Z</span>
+      </div>
+      <button onclick="toggleColorPicker()" title="Цвет акцента"
+        style="width:26px;height:26px;border-radius:18px;border:1px solid rgba(var(--accent-rgb),.3);
+        background:linear-gradient(135deg,var(--accent),rgba(var(--accent-rgb),.5));
+        cursor:pointer;transition:all .2s;box-shadow:0 0 8px var(--accent-glow);"
+        onmouseover="this.style.transform='scale(1.15)'" onmouseout="this.style.transform='scale(1)'">
+      </button>
+      <div id="color-picker-popup" style="display:none;position:absolute;top:60px;right:16px;z-index:500;
+        background:rgba(6,6,18,.9);border:1px solid rgba(255,255,255,.12);border-radius:var(--r-lg);
+        padding:18px;backdrop-filter:blur(22px) saturate(200%);
+        box-shadow:0 24px 60px rgba(0,0,0,.7),0 0 0 1px rgba(var(--accent-rgb),.08);
+        animation:modalIn .22s var(--spring);min-width:210px">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
+          <span>Цвет акцента</span>
+          <button onclick="setAccentColor('#6366f1');localStorage.removeItem('dc_accent_color')"
+            style="font-family:var(--mono);font-size:9px;background:none;border:1px solid rgba(255,255,255,.12);color:var(--text3);border-radius:14px;padding:2px 8px;cursor:pointer;transition:all .15s;"
+            onmouseover="this.style.borderColor='rgba(var(--accent-rgb),.4)';this.style.color='var(--accent)'"
+            onmouseout="this.style.borderColor='rgba(255,255,255,.12)';this.style.color='var(--text3)'">↺ сброс</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px">
+          <div onclick="setAccentColor('#6366f1')" class="accent-swatch" data-color="#6366f1" style="width:30px;height:30px;border-radius:18px;background:#6366f1;cursor:pointer;transition:all .2s var(--spring);border:2px solid transparent;box-shadow:0 2px 8px rgba(0,0,0,.3)" onmouseover="this.style.transform='scale(1.25)';this.style.borderColor='rgba(255,255,255,.5)'" onmouseout="this.style.transform='scale(1)';this.style.borderColor='transparent'"></div>
+          <div onclick="setAccentColor('#8b5cf6')" class="accent-swatch" data-color="#8b5cf6" style="width:30px;height:30px;border-radius:18px;background:#8b5cf6;cursor:pointer;transition:all .2s var(--spring);border:2px solid transparent;box-shadow:0 2px 8px rgba(0,0,0,.3)" onmouseover="this.style.transform='scale(1.25)';this.style.borderColor='rgba(255,255,255,.5)'" onmouseout="this.style.transform='scale(1)';this.style.borderColor='transparent'"></div>
+          <div onclick="setAccentColor('#06b6d4')" class="accent-swatch" data-color="#06b6d4" style="width:30px;height:30px;border-radius:18px;background:#06b6d4;cursor:pointer;transition:all .2s var(--spring);border:2px solid transparent;box-shadow:0 2px 8px rgba(0,0,0,.3)" onmouseover="this.style.transform='scale(1.25)';this.style.borderColor='rgba(255,255,255,.5)'" onmouseout="this.style.transform='scale(1)';this.style.borderColor='transparent'"></div>
+          <div onclick="setAccentColor('#22d3a0')" class="accent-swatch" data-color="#22d3a0" style="width:30px;height:30px;border-radius:18px;background:#22d3a0;cursor:pointer;transition:all .2s var(--spring);border:2px solid transparent;box-shadow:0 2px 8px rgba(0,0,0,.3)" onmouseover="this.style.transform='scale(1.25)';this.style.borderColor='rgba(255,255,255,.5)'" onmouseout="this.style.transform='scale(1)';this.style.borderColor='transparent'"></div>
+          <div onclick="setAccentColor('#f59e0b')" class="accent-swatch" data-color="#f59e0b" style="width:30px;height:30px;border-radius:18px;background:#f59e0b;cursor:pointer;transition:all .2s var(--spring);border:2px solid transparent;box-shadow:0 2px 8px rgba(0,0,0,.3)" onmouseover="this.style.transform='scale(1.25)';this.style.borderColor='rgba(255,255,255,.5)'" onmouseout="this.style.transform='scale(1)';this.style.borderColor='transparent'"></div>
+          <div onclick="setAccentColor('#ef4444')" class="accent-swatch" data-color="#ef4444" style="width:30px;height:30px;border-radius:18px;background:#ef4444;cursor:pointer;transition:all .2s var(--spring);border:2px solid transparent;box-shadow:0 2px 8px rgba(0,0,0,.3)" onmouseover="this.style.transform='scale(1.25)';this.style.borderColor='rgba(255,255,255,.5)'" onmouseout="this.style.transform='scale(1)';this.style.borderColor='transparent'"></div>
+          <div onclick="setAccentColor('#ec4899')" class="accent-swatch" data-color="#ec4899" style="width:30px;height:30px;border-radius:18px;background:#ec4899;cursor:pointer;transition:all .2s var(--spring);border:2px solid transparent;box-shadow:0 2px 8px rgba(0,0,0,.3)" onmouseover="this.style.transform='scale(1.25)';this.style.borderColor='rgba(255,255,255,.5)'" onmouseout="this.style.transform='scale(1)';this.style.borderColor='transparent'"></div>
+          <div onclick="setAccentColor('#f97316')" class="accent-swatch" data-color="#f97316" style="width:30px;height:30px;border-radius:18px;background:#f97316;cursor:pointer;transition:all .2s var(--spring);border:2px solid transparent;box-shadow:0 2px 8px rgba(0,0,0,.3)" onmouseover="this.style.transform='scale(1.25)';this.style.borderColor='rgba(255,255,255,.5)'" onmouseout="this.style.transform='scale(1)';this.style.borderColor='transparent'"></div>
+          <div onclick="setAccentColor('#84cc16')" class="accent-swatch" data-color="#84cc16" style="width:30px;height:30px;border-radius:18px;background:#84cc16;cursor:pointer;transition:all .2s var(--spring);border:2px solid transparent;box-shadow:0 2px 8px rgba(0,0,0,.3)" onmouseover="this.style.transform='scale(1.25)';this.style.borderColor='rgba(255,255,255,.5)'" onmouseout="this.style.transform='scale(1)';this.style.borderColor='transparent'"></div>
+          <div onclick="setAccentColor('#e2e8f0')" class="accent-swatch" data-color="#e2e8f0" style="width:30px;height:30px;border-radius:18px;background:#e2e8f0;cursor:pointer;transition:all .2s var(--spring);border:2px solid transparent;box-shadow:0 2px 8px rgba(0,0,0,.3)" onmouseover="this.style.transform='scale(1.25)';this.style.borderColor='rgba(255,255,255,.5)'" onmouseout="this.style.transform='scale(1)';this.style.borderColor='transparent'"></div>
+        </div>
+        <input type="color" id="custom-color-input" value="#6366f1"
+          style="width:100%;height:36px;border:1px solid rgba(255,255,255,.1);border-radius:var(--r-sm);background:rgba(255,255,255,.07);cursor:pointer;outline:none;padding:2px;"
+          oninput="setAccentColor(this.value)">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:8px;text-align:center;opacity:.6">любой HEX цвет</div>
+      </div>
+    </div>
+  </div>
+  <div class="sidebar" id="main-sidebar">
+    <nav class="navlist">
+      <button class="tab active" onclick="setView('home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>Обзор</button>
+      <button class="tab" onclick="setView('day_today')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>Сегодня</button>
+      <button class="tab" onclick="setView('today')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>Рассылки</button>
+      <button class="tab" onclick="setView('planner')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Планировщик</button>
+      <button class="tab" onclick="setView('history')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="22,7 13.5,15.5 8.5,10.5 2,17"/><polyline points="16,7 22,7 22,13"/></svg>История</button>
+      <button class="tab" onclick="setView('clients')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Клиенты</button>
+      <button class="tab" onclick="setView('finance')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Финансы</button>
+      <button class="tab" onclick="setView('flows')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/></svg>Флоу</button>
+      <button class="tab" onclick="setView('invoices')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Инвойсы</button>
+    </nav>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Сегодня</div>
+      <div class="stat-row">
+        <span class="stat-label"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:-.1em;opacity:.5"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>Осталось</span>
+        <span class="stat-val" style="color:var(--amber)" id="s-pending">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px;vertical-align:-.1em;opacity:.5;color:var(--green)"><polyline points="20,6 9,17 4,12"/></svg>Готово</span>
+        <span class="stat-val" style="color:var(--green)" id="s-done">0</span>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Этот месяц</div>
+      <div class="stat-row">
+        <span class="stat-label"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:-.1em;opacity:.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Email</span>
+        <span class="stat-val" style="color:var(--green)" id="s-email-month">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:-.1em;opacity:.5"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.1 1.18 2 2 0 012.07 0h3a2 2 0 012 1.72c.12.96.36 1.9.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.34 1.85.58 2.81.7A2 2 0 0122 14.92v2z"/></svg>SMS</span>
+        <span class="stat-val" style="color:var(--green)" id="s-sms-month">0</span>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Клиенты</div>
+      <div class="stat-row">
+        <span class="stat-label"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:-.1em;opacity:.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>Всего</span>
+        <span class="stat-val" id="s-total">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:-.1em;color:var(--green);opacity:.7"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>С SMS</span>
+        <span class="stat-val" style="color:var(--green)" id="s-with-sms">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:-.1em;opacity:.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Без SMS</span>
+        <span class="stat-val" style="color:var(--amber)" id="s-without-sms">0</span>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Легенда</div>
+      <div class="stat-row"><span class="stat-label" style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block"></span>Отправлено</span><span class="stat-val" style="color:var(--green)">yes</span></div>
+      <div class="stat-row"><span class="stat-label" style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block"></span>Не отправлено</span><span class="stat-val" style="color:var(--red)">no</span></div>
+      <div class="stat-row"><span class="stat-label" style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--purple);display:inline-block"></span>Черновик</span><span class="stat-val" style="color:var(--purple)">draft</span></div>
+    </div>
+  </div>
+  <div class="main" id="main-content"></div>
+</div>
+
+
+<!-- Day planner modal -->
+<div id="flow-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(20px)" onclick="if(event.target===this)closeFlowModal()">
+  <div style="background:rgba(6,6,18,.92);border:1px solid rgba(255,255,255,.12);border-radius:28px;padding:28px;width:340px;backdrop-filter:blur(22px);box-shadow:0 32px 80px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.08)">
+    <div style="font-size:16px;font-weight:700;margin-bottom:20px;color:var(--text)">⚡ Добавить флоу</div>
+    <input id="flow-name-input" placeholder="Название (напр. Abandoned Cart)" style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:16px;color:var(--text);font-size:13px;padding:10px 13px;outline:none;margin-bottom:12px;font-family:'Inter',sans-serif;box-sizing:border-box" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='rgba(255,255,255,.15)'" onkeydown="if(event.key==='Enter')document.getElementById('flow-count-input').focus()">
+    <input id="flow-count-input" type="number" min="1" max="99" placeholder="Количество мейлов" style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:16px;color:var(--text);font-size:13px;padding:10px 13px;outline:none;margin-bottom:20px;font-family:'Inter',sans-serif;box-sizing:border-box" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='rgba(255,255,255,.15)'" onkeydown="if(event.key==='Enter')saveFlowModal()">
+    <div id="flow-modal-error" style="color:var(--red);font-size:11px;margin-bottom:10px;display:none"></div>
+    <div style="display:flex;gap:10px">
+      <button onclick="saveFlowModal()" class="btn-add" style="flex:1">Сохранить</button>
+      <button onclick="closeFlowModal()" style="padding:9px 18px;border-radius:26px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);color:rgba(255,255,255,.7);cursor:pointer;font-size:12px;font-family:'Inter',sans-serif">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<div class="day-modal-overlay" id="day-modal" style="display:none" onclick="if(event.target===this)closeDayModal()">
+  <div class="day-modal">
+    <div class="day-modal-title">
+      <span id="day-modal-title">—</span>
+      <button class="modal-close" onclick="closeDayModal()">✕</button>
+    </div>
+    <div id="day-modal-tasks"></div>
+    <div class="add-task-form">
+      <label>Клиент (необязательно)</label>
+      <select id="dm-client-sel-top" onchange="
+        document.getElementById('dm-client-sel').value=this.value;
+        updateFlowSelect();
+        document.getElementById('dm-task-text').focus();
+      " style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:16px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:10px 13px;outline:none;margin-bottom:10px">
+        <option value="">— без клиента —</option>
+      </select>
+      <div id="dm-flow-wrap-top" style="display:none;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);border-radius:16px;padding:10px;margin-bottom:10px">
+        <label style="color:var(--accent);font-size:10px;font-family:var(--mono);letter-spacing:.06em;display:block;margin-bottom:6px">⚡ ВЫСТАВЛЕНИЕ ФЛОУ?</label>
+        <select id="dm-flow-sel-top" style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:14px;color:var(--text);font-family:'Inter',sans-serif;font-size:12px;padding:7px 10px;outline:none;margin-bottom:8px">
+          <option value="">— конкретный флоу —</option>
+        </select>
+        <button type="button" onclick="document.getElementById('dm-flow-sel-top').value='__all__';document.getElementById('dm-flow-sel').value='__all__'" style="width:100%;padding:8px;border-radius:14px;border:1px solid rgba(var(--accent-rgb),.4);background:rgba(var(--accent-rgb),.15);color:var(--accent);font-size:12px;font-family:'Inter',sans-serif;font-weight:600;cursor:pointer">⚡ Выставить все флоу</button>
+      </div>
+      <label>Задача</label>
+      <input type="text" id="dm-task-text" placeholder="Что нужно сделать..." autocomplete="off" onkeydown="if(event.key==='Enter')addDayTask()">
+      <select id="dm-client-sel" style="display:none"></select>
+      <div id="dm-flow-wrap" style="display:none"><select id="dm-flow-sel"></select></div>
+      <label style="display:flex;justify-content:space-between"><span>До какого числа</span><span style="color:var(--text3);font-size:10px;font-family:'JetBrains Mono',monospace">за какие даты, необязательно</span></label>
+      <input type="date" id="dm-until" style="color-scheme:dark">
+      <label style="display:flex;justify-content:space-between"><span>⏳ Дедлайн</span><span style="color:var(--text3);font-size:10px;font-family:'JetBrains Mono',monospace">не краснеет до этой даты</span></label>
+      <input type="date" id="dm-deadline" style="color-scheme:dark">
+      <label>Время дня</label>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button type="button" data-tod="morning" onclick="_setTod(this)" class="tod-btn">🌅 утро</button>
+        <button type="button" data-tod="day"     onclick="_setTod(this)" class="tod-btn">☀️ день</button>
+        <button type="button" data-tod="evening" onclick="_setTod(this)" class="tod-btn">🌇 вечер</button>
+        <button type="button" data-tod="night"   onclick="_setTod(this)" class="tod-btn">🌙 ночь</button>
+      </div>
+      <div id="night-day-toggle" style="display:none;gap:6px;margin-bottom:8px">
+        <button type="button" data-nday="0" onclick="_setNightDay(this)" class="tod-btn active">эту ночь</button>
+        <button type="button" data-nday="1" onclick="_setNightDay(this)" class="tod-btn">следующую ночь</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div style="flex:1">
+          <label style="margin-bottom:4px;display:block">С</label>
+          <input type="time" id="dm-time-from" oninput="_checkTimeNight(this.value)" style="width:100%;color-scheme:dark;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:16px;color:var(--text);font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box">
+        </div>
+        <div style="padding-top:18px;color:var(--text3)">—</div>
+        <div style="flex:1">
+          <label style="margin-bottom:4px;display:block">До</label>
+          <input type="time" id="dm-time-to" style="width:100%;color-scheme:dark;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:16px;color:var(--text);font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box">
+        </div>
+      </div>
+      <label>Заметка (необязательно)</label>
+      <textarea id="dm-note" placeholder="доп. инфо..."></textarea>
+      <button class="btn-add" onclick="addDayTask()" style="width:100%">+ добавить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit task modal -->
+<div id="edit-task-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);align-items:center;justify-content:center">
+  <div style="background:var(--bg2);border:1px solid rgba(255,255,255,.12);border-radius:26px;padding:24px;width:min(480px,92vw);max-height:90vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h2 style="font-size:17px;font-weight:700;margin:0">Редактировать задачу</h2>
+      <button onclick="closeEditTask()" style="background:rgba(255,255,255,.08);border:none;border-radius:50%;width:32px;height:32px;color:var(--text2);cursor:pointer;font-size:18px">×</button>
+    </div>
+    <label class="dm-label">Задача</label>
+    <input id="et-text" type="text" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:16px;color:var(--text);font-size:13px;padding:9px 12px;outline:none;font-family:Inter,sans-serif;margin-bottom:14px" placeholder="Что нужно сделать...">
+    <label class="dm-label">Клиент</label>
+    <select id="et-client" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:16px;color:var(--text);font-size:13px;padding:9px 12px;outline:none;font-family:Inter,sans-serif;margin-bottom:14px">
+      <option value="">— без клиента —</option>
+    </select>
+    <label class="dm-label">Время дня</label>
+    <div style="display:flex;gap:6px;margin-bottom:14px">
+      <button type="button" data-tod="morning" onclick="_etSetTod(this)" class="tod-btn">🌅 утро</button>
+      <button type="button" data-tod="day"     onclick="_etSetTod(this)" class="tod-btn">☀️ день</button>
+      <button type="button" data-tod="evening" onclick="_etSetTod(this)" class="tod-btn">🌇 вечер</button>
+      <button type="button" data-tod="night"   onclick="_etSetTod(this)" class="tod-btn">🌙 ночь</button>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:14px">
+      <div style="flex:1"><label class="dm-label">С</label><input type="time" id="et-from" style="width:100%;color-scheme:dark;box-sizing:border-box;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:16px;color:var(--text);font-size:13px;padding:9px 12px;outline:none;font-family:Inter,sans-serif;margin-bottom:14px"></div>
+      <div style="align-self:flex-end;padding-bottom:11px;color:var(--text3)">—</div>
+      <div style="flex:1"><label class="dm-label">До</label><input type="time" id="et-to" style="width:100%;color-scheme:dark;box-sizing:border-box;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:16px;color:var(--text);font-size:13px;padding:9px 12px;outline:none;font-family:Inter,sans-serif;margin-bottom:14px"></div>
+    </div>
+    <label class="dm-label">До какого числа <span style="color:var(--text3);font-size:10px;font-family:var(--mono)">за какие даты, необязательно</span></label>
+    <input type="date" id="et-until" style="width:100%;color-scheme:dark;box-sizing:border-box;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:16px;color:var(--text);font-size:13px;padding:9px 12px;outline:none;font-family:Inter,sans-serif;margin-bottom:14px">
+    <label class="dm-label">⏳ Дедлайн <span style="color:var(--text3);font-size:10px;font-family:var(--mono)">не краснеет до этой даты</span></label>
+    <input type="date" id="et-deadline" style="width:100%;color-scheme:dark;box-sizing:border-box;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:16px;color:var(--text);font-size:13px;padding:9px 12px;outline:none;font-family:Inter,sans-serif;margin-bottom:14px">
+    <label class="dm-label">Заметка</label>
+    <textarea id="et-note" rows="2" placeholder="необязательно" style="width:100%;box-sizing:border-box;margin-bottom:18px;resize:vertical;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:16px;color:var(--text);font-size:13px;padding:9px 12px;outline:none;font-family:Inter,sans-serif;margin-bottom:14px"></textarea>
+    <div style="display:flex;gap:10px">
+      <button onclick="saveEditTask()" class="btn-add" style="flex:1">Сохранить</button>
+      <button onclick="closeEditTask()" style="flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:18px;color:var(--text2);cursor:pointer;font-family:Inter,sans-serif;font-size:13px">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<!-- Calendar modal -->
+<div class="modal-overlay" id="cal-modal" style="display:none" onclick="if(event.target===this)closeCal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="cal-title">—</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px;font-family:var(--mono)" id="cal-stats"></div>
+      </div>
+      <button class="modal-close" onclick="closeCal()">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap" id="cal-legend"></div>
+    <div id="cal-body"></div>
+  </div>
+</div>
+
+<div class="month-bar" id="month-bar"></div>
+<script src="js/core.js"></script>
+<script src="js/state.js"></script>
+<script src="js/views.js"></script>
+<script src="js/planner.js"></script>
+<script src="js/finance-clients.js"></script>
+<script src="js/flows.js"></script>
+<script src="js/clients-calendar.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/pending-inject.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

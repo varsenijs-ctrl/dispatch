@@ -1,0 +1,107 @@
+const MONO="font-family:var(--mono)";
+
+const _TODAY_FIXED = null; // unused, kept for reference
+
+// ── Small shared helpers ─────────────────────────────────────
+// Escape user-supplied text before injecting into innerHTML (prevents broken
+// layout / HTML injection from client names, notes, task text, flow names…).
+function esc(s){
+  return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+// Local-timezone YYYY-MM-DD. NOT toISOString(), which converts to UTC and can
+// land on the wrong day for users east of UTC (this app targets UTC+3).
+function toISO(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+// A task is overdue when it's not done and its due day has already passed.
+// «дедлайн» (if set) postpones the red until that date; otherwise the task's
+// own day counts. The «до …» field is only a label and never affects this.
+function _overdue(t){
+  if(!t || t.done) return false;
+  var due = t.deadline ? t.deadline : t.startIso;
+  return due < isoToday();
+}
+
+// ── Data export/import ───────────────────────────────────────
+function exportData(){
+  var data={};
+  for(var i=0;i<localStorage.length;i++){
+    var k=localStorage.key(i);
+    if(k&&k.startsWith('dc_')) data[k]=localStorage.getItem(k);
+  }
+  var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='dispatch-backup-'+toISO(new Date())+'.json';
+  a.click();
+  showToast('✓ Данные экспортированы');
+}
+function importData(){
+  var input=document.createElement('input');
+  input.type='file';input.accept='.json';
+  input.onchange=function(e){
+    var file=e.target.files[0];if(!file)return;
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      try{
+        var data=JSON.parse(ev.target.result);
+        var count=0;
+        Object.keys(data).forEach(function(k){
+          if(k.startsWith('dc_')){localStorage.setItem(k,data[k]);count++;}
+        });
+        showToast('✓ Импортировано '+count+' ключей');
+        setTimeout(function(){location.reload();},800);
+      }catch(ex){showToast('Ошибка импорта');}
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+function getTODAY(){ return new Date(); }
+const DAYS_RU = ['вс','пн','вт','ср','чт','пт','сб'];
+const MONTHS_RU = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+const MONTHS_SHORT = MONTHS_RU;
+
+function fmtDate(d){ return d.getDate().toString().padStart(2,'0')+'.'+( d.getMonth()+1).toString().padStart(2,'0')+'.'+d.getFullYear(); }
+function todayKey(){ return fmtDate(getTODAY()); }
+function monthKey(d){ return d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0'); }
+
+function getMonths(){try{return JSON.parse(localStorage.getItem('dc_months')||'[]');}catch{return [];}}
+function saveMonths(m){localStorage.setItem('dc_months',JSON.stringify(m));}
+function getActiveMonth(){
+  const stored=localStorage.getItem('dc_active_month');
+  if(stored && stored !== 'null') return stored;
+  const months = getMonths();
+  const mk = months.length ? months[0] : (new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'));
+  localStorage.setItem('dc_active_month', mk);
+  return mk;
+}
+function setActiveMonth(mk){localStorage.setItem('dc_active_month',mk);}
+
+let activeMonth = getActiveMonth();
+
+function load(k,def){
+  try{ return JSON.parse(localStorage.getItem(k+'__'+activeMonth))??def; }catch{ return def; }
+}
+function save(k,v){ localStorage.setItem(k+'__'+activeMonth,JSON.stringify(v)); }
+
+function gload(k,def){ try{ return JSON.parse(localStorage.getItem(k))??def; }catch{ return def; } }
+function gsave(k,v){ localStorage.setItem(k,JSON.stringify(v)); }
+
+// ── one-time migration: legacy un-namespaced keys → current-month namespace ──
+(function(){
+  const OLD_KEYS = ['dc_clients','dc_log','dc_history','dc_plans','dc_plantasks','dc_manual_done','dc_sms_days','dc_pay_disabled','dc_flows'];
+  const TARGET = '2026-06';
+  let migrated = false;
+  OLD_KEYS.forEach(k=>{
+    const old = localStorage.getItem(k);
+    const newKey = k+'__'+TARGET;
+    if(old !== null && localStorage.getItem(newKey) === null){
+      localStorage.setItem(newKey, old);
+      migrated = true;
+    }
+  });
+  if(migrated) console.log('Migrated old data to 2026-06 namespace');
+})();

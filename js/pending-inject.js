@@ -11,27 +11,118 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-06-24T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-06-29T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
-    { "id": "869dwqdjw", "name": "macrobeauty - Jul-2026 - Campaigns - Build", "list": "Imported From Trello", "due": "1783468800000" },
-    { "id": "869dw2j9e", "name": "Orvia Labs - Delivery Flow - Build", "list": "Orvia Labs", "due": "1783296000000" },
-    { "id": "869dwq75b", "name": "pokesource - Jul-2026 - Campaigns - Build", "list": "Imported From Trello", "due": "1783123200000" },
-    { "id": "869dwq4jg", "name": "Wild Harvest© - Jul-2026 - Campaigns - Build", "list": "Wild Harvest©", "due": "1783123200000" },
-    { "id": "869dw49b1", "name": "BikerVision - Jul-2026 - Campaigns - Build", "list": "Imported From Trello", "due": "1783123200000" },
-    { "id": "869dwpwcv", "name": "Nexova | Publish emails", "list": "Nexova", "due": "1782939600000" },
-    { "id": "869dw4aqx", "name": "Lemeli - Flows (Retainer) -Build", "list": "Imported From Trello", "due": "1782864000000" },
-    { "id": "869dwq4pr", "name": "WildHarvest: Trustpilot email in Post Purchase - Build", "list": "Wild Harvest©", "due": "1782777600000" },
-    { "id": "869dwg3q6", "name": "Nevo | Publish emails", "list": "Nevo", "due": "1782680400000" },
-    { "id": "869dv4g94", "name": "[BikerVision] Campaigns | July | Build", "list": "BikerVision", "due": "1782691200000" },
-    { "id": "869dw2b73", "name": "Spicylab | Publish emails", "list": "Spicylab", "due": "1782522000000" },
-    { "id": "869dw2b0v", "name": "Healthy Living Co | Publish emails", "list": "Healthy Living Co", "due": "1782522000000" },
-    { "id": "869dnvbqk", "name": "RISE - Jul-2026 - Campaigns", "list": "RISE", "due": "1782435600000" },
-    { "id": "869dnvbkm", "name": "Lunavo - Jul-2026 - Campaigns", "list": "Lunavo", "due": "1782435600000" },
-    { "id": "869dnvbjr", "name": "Kerablend - Jul-2026 - Campaigns", "list": "Kerablend", "due": "1782428400000" },
-    { "id": "869du5dry", "name": "[BikerVision] Campaigns | June | Build", "list": "BikerVision", "due": "1782259200000" },
-    { "id": "869d98zyj", "name": "Bloomie Blankets: welcome flow разделить на 4 paths", "list": "BloomieBlankets", "due": "1782262800000" }
+    {
+      "id": "869du5dry",
+      "name": "[BikerVision] Campaigns | June | Build",
+      "list": "BikerVision",
+      "due": "1782259200000"
+    },
+    {
+      "id": "869d98zyj",
+      "name": "Bloomie Blankets: welcome flow разделить на 4 paths",
+      "list": "BloomieBlankets",
+      "due": "1782262800000"
+    },
+    {
+      "id": "869dnvbjr",
+      "name": "Kerablend - Jul-2026 - Campaigns",
+      "list": "Kerablend",
+      "due": "1782428400000"
+    },
+    {
+      "id": "869dnvbqk",
+      "name": "RISE - Jul-2026 - Campaigns",
+      "list": "RISE",
+      "due": "1782435600000"
+    },
+    {
+      "id": "869dnvbkm",
+      "name": "Lunavo - Jul-2026 - Campaigns",
+      "list": "Lunavo",
+      "due": "1782435600000"
+    },
+    {
+      "id": "869dw2b73",
+      "name": "Spicylab | Publish emails",
+      "list": "Spicylab",
+      "due": "1782522000000"
+    },
+    {
+      "id": "869dwg3q6",
+      "name": "Nevo | Publish emails",
+      "list": "Nevo",
+      "due": "1782680400000"
+    },
+    {
+      "id": "869dv4g94",
+      "name": "[BikerVision] Campaigns | July | Build",
+      "list": "BikerVision",
+      "due": "1782691200000"
+    },
+    {
+      "id": "869dwq4pr",
+      "name": "WildHarvest: Trustpilot email in Post Purchase - Build",
+      "list": "Wild Harvest©",
+      "due": "1782777600000"
+    },
+    {
+      "id": "869dw4aqx",
+      "name": "Lemeli - Flows (Retainer) -Build",
+      "list": "Imported From Trello",
+      "due": "1782864000000"
+    },
+    {
+      "id": "869dwpwcv",
+      "name": "Nexova | Publish emails",
+      "list": "Nexova",
+      "due": "1782939600000"
+    },
+    {
+      "id": "869dnvbhd",
+      "name": "LifeList Lab - Jul-2026 - Campaigns",
+      "list": "LifeList Lab",
+      "due": "1782954000000"
+    },
+    {
+      "id": "869dwq75b",
+      "name": "pokesource - Jul-2026 - Campaigns - Build",
+      "list": "Imported From Trello",
+      "due": "1783123200000"
+    },
+    {
+      "id": "869dwq4jg",
+      "name": "Wild Harvest© - Jul-2026 - Campaigns - Build",
+      "list": "Wild Harvest©",
+      "due": "1783123200000"
+    },
+    {
+      "id": "869dw49b1",
+      "name": "BikerVision - Jul-2026 - Campaigns - Build",
+      "list": "Imported From Trello",
+      "due": "1783123200000"
+    },
+    {
+      "id": "869dw2j9e",
+      "name": "Orvia Labs - Delivery Flow - Build",
+      "list": "Orvia Labs",
+      "due": "1783296000000"
+    },
+    {
+      "id": "869dwqdjw",
+      "name": "macrobeauty - Jul-2026 - Campaigns - Build",
+      "list": "Imported From Trello",
+      "due": "1783468800000"
+    },
+    {
+      "id": "869dwqdpy",
+      "name": "Garden's Pulse - Campaigns - July - Build",
+      "list": "Imported From Trello",
+      "due": "1783641600000"
+    }
   ]/*RAW_END*/;
 
   // ── once-per-batch guard ──

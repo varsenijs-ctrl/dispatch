@@ -149,16 +149,30 @@
   var clientList = Object.values(clientMap);
 
   function norm(s){ return (s||'').toLowerCase().replace(/[^a-z0-9а-я]/gi,''); }
-  // find the Dispatch client whose name appears in the task name or its list (longest wins)
+  function bigrams(s){ s=norm(s); var b=[]; for(var i=0;i<s.length-1;i++) b.push(s.slice(i,i+2)); return b; }
+  // Sørensen–Dice similarity 0..1 (tolerant to spelling/spacing/typos)
+  function dice(a,b){
+    var A=bigrams(a), B=bigrams(b); if(!A.length||!B.length) return 0;
+    var m={}; A.forEach(function(g){ m[g]=(m[g]||0)+1; });
+    var inter=0; B.forEach(function(g){ if(m[g]>0){ inter++; m[g]--; } });
+    return 2*inter/(A.length+B.length);
+  }
+  // the client part of a ClickUp title (before the first "- | : [ ]")
+  function firstSeg(name){ var p=(name||'').split(/[-|:\[\]]/); for(var i=0;i<p.length;i++){ if(p[i].trim()) return p[i].trim(); } return name||''; }
+  // find the best Dispatch client: exact substring wins; otherwise fuzzy match
+  // the title's client-part / list name (so variants & typos still resolve).
   function matchClient(name, list){
     var hay = norm(name) + '|' + norm(list);
-    var best = null, bestLen = 0;
+    var seg = firstSeg(name);
+    var best = null, bestScore = 0;
     clientList.forEach(function(c){
-      var n = norm(c.name);
-      if(n.length < 3) return;
-      if(hay.indexOf(n) >= 0 && n.length > bestLen){ best = c; bestLen = n.length; }
+      var n = norm(c.name); if(n.length < 3) return;
+      var score;
+      if(hay.indexOf(n) >= 0) score = 1 + n.length/1000;                 // contained → strong (longer wins)
+      else score = Math.max(dice(seg, c.name), dice(list, c.name), dice(name, c.name));
+      if(score > bestScore){ bestScore = score; best = c; }
     });
-    return best;
+    return bestScore >= 0.62 ? best : null;   // ~1 for substring, ≥0.62 for fuzzy
   }
   function cleanText(s){
     return (s||'')
@@ -168,47 +182,64 @@
       .trim();
   }
   function stripName(text, name){
+    // 1) exact occurrence anywhere — handles "[BikerVision] …", "Nevo | …"
     var lt = text.toLowerCase(), ln = name.toLowerCase();
     var i = lt.indexOf(ln);
-    if(i < 0) return cleanText(text);
-    var out = text.slice(0, i) + text.slice(i + name.length);
-    return cleanText(out) || cleanText(text);
+    if(i >= 0){ var out = text.slice(0, i) + text.slice(i + name.length); return cleanText(out) || cleanText(text); }
+    // 2) fuzzy LEADING mention — handles spacing/punct diffs like
+    //    "Bloomie Blankets:" ↔ "BloomieBlankets", "WildHarvest:" ↔ "Wild Harvest©"
+    var nn = norm(name);
+    if(nn){
+      var consumed = '', j = 0;
+      while(j < text.length && norm(consumed).length < nn.length){ consumed += text[j]; j++; }
+      if(norm(consumed) === nn){ var rest = cleanText(text.slice(j)); if(rest) return rest; }
+    }
+    return cleanText(text);
   }
 
-  // tasks already injected before (any month) — dedupe by ClickUp id
-  var seen = {};
+  // ── existing tasks: dedupe by ClickUp id (all months) + by text+client per month ──
+  var seenIds = {}, monthTexts = {};
   Object.keys(localStorage).filter(function(k){return k.indexOf('dc_plantasks__')===0;}).forEach(function(k){
-    try { Object.values(JSON.parse(localStorage.getItem(k)||'{}')).forEach(function(t){ if(t&&t.injectId) seen[t.injectId]=1; }); } catch(e){}
+    var m = k.slice('dc_plantasks__'.length);
+    try { Object.values(JSON.parse(localStorage.getItem(k)||'{}')).forEach(function(t){
+      if(!t) return;
+      if(t.injectId) seenIds[t.injectId] = 1;
+      if(!monthTexts[m]) monthTexts[m] = {};
+      monthTexts[m][norm(t.text)+'|'+(t.cid||'')] = 1;
+    }); } catch(e){}
   });
 
-  var TASKS_KEY = 'dc_plantasks__' + MONTH;
-  var tasks = {};
-  try { tasks = JSON.parse(localStorage.getItem(TASKS_KEY)||'{}'); } catch(e){}
+  // place each task into the month of its DEADLINE, so it shows up where you
+  // actually work (June tasks in June, July in July) — not all dumped in one month
+  function firstDay(m){ return m + '-01'; }
+  function lastDay(m){ var p=m.split('-'); var d=new Date(Number(p[0]), Number(p[1]), 0); return m+'-'+_p(d.getDate()); }
+  function startFor(m){ var tm=TODAY_ISO.slice(0,7); return tm===m ? TODAY_ISO : (TODAY_ISO<firstDay(m) ? firstDay(m) : lastDay(m)); }
+  var buckets = {};
+  function bucket(m){ if(!buckets[m]){ try{ buckets[m]=JSON.parse(localStorage.getItem('dc_plantasks__'+m)||'{}'); }catch(e){ buckets[m]={}; } } return buckets[m]; }
 
-  var added = 0, matched = 0;
+  var added = 0, matched = 0, perMonth = {};
   RAW.forEach(function(r){
-    if(!r || !r.id || seen[r.id]) return;            // already injected on an earlier day
+    if(!r || !r.id || seenIds[r.id]) return;                  // same ClickUp task already injected
     var c = matchClient(r.name, r.list);
     var deadline = isoFromMs(r.due);
-    var text = c ? stripName(r.name, c.name) : r.name;
-    if(!text) text = r.name;
+    var month = deadline ? deadline.slice(0,7) : TODAY_ISO.slice(0,7);
+    var startIso = startFor(month);
+    var text = c ? stripName(r.name, c.name) : r.name; if(!text) text = r.name;
+    var key = norm(text)+'|'+(c?c.id:'');
+    if(monthTexts[month] && monthTexts[month][key]) return;    // identical task already in that month
     var id = 'inject_' + r.id;
-    var hint = (r.list && r.list !== 'Imported From Trello') ? r.list : (r.name.split(/[-|:[\]]/)[0]||'').trim();
-    tasks[id] = {
-      id: id, injectId: r.id,
-      text: text,
-      cid: c ? c.id : '',
-      clientName: c ? c.name : '',
-      startIso: TODAY_ISO,
-      until: deadline || TODAY_ISO,
-      deadline: deadline || '',
-      done: false,
-      note: c ? 'ClickUp' : ('ClickUp: ' + hint)
+    var hint = (r.list && r.list !== 'Imported From Trello') ? r.list : firstSeg(r.name);
+    bucket(month)[id] = {
+      id: id, injectId: r.id, text: text,
+      cid: c ? c.id : '', clientName: c ? c.name : '',
+      startIso: startIso, until: deadline || startIso, deadline: deadline || '',
+      done: false, note: c ? 'ClickUp' : ('ClickUp: ' + hint)
     };
-    seen[r.id] = 1; added++; if(c) matched++;
+    if(!monthTexts[month]) monthTexts[month] = {}; monthTexts[month][key] = 1;
+    seenIds[r.id] = 1; added++; if(c) matched++; perMonth[month] = (perMonth[month]||0) + 1;
   });
 
-  localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+  Object.keys(buckets).forEach(function(m){ localStorage.setItem('dc_plantasks__'+m, JSON.stringify(buckets[m])); });
   localStorage.setItem(INJECT_KEY, '1');
-  console.log('Dispatch ← ClickUp: +' + added + ' tasks (' + matched + ' matched to a client) · batch ' + INJECT_VERSION);
+  console.log('Dispatch ← ClickUp: +'+added+' tasks ('+matched+' matched) → '+JSON.stringify(perMonth)+' · '+INJECT_VERSION);
 })();

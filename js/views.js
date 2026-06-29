@@ -601,25 +601,27 @@ function renderHistory(){
     <div style="display:flex;flex-wrap:wrap;gap:5px">${heat}</div></div>`;
 
   // ── timeline (newest first) ──
-  const chip=(txt,col)=>`<span style="font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:12px;background:${col}1f;color:${col};white-space:nowrap">${esc(txt)}</span>`;
-  isos.forEach(iso=>{
+  // Compact day log (like a browser history): one row per day — date, how much
+  // was done (sent count + a small breakdown) and the day's earnings. No per-email detail.
+  html += `<div style="background:var(--bg2);border:.5px solid var(--glass-border);border-radius:16px;overflow:hidden">`;
+  isos.forEach((iso,idx)=>{
     const D=dayMap[iso];
     const d=new Date(iso+'T00:00:00');
     const isT=iso===isoToday();
-    let lines='';
-    if(D.sent.length)  lines+=`<div style="margin-top:8px"><span style="color:var(--green);font-size:12px;font-weight:600">✓ Отправлено ${D.sent.length}</span><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px">${D.sent.map(n=>chip(n,'rgba(52,211,153,1)')).join('')}</div></div>`;
-    if(D.sms.length)   lines+=`<div style="margin-top:8px"><span style="color:var(--blue);font-size:12px;font-weight:600">📱 SMS ${D.sms.length}</span><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px">${D.sms.map(n=>chip(n,'rgba(96,165,250,1)')).join('')}</div></div>`;
-    if(D.flows.length) lines+=`<div style="margin-top:8px"><span style="color:var(--amber);font-size:12px;font-weight:600">⚡ Флоу ${D.flows.length}</span><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px">${D.flows.map(f=>chip('⚡ '+f.name+(f.client?(' · '+f.client):''),'rgba(251,191,36,1)')).join('')}</div></div>`;
-    if(D.draft.length) lines+=`<div style="margin-top:8px"><span style="color:var(--purple);font-size:12px;font-weight:600">~ Черновики ${D.draft.length}</span><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px">${D.draft.map(n=>chip(n,'rgba(167,139,250,1)')).join('')}</div></div>`;
-    if(D.tasks.length) lines+=`<div style="margin-top:8px"><span style="color:var(--text2);font-size:12px;font-weight:600">📋 Задачи ${D.tasks.length}</span><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px">${D.tasks.map(t=>chip(t.text+(t.client?(' · '+t.client):''),'rgba(255,255,255,.5)')).join('')}</div></div>`;
-    if(D.inv) lines+=`<div style="margin-top:8px"><span style="color:var(--green);font-size:12px;font-weight:600">🧾 Инвойсы: ${D.inv}</span></div>`;
-    html += `<div id="hd-${iso}" style="background:${isT?'rgba(var(--accent-rgb),.06)':'var(--glass)'};border:1px solid ${isT?'rgba(var(--accent-rgb),.25)':'var(--glass-border)'};border-radius:18px;padding:14px 16px;margin-bottom:10px">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;border-bottom:1px solid rgba(255,255,255,.07);padding-bottom:8px">
-        <div style="font-weight:700;font-size:15px;color:${isT?'var(--accent)':'var(--text)'}">${d.getDate()} ${MONTHS_RU?MONTHS_RU[mm-1]:''} <span style="font-family:var(--mono);font-size:11px;color:var(--text3);font-weight:400">${DAYS_RU[d.getDay()]}${isT?' · сегодня':''}</span></div>
-        <div style="font-family:var(--mono);font-size:14px;font-weight:700;color:${D.earned>0?'var(--green)':'var(--text3)'}">$${D.earned.toFixed(2)}</div>
-      </div>${lines||'<div style="margin-top:8px;color:var(--text3);font-size:12px">—</div>'}
+    const bits=[];
+    if(D.sms.length)   bits.push(D.sms.length+' SMS');
+    if(D.flows.length) bits.push(D.flows.length+' ⚡');
+    if(D.draft.length) bits.push(D.draft.length+' черн.');
+    if(D.tasks.length) bits.push(D.tasks.length+' задач');
+    if(D.inv)          bits.push(D.inv+' инв.');
+    const sub = bits.length?` <span style="color:var(--text3);font-family:var(--mono);font-size:11px">· ${bits.join(' · ')}</span>`:'';
+    html += `<div id="hd-${iso}" style="display:flex;align-items:center;gap:12px;padding:13px 15px;${idx<isos.length-1?'border-bottom:.5px solid var(--glass-border);':''}${isT?'background:rgba(var(--accent-rgb),.07)':''}">
+      <div style="min-width:128px;font-family:var(--mono);font-size:12px;color:${isT?'var(--accent)':'var(--text2)'}">${d.getDate()} ${MONTHS_RU[mm-1]} · ${DAYS_RU[d.getDay()]}${isT?' (сегодня)':''}</div>
+      <div style="flex:1;min-width:0"><span style="font-size:16px;font-weight:800;color:var(--green)">${D.sent.length}</span><span style="font-size:12px;color:var(--text3)"> отправлено</span>${sub}</div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:${D.earned>0?'var(--green)':'var(--text3)'}">$${D.earned.toFixed(2)}</div>
     </div>`;
   });
+  html += `</div>`;
   return html;
 }
 

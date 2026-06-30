@@ -125,10 +125,9 @@
     }
   ]/*RAW_END*/;
 
-  // ── once-per-batch guard ──
-  var INJECT_KEY = 'dc_inject_v__' + INJECT_VERSION;
-  if(localStorage.getItem(INJECT_KEY)) return;
-
+  // No once-per-day gate: RAW is re-processed on every load, but any ClickUp id
+  // ever injected (persisted in dc_inject_seen) is skipped — so new tasks always
+  // appear, nothing duplicates, and a task you deleted is not resurrected.
   var _t = new Date();
   var _p = function(n){ return String(n).padStart(2,'0'); };
   var TODAY_ISO = _t.getFullYear()+'-'+_p(_t.getMonth()+1)+'-'+_p(_t.getDate());
@@ -208,6 +207,8 @@
       monthTexts[m][norm(t.text)+'|'+(t.cid||'')] = 1;
     }); } catch(e){}
   });
+  // also skip ClickUp ids injected on earlier days (even if the task was later deleted)
+  try { (JSON.parse(localStorage.getItem('dc_inject_seen')||'[]')||[]).forEach(function(id){ seenIds[id]=1; }); } catch(e){}
 
   // place each task into the month of its DEADLINE, so it shows up where you
   // actually work (June tasks in June, July in July) — not all dumped in one month
@@ -240,6 +241,6 @@
   });
 
   Object.keys(buckets).forEach(function(m){ localStorage.setItem('dc_plantasks__'+m, JSON.stringify(buckets[m])); });
-  localStorage.setItem(INJECT_KEY, '1');
+  localStorage.setItem('dc_inject_seen', JSON.stringify(Object.keys(seenIds)));
   console.log('Dispatch ← ClickUp: +'+added+' tasks ('+matched+' matched) → '+JSON.stringify(perMonth)+' · '+INJECT_VERSION);
 })();

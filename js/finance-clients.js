@@ -3,7 +3,36 @@ let financeSelectedCid=null;let financeScope='all';   // Finance tab always show
 // Single source of truth for earnings totals — used by BOTH Finance and Home so
 // the two earnings blocks always agree. Counts email (yes/draft) + flows +
 // invoices; skips pay-disabled days; SMS days pay the higher rate.
+// read a month-namespaced key for a specific month (not just the active one)
+function _loadM(base, mk, def){ try{ const v=localStorage.getItem(base+'__'+mk); return v==null?def:(JSON.parse(v)??def); }catch(e){ return def; } }
+
+// TRUE all-time totals — aggregate every month bucket (history/sms/invoices) +
+// global flows. Used so Finance & Home show real all-time, not just this month.
+function computeAllTimeTotals(){
+  let earned=0,potential=0,sentCount=0,totalCount=0,invTotal=0;
+  const ac=clients.filter(c=>c.active);
+  const histMonths={}; let allTasks=[];
+  Object.keys(localStorage).forEach(k=>{
+    if(k.indexOf('dc_history__')===0) histMonths[k.slice(12)]=1;
+    if(k.indexOf('dc_plantasks__')===0){ try{ allTasks=allTasks.concat(Object.values(JSON.parse(localStorage.getItem(k)||'{}'))); }catch(e){} }
+    if(k.indexOf('dc_invoices__')===0){ try{ const arr=JSON.parse(localStorage.getItem(k)||'[]'); if(Array.isArray(arr)) arr.forEach(i=>{ invTotal+=i.count*INV_RATE; }); }catch(e){} }
+  });
+  Object.keys(histMonths).forEach(mk=>{
+    const hist=_loadM('dc_history',mk,{}), sms=_loadM('dc_sms_days',mk,{}), dis=_loadM('dc_pay_disabled',mk,{});
+    ac.forEach(c=>{
+      const cidSms=sms[c.id]||{}, cidDis=dis[c.id]||{}, h=hist[c.name]||{};
+      Object.keys(h).forEach(d=>{ const v=h[d]; if(cidDis[d])return; const rate=cidSms[d]?1.00:0.50;
+        if(v==='yes'||v==='draft'){earned+=rate;potential+=rate;sentCount++;totalCount++;} else if(v==='no'){potential+=rate;totalCount++;} });
+    });
+  });
+  ac.forEach(c=>{ getFlows(c.id).forEach(f=>{ const val=f.count*0.60; potential+=val;
+    if(allTasks.some(t=>t.cid===c.id && t.flowId===f.id && t.done)) earned+=val; }); });
+  earned+=invTotal; potential+=invTotal;
+  return {earned,potential,sentCount,totalCount,invTotal};
+}
+
 function computeFinanceTotals(scope){
+  if(scope==='all') return computeAllTimeTotals();
   const mk=monthKey(getTODAY());
   const smsDays=load('dc_sms_days',{});const dis=load('dc_pay_disabled',{});
   let earned=0,potential=0,sentCount=0,totalCount=0;

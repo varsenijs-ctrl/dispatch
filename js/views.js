@@ -465,6 +465,7 @@ function markDoneToday(cid){ _sfx.play('done');
   save('dc_manual_done',manual);
   _undoStack.push({type:'manual_done',cid,prev:false});
   if(_undoStack.length>MAX_UNDO)_undoStack.shift();
+  try{ var _c=clients.find(c=>c.id===cid); if(_c&&typeof _sheetPush==='function') _sheetPush(_c.name, isoToday(), 'yes'); }catch(e){}
   render();
 }
 function undoDoneToday(cid){ _sfx.play('undo');
@@ -473,6 +474,7 @@ function undoDoneToday(cid){ _sfx.play('undo');
   save('dc_manual_done',manual);
   _undoStack.push({type:'manual_done',cid,prev:true});
   if(_undoStack.length>MAX_UNDO)_undoStack.shift();
+  try{ var _c=clients.find(c=>c.id===cid); if(_c&&typeof _sheetPush==='function') _sheetPush(_c.name, isoToday(), ''); }catch(e){}
   render();
 }
 

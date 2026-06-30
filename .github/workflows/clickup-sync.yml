@@ -30,7 +30,7 @@ jobs:
         env:
           CLICKUP_TOKEN: ${{ secrets.CLICKUP_TOKEN }}
           CLICKUP_TEAM_ID: ${{ secrets.CLICKUP_TEAM_ID }}   # optional, defaults below
-          SYNC_DAYS_AHEAD: '12'                              # how far ahead to pull
+          SYNC_DAYS_AHEAD: '40'                              # how far ahead to pull (covers ~the next month)
         run: node scripts/clickup-sync.mjs
 
       - name: Commit & push if changed

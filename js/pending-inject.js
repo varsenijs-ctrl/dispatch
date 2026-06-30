@@ -204,11 +204,8 @@
   // also skip ClickUp ids injected on earlier days (even if the task was later deleted)
   try { (JSON.parse(localStorage.getItem('dc_inject_seen')||'[]')||[]).forEach(function(id){ seenIds[id]=1; }); } catch(e){}
 
-  // place each task into the month of its DEADLINE, so it shows up where you
-  // actually work (June tasks in June, July in July) — not all dumped in one month
-  function firstDay(m){ return m + '-01'; }
-  function lastDay(m){ var p=m.split('-'); var d=new Date(Number(p[0]), Number(p[1]), 0); return m+'-'+_p(d.getDate()); }
-  function startFor(m){ var tm=TODAY_ISO.slice(0,7); return tm===m ? TODAY_ISO : (TODAY_ISO<firstDay(m) ? firstDay(m) : lastDay(m)); }
+  // place each task ON ITS DEADLINE DAY, in that day's month (June tasks in June,
+  // July in July) — so the planner reads like a real schedule.
   var buckets = {};
   function bucket(m){ if(!buckets[m]){ try{ buckets[m]=JSON.parse(localStorage.getItem('dc_plantasks__'+m)||'{}'); }catch(e){ buckets[m]={}; } } return buckets[m]; }
 
@@ -217,8 +214,8 @@
     if(!r || !r.id || seenIds[r.id]) return;                  // same ClickUp task already injected
     var c = matchClient(r.name, r.list);
     var deadline = isoFromMs(r.due);
-    var month = deadline ? deadline.slice(0,7) : TODAY_ISO.slice(0,7);
-    var startIso = startFor(month);
+    var startIso = deadline || TODAY_ISO;          // task sits on its deadline day
+    var month = startIso.slice(0,7);               // …in that day's month
     var text = c ? stripName(r.name, c.name) : r.name; if(!text) text = r.name;
     var key = norm(text)+'|'+(c?c.id:'');
     if(monthTexts[month] && monthTexts[month][key]) return;    // identical task already in that month

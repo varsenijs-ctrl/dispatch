@@ -13,7 +13,7 @@ function renderPlanner(){
     const isToday=iso===isoToday();const dayTasks=byDate[iso]||[];
     const show=dayTasks.slice(0,3);const more=dayTasks.length-3;
     const overdueCount = dayTasks.filter(_overdue).length;
-    html+=`<div class="pcal-cell${isToday?' today':''}${dayTasks.length?' has-tasks':''}" onclick="openDayModal('${iso}')" style="${overdueCount?'border-color:rgba(255,69,58,.3);background:rgba(255,69,58,.04)':''}"><div class="pcal-cell-num" style="${overdueCount?'color:var(--red)':''}">${d}${overdueCount?` <span style="font-size:9px">⚠</span>`:''}</div>${show.map(t=>`<div class="pcal-pill ${_overdue(t)?'type-overdue':'type-plan'}" title="${esc(t.text||t.name)}">${esc((t.text||t.name).slice(0,12))}</div>`).join('')}${more>0?`<div class="pcal-pill type-more">+${more}</div>`:''}</div>`;
+    html+=`<div class="pcal-cell${isToday?' today':''}${overdueCount?' overdue':''}${dayTasks.length?' has-tasks':''}" onclick="openDayModal('${iso}')" style="${overdueCount?'border-color:rgba(255,69,58,.3);background:rgba(255,69,58,.04)':''}"><div class="pcal-cell-num" style="${overdueCount?'color:var(--red)':''}">${d}${overdueCount?` <span style="font-size:9px">⚠</span>`:''}</div>${show.map(t=>`<div class="pcal-pill ${_overdue(t)?'type-overdue':'type-plan'}" title="${esc(t.text||t.name)}">${esc((t.text||t.name).slice(0,12))}</div>`).join('')}${more>0?`<div class="pcal-pill type-more">+${more}</div>`:''}</div>`;
   }
   html+=`</div>`;return html;
 }

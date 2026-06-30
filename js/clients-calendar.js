@@ -119,7 +119,7 @@ function undoLastCalendarChange(){ _sfx.play('undo');
   const entry=_undoStack.pop();
   if(entry.type==='manual_done'){const manual=load('dc_manual_done',{});if(entry.prev===true)manual[entry.cid]=true;else delete manual[entry.cid];save('dc_manual_done',manual);showToast('↩ Галочка отменена');}
   else if(entry.type==='delete_client'){clients.push(entry.snapshot);if(entry.histSnapshot)historyData[entry.snapshot.name]=entry.histSnapshot;saveAll();showToast('↩ Клиент восстановлен');}
-  else{const{cid,name,iso,prev}=entry;if(!historyData[name])historyData[name]={};if(prev===''||prev===undefined)delete historyData[name][iso];else historyData[name][iso]=prev;saveAll();if(calCurrentCid===cid)renderCalModal(cid);showToast('↩ Отменено');}
+  else{const{cid,name,iso,prev}=entry;if(!historyData[name])historyData[name]={};if(prev===''||prev===undefined)delete historyData[name][iso];else historyData[name][iso]=prev;saveAll();try{ if(typeof _sheetPush==='function') _sheetPush(name, iso, (prev===''||prev===undefined)?'':prev); }catch(e){}if(calCurrentCid===cid)renderCalModal(cid);showToast('↩ Отменено');}
   updateSidebar();render();
 }
 function showToast(msg){
@@ -135,7 +135,9 @@ function cycleCalDay(cid,iso){ _sfx.play('click');
   const cycle=['','yes','draft','no'];const next=cycle[(cycle.indexOf(prev)+1)%cycle.length];
   _undoStack.push({cid,name:c.name,iso,prev});if(_undoStack.length>MAX_UNDO)_undoStack.shift();
   if(next==='')delete historyData[c.name][iso];else historyData[c.name][iso]=next;
-  saveAll();renderCalModal(cid);updateSidebar();
+  saveAll();
+  try{ if(typeof _sheetPush==='function') _sheetPush(c.name, iso, next); }catch(e){}   // → Google Sheet
+  renderCalModal(cid);updateSidebar();
 }
 function closeCal(){ _sfx.play('close');document.getElementById('cal-modal').style.display='none';}
 

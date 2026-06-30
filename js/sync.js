@@ -198,6 +198,7 @@ function sheetPushAll(){
 function saveSheetUrl(){
   const v=(document.getElementById('sheet-sync-url')||{}).value||'';
   gsave('dc_sheet_sync_url', v.trim());
+  if(typeof _cacheInvalidate==='function') _cacheInvalidate();   // gsave doesn't bump the view cache
   showToast(v.trim()?'✓ URL таблицы сохранён':'URL очищен');
   render();
 }

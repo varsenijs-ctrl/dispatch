@@ -334,21 +334,21 @@ function renderDayToday(){
   const tasks=load('dc_plantasks',{});
   const todEmoji={morning:'🌅',day:'☀️',evening:'🌇',night:'🌙'};
 
-  // ── sort every task into ONE mutually-exclusive group ──
-  const G={overdue:[],today:[],deadline:[],next:[]}; const done=[];
+  // ── time-based buckets (mutually exclusive) + a cross-cutting «с дедлайном» lens ──
+  const due=t=>t.deadline||t.startIso;
+  const G={overdue:[],today:[],next:[]}; const done=[]; const withDeadline=[];
   Object.values(tasks).forEach(t=>{
     if(t.done){ if(t.doneDate===iso||t.startIso===iso) done.push(t); return; }
+    if(t.deadline) withDeadline.push(t);                       // lens: any task that has a deadline
     if(_overdue(t)) G.overdue.push(t);
-    else if(t.startIso===iso) G.today.push(t);
-    else if(t.deadline && t.deadline>=iso) G.deadline.push(t);
-    else if(t.startIso>iso) G.next.push(t);
+    else if(t.startIso===iso || t.deadline===iso) G.today.push(t);
+    else G.next.push(t);                                       // everything else upcoming (with or without a deadline)
   });
-  const due=t=>t.deadline||t.startIso;
   G.overdue.sort((a,b)=>due(a).localeCompare(due(b)));
   G.today.sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
-  G.deadline.sort((a,b)=>(a.deadline||'').localeCompare(b.deadline||''));
-  G.next.sort((a,b)=>a.startIso.localeCompare(b.startIso));
-  const totalPending=G.overdue.length+G.today.length+G.deadline.length+G.next.length;
+  G.next.sort((a,b)=>due(a).localeCompare(due(b)));
+  withDeadline.sort((a,b)=>(a.deadline||'').localeCompare(b.deadline||''));
+  const totalPending=G.overdue.length+G.today.length+G.next.length;
 
   let html=`<div class="section-header"><h2>Сегодня — ${fmtDate(d)}, ${DAYS_RU[d.getDay()]}</h2><button class="toggle-btn" style="font-size:10px;padding:3px 10px" onclick="openDayModal('${iso}')">+ задача</button></div>`;
 
@@ -357,7 +357,7 @@ function renderDayToday(){
     {k:'all',      label:'Все',         n:totalPending},
     {k:'overdue',  label:'Просрочено',  n:G.overdue.length},
     {k:'today',    label:'Сегодня',     n:G.today.length},
-    {k:'deadline', label:'С дедлайном', n:G.deadline.length},
+    {k:'deadline', label:'С дедлайном', n:withDeadline.length},
     {k:'next',     label:'Следующие',   n:G.next.length},
   ];
   if(!FILTERS.some(f=>f.k===todayFilter)) todayFilter='all';
@@ -396,22 +396,18 @@ function renderDayToday(){
       <button onclick="event.stopPropagation();removeDayTask('${t.id}');render()" title="Удалить" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:2px 3px">✕</button>
     </div>`;
   }
+  // «Все» shows time-based groups; «С дедлайном» is a cross-cutting lens (its tab)
   const GROUPS=[
-    {k:'overdue',  title:'⚠ Просрочено',   col:'var(--red)'},
-    {k:'today',    title:'📌 Сегодня',      col:'var(--green)'},
-    {k:'deadline', title:'⏳ С дедлайном',  col:'var(--amber)'},
-    {k:'next',     title:'→ Следующие дни', col:'var(--blue)'},
+    {arr:G.overdue, title:'⚠ Просрочено',   col:'var(--red)'},
+    {arr:G.today,   title:'📌 Сегодня',      col:'var(--green)'},
+    {arr:G.next,    title:'→ Следующие дни', col:'var(--blue)'},
   ];
-  function groupBlock(g){
-    const arr=G[g.k]; if(!arr.length) return '';
-    return `<div style="font-family:var(--mono);font-size:10px;color:${g.col};letter-spacing:.08em;text-transform:uppercase;margin:16px 0 8px">${g.title} — ${arr.length}</div>`+arr.map(taskRow).join('');
-  }
 
   if(todayFilter==='all'){
-    GROUPS.forEach(g=>{ html+=groupBlock(g); });
+    GROUPS.forEach(g=>{ if(g.arr.length) html+=`<div style="font-family:var(--mono);font-size:10px;color:${g.col};letter-spacing:.08em;text-transform:uppercase;margin:16px 0 8px">${g.title} — ${g.arr.length}</div>`+g.arr.map(taskRow).join(''); });
   } else {
-    const arr=G[todayFilter];
-    if(!arr.length) html+=`<div class="empty" style="padding:40px 20px"><span class="empty-icon">—</span>Здесь пусто.</div>`;
+    const arr = todayFilter==='deadline' ? withDeadline : G[todayFilter];
+    if(!arr || !arr.length) html+=`<div class="empty" style="padding:40px 20px"><span class="empty-icon">—</span>Здесь пусто.</div>`;
     else arr.forEach(t=>{ html+=taskRow(t); });
   }
 

@@ -484,6 +484,7 @@ function setLog(clientName, iso, val){
   if(historyData[clientName][iso]===val) delete historyData[clientName][iso];
   else historyData[clientName][iso]=val;
   saveAll();
+  try{ if(typeof _sheetPush==='function') _sheetPush(clientName, iso, historyData[clientName][iso]||''); }catch(e){}
   render();
 }
 function _setLogCell(el){

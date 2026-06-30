@@ -167,6 +167,59 @@ function renderSyncPanel(){
   </div>`;
 }
 
+/* ═══════════════════════════════════════════════════════
+   Google Sheets push — mirror per-date statuses into a Google Sheet via a
+   user-deployed Apps Script web app. Fire-and-forget (no-cors) so a status
+   tick in Dispatch lands in the sheet's right month tab + client column.
+   ═══════════════════════════════════════════════════════ */
+function _sheetUrl(){ return gload('dc_sheet_sync_url',''); }
+function _sheetPush(client, iso, status){
+  const url=_sheetUrl(); if(!url) return;
+  try{
+    fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({client:client,iso:iso,status:status})});
+  }catch(e){}
+}
+// One-shot backfill: send every recorded status in one bulk request
+function sheetPushAll(){
+  const url=_sheetUrl(); if(!url){ showToast('Сначала укажи URL таблицы'); return; }
+  const bulk=[];
+  // historyData is the active month; gather across all month namespaces
+  Object.keys(localStorage).filter(k=>k.indexOf('dc_history__')===0).forEach(k=>{
+    let obj={}; try{ obj=JSON.parse(localStorage.getItem(k)||'{}'); }catch(e){}
+    Object.keys(obj).forEach(name=>{ const days=obj[name]||{}; Object.keys(days).forEach(iso=>{ if(days[iso]) bulk.push({client:name,iso:iso,status:days[iso]}); }); });
+  });
+  if(!bulk.length){ showToast('Нет отмеченных статусов'); return; }
+  try{
+    fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({bulk:bulk})});
+    showToast('⬆ Отправил '+bulk.length+' отметок в таблицу');
+  }catch(e){ showToast('Ошибка отправки'); }
+}
+function saveSheetUrl(){
+  const v=(document.getElementById('sheet-sync-url')||{}).value||'';
+  gsave('dc_sheet_sync_url', v.trim());
+  showToast(v.trim()?'✓ URL таблицы сохранён':'URL очищен');
+  render();
+}
+function renderSheetSyncPanel(){
+  const url=esc(_sheetUrl());
+  const on=!!_sheetUrl();
+  return `<div style="border-top:1px solid var(--glass-border2);margin-top:14px;padding-top:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <h3 style="margin:0">Google-таблица (статусы)</h3>
+      <span style="font-size:11px;color:${on?'var(--green)':'var(--text3)'};font-family:var(--mono)">${on?'● подключено':'○ выкл'}</span>
+    </div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.6">Когда отмечаешь статус (yes/draft/no), приложение пишет его в твою Google-таблицу: само находит вкладку месяца и приблизительно — клиента. Нужен URL Apps Script Web App (см. инструкцию).</div>
+    <div style="display:flex;flex-direction:column;gap:8px;max-width:560px">
+      <input id="sheet-sync-url" placeholder="https://script.google.com/macros/s/…/exec" value="${url}" style="background:rgba(255,255,255,.07);border:1px solid var(--glass-border2);color:var(--text);font-family:var(--mono);font-size:11px;padding:9px 12px;border-radius:13px;outline:none">
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
+      <button class="btn-add" onclick="saveSheetUrl()">Сохранить</button>
+      ${on?`<button class="toggle-btn" onclick="sheetPushAll()">⬆ Отправить все статусы</button>`:''}
+    </div>
+  </div>`;
+}
+
 // Startup: if configured, subscribe + pull-if-remote-is-newer + poll
 async function _syncInit(){
   if(!SYNC.enabled()) return;

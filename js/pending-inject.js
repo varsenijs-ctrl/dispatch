@@ -11,7 +11,7 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-06-29T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-06-30T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
@@ -20,42 +20,6 @@
       "name": "[BikerVision] Campaigns | June | Build",
       "list": "BikerVision",
       "due": "1782259200000"
-    },
-    {
-      "id": "869d98zyj",
-      "name": "Bloomie Blankets: welcome flow разделить на 4 paths",
-      "list": "BloomieBlankets",
-      "due": "1782262800000"
-    },
-    {
-      "id": "869dnvbjr",
-      "name": "Kerablend - Jul-2026 - Campaigns",
-      "list": "Kerablend",
-      "due": "1782428400000"
-    },
-    {
-      "id": "869dnvbqk",
-      "name": "RISE - Jul-2026 - Campaigns",
-      "list": "RISE",
-      "due": "1782435600000"
-    },
-    {
-      "id": "869dnvbkm",
-      "name": "Lunavo - Jul-2026 - Campaigns",
-      "list": "Lunavo",
-      "due": "1782435600000"
-    },
-    {
-      "id": "869dw2b73",
-      "name": "Spicylab | Publish emails",
-      "list": "Spicylab",
-      "due": "1782522000000"
-    },
-    {
-      "id": "869dwg3q6",
-      "name": "Nevo | Publish emails",
-      "list": "Nevo",
-      "due": "1782680400000"
     },
     {
       "id": "869dv4g94",
@@ -70,10 +34,10 @@
       "due": "1782777600000"
     },
     {
-      "id": "869dw4aqx",
-      "name": "Lemeli - Flows (Retainer) -Build",
-      "list": "Imported From Trello",
-      "due": "1782864000000"
+      "id": "869dnvbjr",
+      "name": "Kerablend - Jul-2026 - Campaigns",
+      "list": "Kerablend",
+      "due": "1782781200000"
     },
     {
       "id": "869dwpwcv",
@@ -82,10 +46,22 @@
       "due": "1782939600000"
     },
     {
+      "id": "869dw4aqx",
+      "name": "Lemeli - Flows (Retainer) -Build",
+      "list": "Imported From Trello",
+      "due": "1782954000000"
+    },
+    {
       "id": "869dnvbhd",
       "name": "LifeList Lab - Jul-2026 - Campaigns",
       "list": "LifeList Lab",
       "due": "1782954000000"
+    },
+    {
+      "id": "869dnvbkm",
+      "name": "Lunavo - Jul-2026 - Campaigns",
+      "list": "Lunavo",
+      "due": "1783040400000"
     },
     {
       "id": "869dwq75b",
@@ -104,6 +80,24 @@
       "name": "BikerVision - Jul-2026 - Campaigns - Build",
       "list": "Imported From Trello",
       "due": "1783123200000"
+    },
+    {
+      "id": "869dww9xg",
+      "name": "[PokeSource]: Flows: Build",
+      "list": "pokesource",
+      "due": "1783126800000"
+    },
+    {
+      "id": "869dwqejp",
+      "name": "FaithIsMade - Jul-2026 - Campaigns - Build",
+      "list": "Imported From Trello",
+      "due": "1783126800000"
+    },
+    {
+      "id": "869dwqctg",
+      "name": "[FaithIsMade] New Post Purchase Flow: Build",
+      "list": "FaithIsMade",
+      "due": "1783126800000"
     },
     {
       "id": "869dw2j9e",

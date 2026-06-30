@@ -34,7 +34,7 @@ function openDayModal(iso){ _sfx.play('open');
   const ftop=document.getElementById('dm-flow-wrap-top');
   if(ftop) ftop.style.display='none';
   document.getElementById('dm-task-text').value='';
-  document.getElementById('dm-until').value=iso;
+  document.getElementById('dm-until').value=isoToday();   // default «до» = today, always
   const _dmdl=document.getElementById('dm-deadline'); if(_dmdl) _dmdl.value='';
   document.getElementById('dm-note').value='';
   renderDayTasks(iso);
@@ -147,7 +147,8 @@ function removeDayTask(id){_sfx.play('delete');
   if(document.getElementById('day-modal').style.display!=='none')renderDayTasks(currentDayIso);
   render();
 }
-// Move a plan to another day (changes its date in place — no new task created).
+// Move a plan to another day — and, if that day is in another month, relocate the
+// task into that month's «рабочую зону» (its own data bucket), creating the month if needed.
 function moveTask(id,newIso){
   if(!newIso) return;
   const tasks=load('dc_plantasks',{});
@@ -157,8 +158,27 @@ function moveTask(id,newIso){
   t.startIso=newIso;
   if(wasSingleDay) t.until=newIso;          // single-day task follows its date
   else if(t.until<newIso) t.until=newIso;   // keep the deadline, but never before the start
-  save('dc_plantasks',tasks);
   _sfx.play('swipe');
+  const newMonth=newIso.slice(0,7);
+  if(newMonth!==activeMonth){
+    // relocate to the target month's bucket
+    delete tasks[id];
+    save('dc_plantasks',tasks);                                  // current month minus the task (cache+sync handled)
+    const key='dc_plantasks__'+newMonth;
+    let target={}; try{ target=JSON.parse(localStorage.getItem(key)||'{}'); }catch(e){}
+    target[id]=t; localStorage.setItem(key, JSON.stringify(target));
+    // make sure the month shows up in the month bar
+    try{ const ms=getMonths(); if(ms.indexOf(newMonth)<0){ ms.push(newMonth); ms.sort(); saveMonths(ms); } }catch(e){}
+    if(typeof _cacheInvalidate==='function') _cacheInvalidate();
+    if(typeof _syncSchedulePush==='function') _syncSchedulePush();
+    const dm=document.getElementById('day-modal');
+    if(dm && dm.style.display!=='none') renderDayTasks(currentDayIso);
+    renderMonthBar(); render();
+    const mn=MONTHS_RU[parseInt(newMonth.slice(5,7),10)-1]+' '+newMonth.slice(0,4);
+    showToast('📦 Перенесено в «'+mn+'»');
+    return;
+  }
+  save('dc_plantasks',tasks);
   const dm=document.getElementById('day-modal');
   if(dm && dm.style.display!=='none') renderDayTasks(currentDayIso);
   render();

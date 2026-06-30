@@ -1,4 +1,4 @@
-let financeSelectedCid=null;let financeScope='month';
+let financeSelectedCid=null;let financeScope='all';   // Finance tab always shows all-time
 
 // Single source of truth for earnings totals — used by BOTH Finance and Home so
 // the two earnings blocks always agree. Counts email (yes/draft) + flows +
@@ -65,7 +65,7 @@ function renderFinance(){
       <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:16px">${detailHtml}</div>
     </div>`;
   }
-    return `<div style="max-width:860px"><div class="section-header" style="margin-bottom:12px"><h2>Финансы 💰</h2><div style="display:flex;gap:6px"><button onclick="financeScope='month';render()" class="scope-btn ${financeScope==='month'?'active':''}">этот месяц</button><button onclick="financeScope='all';render()" class="scope-btn ${financeScope==='all'?'active':''}">всё время</button></div></div>
+    return `<div style="max-width:860px"><div class="section-header" style="margin-bottom:12px"><h2>Финансы 💰</h2><span style="font-family:var(--mono);font-size:11px;color:var(--text3)">всё время</span></div>
     <div class="earn-card" style="background:linear-gradient(135deg,rgba(var(--accent-rgb),.1),rgba(48,209,88,.05));border:1px solid rgba(var(--accent-rgb),.2);border-radius:22px;padding:18px 22px;margin-bottom:16px;display:flex;gap:28px;align-items:center;flex-wrap:wrap">
       <div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Заработано</div><div style="font-size:30px;font-weight:700;color:var(--green);line-height:1">$${totalWithInv.toFixed(2)}</div></div>
       <div style="width:1px;height:40px;background:rgba(255,255,255,.1)"></div>

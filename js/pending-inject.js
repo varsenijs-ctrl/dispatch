@@ -127,6 +127,21 @@
   var TODAY_ISO = _t.getFullYear()+'-'+_p(_t.getMonth()+1)+'-'+_p(_t.getDate());
   var MONTH = _t.getFullYear()+'-'+_p(_t.getMonth()+1);
 
+  // One-time cleanup: earlier auto-injected tasks used a different placement.
+  // Drop ONLY auto-injected tasks (those with injectId) + the seen-set so every
+  // ClickUp task re-lands on its correct deadline day. Manual tasks are untouched.
+  if(!localStorage.getItem('dc_inject_reset_v2')){
+    Object.keys(localStorage).filter(function(k){return k.indexOf('dc_plantasks__')===0;}).forEach(function(k){
+      try { var o=JSON.parse(localStorage.getItem(k)||'{}'), changed=false;
+        Object.keys(o).forEach(function(id){ if(o[id]&&o[id].injectId){ delete o[id]; changed=true; } });
+        if(changed) localStorage.setItem(k, JSON.stringify(o));
+      } catch(e){}
+    });
+    localStorage.removeItem('dc_inject_seen');
+    Object.keys(localStorage).forEach(function(k){ if(k.indexOf('dc_inject_v__')===0) localStorage.removeItem(k); });
+    localStorage.setItem('dc_inject_reset_v2','1');
+  }
+
   // ms → YYYY-MM-DD in the user's own timezone (so it matches the ClickUp date)
   function isoFromMs(ms){
     if(!ms) return '';

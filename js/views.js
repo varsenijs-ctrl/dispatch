@@ -327,97 +327,104 @@ function isTodOverdue(tod, timeFrom, taskStartIso){
   return false;
 }
 
+var todayFilter='all';   // all | overdue | today | deadline | next
 function renderDayToday(){
   const iso=isoToday();
-  const tasks=load('dc_plantasks',{});
-  const todayTasks=Object.values(tasks).filter(t=>t.startIso===iso);
-  // carry a past-day task into today if it's still within its «до» window OR has an
-  // upcoming deadline (deadline not passed) — a gentle reminder so it isn't forgotten
-  const ongoing=Object.values(tasks).filter(t=>t.startIso<iso&&!t.done&&((t.until&&t.until>=iso)||(t.deadline&&t.deadline>=iso)));
   const d=getTODAY();
+  const tasks=load('dc_plantasks',{});
+  const todEmoji={morning:'🌅',day:'☀️',evening:'🌇',night:'🌙'};
+
+  // ── sort every task into ONE mutually-exclusive group ──
+  const G={overdue:[],today:[],deadline:[],next:[]}; const done=[];
+  Object.values(tasks).forEach(t=>{
+    if(t.done){ if(t.doneDate===iso||t.startIso===iso) done.push(t); return; }
+    if(_overdue(t)) G.overdue.push(t);
+    else if(t.startIso===iso) G.today.push(t);
+    else if(t.deadline && t.deadline>=iso) G.deadline.push(t);
+    else if(t.startIso>iso) G.next.push(t);
+  });
+  const due=t=>t.deadline||t.startIso;
+  G.overdue.sort((a,b)=>due(a).localeCompare(due(b)));
+  G.today.sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
+  G.deadline.sort((a,b)=>(a.deadline||'').localeCompare(b.deadline||''));
+  G.next.sort((a,b)=>a.startIso.localeCompare(b.startIso));
+  const totalPending=G.overdue.length+G.today.length+G.deadline.length+G.next.length;
+
   let html=`<div class="section-header"><h2>Сегодня — ${fmtDate(d)}, ${DAYS_RU[d.getDay()]}</h2><button class="toggle-btn" style="font-size:10px;padding:3px 10px" onclick="openDayModal('${iso}')">+ задача</button></div>`;
-  const _due=t=>t.deadline?t.deadline:t.startIso;
-  const overdueTasks = Object.values(tasks).filter(_overdue)
-    .sort((a,b)=>_due(a).localeCompare(_due(b)));
 
-  const overdudeIds=new Set(overdueTasks.map(t=>t.id));
-const allTasks=[...todayTasks,...ongoing.filter(t=>!todayTasks.find(x=>x.id===t.id))].filter(t=>!overdudeIds.has(t.id));
+  // ── segmented sort/filter ──
+  const FILTERS=[
+    {k:'all',      label:'Все',         n:totalPending},
+    {k:'overdue',  label:'Просрочено',  n:G.overdue.length},
+    {k:'today',    label:'Сегодня',     n:G.today.length},
+    {k:'deadline', label:'С дедлайном', n:G.deadline.length},
+    {k:'next',     label:'Следующие',   n:G.next.length},
+  ];
+  if(!FILTERS.some(f=>f.k===todayFilter)) todayFilter='all';
+  html+=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">`+
+    FILTERS.map(f=>`<button onclick="todayFilter='${f.k}';render()" class="scope-btn ${todayFilter===f.k?'active':''}">${f.label}${f.n?` <span style="opacity:.65;font-family:var(--mono)">${f.n}</span>`:''}</button>`).join('')+`</div>`;
 
-  if(overdueTasks.length){
-    html+=`<div style="background:rgba(255,69,58,.08);border:1px solid rgba(255,69,58,.25);border-radius:18px;padding:12px 14px;margin-bottom:14px">
-      <div style="font-family:var(--mono);font-size:10px;color:var(--red);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">⚠ Просроченные задачи — ${overdueTasks.length}</div>`;
-    const _todEmoji={morning:'🌅',day:'☀️',evening:'🌇',night:'🌙'};
-    overdueTasks.forEach(t=>{
-      const dt=new Date(t.startIso+'T00:00:00');
-      const dueIso=t.deadline?t.deadline:t.startIso;
-      const daysAgo=Math.floor((new Date(getTODAY().toDateString())-new Date(dueIso+'T00:00:00'))/86400000);
-      const _cl=t.cid?clients.find(c=>c.id===t.cid):t.clientName?clients.find(c=>c.name===t.clientName):null;
-      const clientBadge=_cl?`<span style="font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:14px;background:var(--blue-dim);color:var(--blue);margin-left:6px;cursor:pointer" onclick="event.stopPropagation();openCal('${_cl.id}')">${esc(_cl.name)}</span>`:'';
-      // срок: planned date + time-of-day + time window + deadline
-      let srok=`<span style="color:var(--amber)">${fmtDate(dt)} ${DAYS_RU[dt.getDay()]}</span>`;
-      if(t.tod&&_todEmoji[t.tod]) srok+=` ${_todEmoji[t.tod]}`;
-      if(t.timeFrom||t.timeTo) srok+=` ${t.timeFrom||''}${t.timeTo?'–'+t.timeTo:''}`;
-      if(t.until&&t.until!==t.startIso) srok+=` · до ${fmtDate(new Date(t.until+'T00:00:00'))}`;
-      if(t.deadline) srok+=` · <span style="color:var(--red)">⏳ дедлайн ${fmtDate(new Date(t.deadline+'T00:00:00'))}</span>`;
-      html+=`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,69,58,.1)">
-        <div style="width:16px;height:16px;border-radius:10px;border:1px solid rgba(255,69,58,.4);background:none;flex-shrink:0;cursor:pointer" onclick="toggleDayTask('${t.id}');render()"></div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:12px;font-weight:500;cursor:pointer" ondblclick="event.stopPropagation();_editTask('${t.id}')" title="Двойной клик — редактировать">${esc(t.text)}${clientBadge}</div>
-          <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:2px">${srok}</div>
-        </div>
-        <div style="font-family:var(--mono);font-size:10px;color:var(--red);white-space:nowrap">${daysAgo}д назад</div>
-        <input type="date" value="${t.startIso}" onchange="moveTask('${t.id}',this.value)" title="Перенести на другой день" style="color-scheme:dark;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;color:var(--text3);font-size:10px;padding:3px 6px;cursor:pointer;outline:none">
-        <button onclick="event.stopPropagation();_editTask('${t.id}')" title="Редактировать" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:2px 4px">✎</button>
-        <button onclick="removeDayTask('${t.id}')" title="Удалить" style="background:none;border:none;color:rgba(255,69,58,.5);cursor:pointer;font-size:13px;padding:2px 4px">✕</button>
-      </div>`;
-    });
-    html+=`</div>`;
-  }
+  if(!totalPending && !done.length){ html+=`<div class="empty"><span class="empty-icon">—</span>Задач нет.<br>Нажми «+ задача», чтобы добавить.</div>`; return html; }
 
-  if(!allTasks.length && !overdueTasks.length){html+=`<div class="empty"><span class="empty-icon">—</span>Задач на сегодня нет.<br>Нажми «+ задача» чтобы добавить.</div>`;return html;}
-  const pending=allTasks.filter(t=>!t.done).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
-  const done=allTasks.filter(t=>t.done&&(t.doneDate===iso||t.startIso===iso));
-  const pendToday   = pending.filter(t=>t.startIso===iso);              // planned for today
-  const pendCarried = pending.filter(t=>t.startIso<iso);                // carried from earlier days (kept by an upcoming deadline)
-  function pendRow(t){
-    const todLate=!t.done&&(t.tod||t.timeFrom)&&isTodOverdue(t.tod,t.timeFrom,t.startIso);
-    const until=t.until&&t.until!==iso?`<span style="font-family:var(--mono);font-size:10px;color:var(--amber)"> · до ${fmtDate(new Date(t.until+'T00:00:00'))}</span>`:'';
-    const dlChip=t.deadline?`<span style="font-family:var(--mono);font-size:10px;color:var(--amber)"> · ⏳ ${fmtDate(new Date(t.deadline+'T00:00:00'))}</span>`:'';
-    const fromMark=t.startIso<iso?`<span style="font-family:var(--mono);font-size:10px;color:var(--text3)"> · ⤷ с ${fmtDate(new Date(t.startIso+'T00:00:00'))}</span>`:'';
-    const note=t.note?`<div style="font-size:11px;color:var(--text3);margin-top:3px">${esc(t.note)}</div>`:'';
-    const _cl=t.cid?clients.find(c=>c.id===t.cid):t.clientName?clients.find(c=>c.name===t.clientName||c.name.toLowerCase().includes(t.clientName.toLowerCase())||t.clientName.toLowerCase().includes(c.name.toLowerCase())):null;
-    const clientBadge=_cl?`<span style="font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:16px;background:var(--blue-dim);color:var(--blue);margin-left:8px;white-space:nowrap;cursor:pointer;border:1px solid rgba(96,165,250,.2)" onclick="event.stopPropagation();openCal('${_cl.id}')">${esc(t.clientName)}</span>`:t.clientName?`<span style="font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:16px;background:var(--blue-dim);color:var(--blue);margin-left:8px">${esc(t.clientName)}</span>`:'';
-    const _calOnclick = _cl ? `openCal('${_cl.id}')` : '';
-    return `<div data-tid="${t.id}" draggable="true" ondragstart="_startDrag(this,event)" ondragend="_endDrag(this)" ondragover="_dragOver(this,event)" ondragleave="_dragLeave(this)" ondrop="_drop(this,event)" style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid ${todLate?'rgba(255,69,58,.4)':`var(--glass-border)`};border-radius:18px;margin-bottom:6px;background:${todLate?'rgba(255,69,58,.06)':`var(--glass)`};backdrop-filter:blur(12px);cursor:pointer" onclick="${_calOnclick||`toggleDayTask('${t.id}');render()`}">
-      <div style="display:flex;flex-direction:column;justify-content:center;padding:2px 0;cursor:grab;color:var(--text3);font-size:14px;line-height:1;user-select:none" title="Перетащить">⠿</div>
-      <div style="width:18px;height:18px;border-radius:10px;border:2px solid rgba(255,255,255,.25);margin-top:2px;flex-shrink:0;cursor:pointer;background:rgba(255,255,255,.07)" onclick="event.stopPropagation();toggleDayTask('${t.id}');render()"></div>
-      <div style="flex:1"><div style="display:flex;align-items:center;flex-wrap:wrap;gap:0">${(t.timeFrom||t.timeTo)?`<span style="font-family:var(--mono);font-size:10px;color:var(--accent);margin-right:5px;white-space:nowrap">${t.timeFrom||""}${t.timeTo?"–"+t.timeTo:""}</span>`:""}${t.tod?('<span style="font-size:14px;margin-right:4px">'+(t.tod==="morning"?"🌅":t.tod==="day"?"☀️":t.tod==="evening"?"🌇":t.tod==="night"?"🌙":"")+"</span>"):"" }<span class="task-text" ondblclick="event.stopPropagation();_editTask('${t.id}')" style="font-size:13px;font-weight:500;cursor:pointer" title="Двойной клик — редактировать">${esc(t.text)}</span>${clientBadge}${until}${dlChip}${fromMark}</div>${note}</div>
-      <button onclick="event.stopPropagation();_editTask('${t.id}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 3px" title="Редактировать">✎</button>
-      <button onclick="event.stopPropagation();removeDayTask('${t.id}');render()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:2px 4px">✕</button>
+  // ── one unified task row ──
+  function taskRow(t){
+    const over=_overdue(t);
+    const todLate=!over&&(t.tod||t.timeFrom)&&isTodOverdue(t.tod,t.timeFrom,t.startIso);
+    const _cl=t.cid?clients.find(c=>c.id===t.cid):t.clientName?clients.find(c=>c.name===t.clientName):null;
+    const cname=(_cl&&_cl.name)||t.clientName||'';
+    const clientBadge=cname?`<span style="font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:14px;background:var(--blue-dim);color:var(--blue);margin-left:8px;white-space:nowrap;${_cl?'cursor:pointer':''}" ${_cl?`onclick="event.stopPropagation();openCal('${_cl.id}')"`:''}>${esc(cname)}</span>`:'';
+    const meta=[];
+    const dt=new Date(t.startIso+'T00:00:00');
+    if(t.startIso!==iso) meta.push(`<span style="color:${over&&!t.deadline?'var(--red)':'var(--text3)'}">📅 ${fmtDate(dt)} ${DAYS_RU[dt.getDay()]}</span>`);
+    if(t.timeFrom||t.timeTo) meta.push(`<span style="color:var(--accent)">${t.timeFrom||''}${t.timeTo?'–'+t.timeTo:''}</span>`);
+    if(t.deadline) meta.push(`<span style="color:${over?'var(--red)':'var(--amber)'}">⏳ ${fmtDate(new Date(t.deadline+'T00:00:00'))}</span>`);
+    if(over){ const daysAgo=Math.floor((new Date(getTODAY().toDateString())-new Date(due(t)+'T00:00:00'))/86400000); meta.push(`<span style="color:var(--red)">${daysAgo}д назад</span>`); }
+    const metaHtml=meta.length?`<div style="font-family:var(--mono);font-size:10px;margin-top:3px;display:flex;flex-wrap:wrap;gap:8px">${meta.join('')}</div>`:'';
+    const note=(t.note&&t.note!=='ClickUp'&&t.note.indexOf('ClickUp')!==0)?`<div style="font-size:11px;color:var(--text3);margin-top:2px">${esc(t.note)}</div>`:'';
+    const todIcon=t.tod&&todEmoji[t.tod]?`<span style="font-size:13px;margin-right:5px">${todEmoji[t.tod]}</span>`:'';
+    const bc=over?'rgba(255,69,58,.35)':todLate?'rgba(255,69,58,.3)':'var(--glass-border)';
+    const bg=over?'rgba(255,69,58,.06)':'var(--glass)';
+    return `<div data-tid="${t.id}" draggable="true" ondragstart="_startDrag(this,event)" ondragend="_endDrag(this)" ondragover="_dragOver(this,event)" ondragleave="_dragLeave(this)" ondrop="_drop(this,event)" style="display:flex;align-items:flex-start;gap:10px;padding:11px 13px;border:1px solid ${bc};border-radius:16px;margin-bottom:7px;background:${bg}">
+      <div style="cursor:grab;color:var(--text3);font-size:13px;line-height:1.5;user-select:none" title="Перетащить">⠿</div>
+      <div onclick="toggleDayTask('${t.id}');render()" style="width:18px;height:18px;border-radius:9px;border:2px solid ${over?'rgba(255,69,58,.6)':'rgba(255,255,255,.25)'};margin-top:1px;flex-shrink:0;cursor:pointer;background:rgba(255,255,255,.06)"></div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;flex-wrap:wrap">${todIcon}<span class="task-text" ondblclick="event.stopPropagation();_editTask('${t.id}')" style="font-size:13px;font-weight:600;cursor:pointer;${over?'color:var(--red)':''}" title="Двойной клик — редактировать">${esc(t.text)}</span>${clientBadge}</div>
+        ${metaHtml}${note}
+      </div>
+      <input type="date" value="${t.startIso}" onclick="event.stopPropagation()" onchange="moveTask('${t.id}',this.value)" title="Перенести на другой день" style="color-scheme:dark;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:9px;color:var(--text3);font-size:10px;padding:3px 5px;cursor:pointer;outline:none">
+      <button onclick="event.stopPropagation();_editTask('${t.id}')" title="Редактировать" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:2px 3px">✎</button>
+      <button onclick="event.stopPropagation();removeDayTask('${t.id}');render()" title="Удалить" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:2px 3px">✕</button>
     </div>`;
   }
-  // today's own tasks (label only needed when a carried-deadline block follows)
-  if(pendToday.length){
-    if(pendCarried.length) html+=`<div style="font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin:2px 0 10px">📌 На сегодня — ${pendToday.length}</div>`;
-    pendToday.forEach(t=>{ html+=pendRow(t); });
+  const GROUPS=[
+    {k:'overdue',  title:'⚠ Просрочено',   col:'var(--red)'},
+    {k:'today',    title:'📌 Сегодня',      col:'var(--green)'},
+    {k:'deadline', title:'⏳ С дедлайном',  col:'var(--amber)'},
+    {k:'next',     title:'→ Следующие дни', col:'var(--blue)'},
+  ];
+  function groupBlock(g){
+    const arr=G[g.k]; if(!arr.length) return '';
+    return `<div style="font-family:var(--mono);font-size:10px;color:${g.col};letter-spacing:.08em;text-transform:uppercase;margin:16px 0 8px">${g.title} — ${arr.length}</div>`+arr.map(taskRow).join('');
   }
-  // separate block: tasks with a deadline carried over from previous days
-  if(pendCarried.length){
-    html+=`<div style="background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.22);border-radius:18px;padding:12px 14px;margin:14px 0 6px">
-      <div style="font-family:var(--mono);font-size:10px;color:var(--amber);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">⏳ С дедлайном · с прошлых дней — ${pendCarried.length}</div>`;
-    pendCarried.forEach(t=>{ html+=pendRow(t); });
-    html+=`</div>`;
+
+  if(todayFilter==='all'){
+    GROUPS.forEach(g=>{ html+=groupBlock(g); });
+  } else {
+    const arr=G[todayFilter];
+    if(!arr.length) html+=`<div class="empty" style="padding:40px 20px"><span class="empty-icon">—</span>Здесь пусто.</div>`;
+    else arr.forEach(t=>{ html+=taskRow(t); });
   }
-  if(done.length){
-    html+=`<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06)"><div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Готово ${done.length}</div>`;
+
+  // ── done today (only in the «Все» view) ──
+  if(todayFilter==='all' && done.length){
+    html+=`<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--glass-border)"><div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">✓ Готово сегодня — ${done.length}</div>`;
     done.forEach(t=>{
       const _cl2=t.clientName?clients.find(c=>c.name===t.clientName||c.id===t.cid):null;
-      const clientBadge=_cl2?`<span style="font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:16px;background:rgba(255,255,255,.07);color:var(--text3);margin-left:8px;cursor:pointer" onclick="event.stopPropagation();openCal('${_cl2.id}')">${esc(t.clientName)}</span>`:t.clientName?`<span style="font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:16px;background:rgba(255,255,255,.07);color:var(--text3);margin-left:8px">${esc(t.clientName)}</span>`:'';
-      html+=`<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid rgba(255,255,255,.06);border-radius:18px;margin-bottom:5px;background:var(--glass);opacity:.4;cursor:pointer" onclick="toggleDayTask('${t.id}');render()">
-        <div style="width:18px;height:18px;border-radius:10px;border:1px solid var(--green);background:var(--green-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="color:var(--green);font-size:10px">✓</span></div>
-        <div style="flex:1;display:flex;align-items:center;flex-wrap:wrap"><span style="font-size:13px;text-decoration:line-through;color:var(--text3)">${esc(t.text)}</span>${clientBadge}</div>
-        <button onclick="event.stopPropagation();_editTask('${t.id}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 3px" title="Редактировать">✎</button>
-      <button onclick="event.stopPropagation();removeDayTask('${t.id}');render()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:2px 4px">✕</button>
+      const cb=t.clientName?`<span style="font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:14px;background:rgba(255,255,255,.07);color:var(--text3);margin-left:8px">${esc(t.clientName)}</span>`:'';
+      html+=`<div style="display:flex;align-items:center;gap:10px;padding:9px 13px;border:1px solid var(--glass-border);border-radius:16px;margin-bottom:6px;background:var(--glass);opacity:.5">
+        <div onclick="toggleDayTask('${t.id}');render()" style="width:18px;height:18px;border-radius:9px;border:1px solid var(--green);background:var(--green-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer"><span style="color:var(--green);font-size:10px">✓</span></div>
+        <div style="flex:1;display:flex;align-items:center;flex-wrap:wrap"><span style="font-size:13px;text-decoration:line-through;color:var(--text3)">${esc(t.text)}</span>${cb}</div>
+        <button onclick="event.stopPropagation();removeDayTask('${t.id}');render()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:2px 3px">✕</button>
       </div>`;
     });
     html+=`</div>`;

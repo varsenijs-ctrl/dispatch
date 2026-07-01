@@ -11,34 +11,10 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-06-30T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-07-01T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
-    {
-      "id": "869du5dry",
-      "name": "[BikerVision] Campaigns | June | Build",
-      "list": "BikerVision",
-      "due": "1782259200000"
-    },
-    {
-      "id": "869dv4g94",
-      "name": "[BikerVision] Campaigns | July | Build",
-      "list": "BikerVision",
-      "due": "1782691200000"
-    },
-    {
-      "id": "869dwq4pr",
-      "name": "WildHarvest: Trustpilot email in Post Purchase - Build",
-      "list": "Wild Harvest©",
-      "due": "1782777600000"
-    },
-    {
-      "id": "869dnvbjr",
-      "name": "Kerablend - Jul-2026 - Campaigns",
-      "list": "Kerablend",
-      "due": "1782781200000"
-    },
     {
       "id": "869dwpwcv",
       "name": "Nexova | Publish emails",
@@ -58,10 +34,10 @@
       "due": "1782954000000"
     },
     {
-      "id": "869dnvbkm",
-      "name": "Lunavo - Jul-2026 - Campaigns",
-      "list": "Lunavo",
-      "due": "1783040400000"
+      "id": "869da21ty",
+      "name": "Retros: post purchase survey ",
+      "list": "Drinkretros.com",
+      "due": "1782954000000"
     },
     {
       "id": "869dwq75b",
@@ -73,12 +49,6 @@
       "id": "869dwq4jg",
       "name": "Wild Harvest© - Jul-2026 - Campaigns - Build",
       "list": "Wild Harvest©",
-      "due": "1783123200000"
-    },
-    {
-      "id": "869dw49b1",
-      "name": "BikerVision - Jul-2026 - Campaigns - Build",
-      "list": "Imported From Trello",
       "due": "1783123200000"
     },
     {

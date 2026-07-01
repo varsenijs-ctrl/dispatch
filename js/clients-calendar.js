@@ -35,18 +35,20 @@ function importFromPaste(){
   for(let i=0;i<Math.min(5,rows.length);i++){const cols=rows[i].slice(1).filter(c=>c&&c.trim());if(cols.length>0&&!rows[i][0].match(/^\d{4}-\d{2}-\d{2}$/)&&!rows[i][0].match(/^\d{1,2}\.\d{1,2}/)){headerRow=i;break;}}
   const headers=rows[headerRow];const colClients=headers.slice(1).map(h=>h.trim()).filter(h=>h);
   if(!colClients.length){statusEl.className='import-status err';statusEl.textContent='Не нашёл имена клиентов';return;}
-  let totalDates=0;const newClientNames=new Set();
+  let totalDates=0;const newClientNames=new Set();const monthBuckets={};   // mk → history bucket, so each date lands in its own month
   for(let r=headerRow+1;r<rows.length;r++){
     const row=rows[r];const dateRaw=(row[0]||'').trim();if(!dateRaw)continue;
     let iso=null;
     if(/^\d{4}-\d{2}-\d{2}$/.test(dateRaw))iso=dateRaw;
     else{const m1=dateRaw.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);if(m1)iso=`${m1[3]}-${m1[2].padStart(2,'0')}-${m1[1].padStart(2,'0')}`;}
     if(!iso)continue;
-    for(let c=0;c<colClients.length;c++){const clientName=colClients[c];if(!clientName)continue;const val=(row[c+1]||'').trim().toLowerCase().replace(/\u200b/g,'');if(!val||!['yes','no','draft'].includes(val))continue;if(!historyData[clientName])historyData[clientName]={};historyData[clientName][iso]=val;newClientNames.add(clientName);totalDates++;}
+    const mk=iso.slice(0,7);const bucket=(mk===activeMonth?historyData:(monthBuckets[mk]||(monthBuckets[mk]=_loadMonth('dc_history',mk))));
+    for(let c=0;c<colClients.length;c++){const clientName=colClients[c];if(!clientName)continue;const val=(row[c+1]||'').trim().toLowerCase().replace(/\u200b/g,'');if(!val||!['yes','no','draft'].includes(val))continue;if(!bucket[clientName])bucket[clientName]={};bucket[clientName][iso]=val;newClientNames.add(clientName);totalDates++;}
   }
   if(!totalDates){statusEl.className='import-status err';statusEl.textContent='Не нашёл данных (yes/no/draft)';return;}
   let added=0;
   newClientNames.forEach(name=>{const exists=clients.find(c=>c.active&&c.name.toLowerCase()===name.toLowerCase());if(!exists){clients.push({id:'c_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),name,active:true,smsEnabled:false,schedule:'',deadline:null});added++;}});
+  Object.keys(monthBuckets).forEach(mk=>{ if(mk!==activeMonth){ _saveMonth('dc_history',mk,monthBuckets[mk]); _ensureMonthListed(mk); } });
   saveAll();
   statusEl.className='import-status ok';statusEl.textContent=`✓ ${totalDates} записей, ${newClientNames.size} клиентов${added?' (+'+added+' новых)':''}.`;
   document.getElementById('paste-data').value='';render();
@@ -56,7 +58,11 @@ function handleRowClick(event,cid){if(event.target.closest('button')||event.targ
 let calCurrentCid=null;
 function collectAllDates(cid){
   const c=clients.find(x=>x.id===cid);if(!c)return{};const all={};
-  Object.entries(historyData[c.name]||{}).forEach(([iso,val])=>{all[iso]=val;});
+  // marks live in their own date's month bucket — aggregate this client across ALL buckets
+  Object.keys(localStorage).forEach(function(k){
+    if(k.indexOf('dc_history__')!==0) return;
+    try{ const b=JSON.parse(localStorage.getItem(k))||{}; const days=b[c.name]||{}; Object.keys(days).forEach(iso=>{ all[iso]=days[iso]; }); }catch(e){}
+  });
   Object.entries(log).forEach(([dateStr,entries])=>{const e=entries[cid];if(!e)return;const p=dateStr.split('.');if(p.length!==3)return;const iso=`${p[2]}-${p[1]}-${p[0]}`;if(e.email)all[iso]='yes';else if(e.blocked)all[iso]='no';});
   return all;
 }
@@ -94,7 +100,7 @@ function renderCalModal(cid){
     const daysInMonth=new Date(y,m,0).getDate();const firstDow=new Date(y,m-1,1).getDay();const offset=(firstDow+6)%7;
     html+=`<div class="cal-month"><div class="cal-month-title">${MONTHS_RU[m-1]} ${y}</div><div class="cal-grid">${['пн','вт','ср','чт','пт','сб','вс'].map(d=>`<div class="cal-dow">${d}</div>`).join('')}`;
     for(let i=0;i<offset;i++)html+=`<div class="cal-day empty"></div>`;
-    const smsDays=load('dc_sms_days',{});const cidSms=smsDays[cid]||{};
+    const smsDays=_loadMonth('dc_sms_days',mk);const cidSms=smsDays[cid]||{};
     const flowDaysCal=getFlowDays(cid);
     const clientFlowsCal=getFlows(cid);
     for(let d=1;d<=daysInMonth;d++){
@@ -119,7 +125,10 @@ function undoLastCalendarChange(){ _sfx.play('undo');
   const entry=_undoStack.pop();
   if(entry.type==='manual_done'){const manual=load('dc_manual_done',{});if(entry.prev===true)manual[entry.cid]=true;else delete manual[entry.cid];save('dc_manual_done',manual);showToast('↩ Галочка отменена');}
   else if(entry.type==='delete_client'){clients.push(entry.snapshot);if(entry.histSnapshot)historyData[entry.snapshot.name]=entry.histSnapshot;saveAll();showToast('↩ Клиент восстановлен');}
-  else{const{cid,name,iso,prev}=entry;if(!historyData[name])historyData[name]={};if(prev===''||prev===undefined)delete historyData[name][iso];else historyData[name][iso]=prev;saveAll();try{ _logAct(name, iso, (prev===''||prev===undefined)?'':prev); }catch(e){}try{ if(typeof _sheetPush==='function') _sheetPush(name, iso, (prev===''||prev===undefined)?'':prev); }catch(e){}if(calCurrentCid===cid)renderCalModal(cid);showToast('↩ Отменено');}
+  else{const{cid,name,iso,prev}=entry;const tm=entry.month||iso.slice(0,7);const restore=(prev===''||prev===undefined)?'':prev;
+    if(tm===activeMonth){if(!historyData[name])historyData[name]={};if(restore==='')delete historyData[name][iso];else historyData[name][iso]=restore;saveAll();}
+    else{const hb=_loadMonth('dc_history',tm);if(!hb[name])hb[name]={};if(restore==='')delete hb[name][iso];else hb[name][iso]=restore;_saveMonth('dc_history',tm,hb);}
+    try{ _logAct(name, iso, restore); }catch(e){}try{ if(typeof _sheetPush==='function') _sheetPush(name, iso, restore); }catch(e){}if(calCurrentCid===cid)renderCalModal(cid);showToast('↩ Отменено');}
   updateSidebar();render();
 }
 function showToast(msg){
@@ -130,12 +139,24 @@ function showToast(msg){
 }
 function cycleCalDay(cid,iso){ _sfx.play('click');
   const c=clients.find(x=>x.id===cid);if(!c)return;
-  if(!historyData[c.name])historyData[c.name]={};
-  const prev=historyData[c.name][iso]||'';
-  const cycle=['','yes','draft','no'];const next=cycle[(cycle.indexOf(prev)+1)%cycle.length];
-  _undoStack.push({cid,name:c.name,iso,prev});if(_undoStack.length>MAX_UNDO)_undoStack.shift();
-  if(next==='')delete historyData[c.name][iso];else historyData[c.name][iso]=next;
-  saveAll();
+  const tm=iso.slice(0,7);                    // store the mark in ITS date's month bucket
+  const cycle=['','yes','draft','no'];
+  let prev,next;
+  if(tm===activeMonth){                        // active month → in-memory historyData
+    if(!historyData[c.name])historyData[c.name]={};
+    prev=historyData[c.name][iso]||'';
+    next=cycle[(cycle.indexOf(prev)+1)%cycle.length];
+    if(next==='')delete historyData[c.name][iso];else historyData[c.name][iso]=next;
+    saveAll();
+  } else {                                     // another month → that month's bucket directly
+    const hb=_loadMonth('dc_history',tm);
+    if(!hb[c.name])hb[c.name]={};
+    prev=hb[c.name][iso]||'';
+    next=cycle[(cycle.indexOf(prev)+1)%cycle.length];
+    if(next==='')delete hb[c.name][iso];else hb[c.name][iso]=next;
+    _saveMonth('dc_history',tm,hb); _ensureMonthListed(tm);
+  }
+  _undoStack.push({cid,name:c.name,iso,prev,month:tm});if(_undoStack.length>MAX_UNDO)_undoStack.shift();
   try{ _logAct(c.name, iso, next); }catch(e){}                                         // → action log (История)
   try{ if(typeof _sheetPush==='function') _sheetPush(c.name, iso, next); }catch(e){}   // → Google Sheet
   renderCalModal(cid);updateSidebar();

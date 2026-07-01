@@ -133,6 +133,42 @@ function _seedActLog(){
   }catch(e){}
 }
 
+// ── month-bucket helpers ── read/write a specific month's bucket (not just active)
+function _loadMonth(base, mk){ try{ var v=localStorage.getItem(base+'__'+mk); return v==null?{}:(JSON.parse(v)||{}); }catch(e){ return {}; } }
+function _saveMonth(base, mk, obj){ localStorage.setItem(base+'__'+mk, JSON.stringify(obj)); }
+function _ensureMonthListed(mk){ try{ if(typeof getMonths==='function'&&typeof saveMonths==='function'){ var ms=getMonths(); if(ms.indexOf(mk)<0){ ms.push(mk); ms.sort(); saveMonths(ms); } } }catch(e){} }
+
+// One-time repair: history/sms/pay entries were written into the ACTIVE month's
+// bucket even when the date belonged to another month (calendar shows ±2 months;
+// sheet import writes every date to the active bucket). That made other months'
+// emails appear in the wrong month ("duplicates"). Move every entry into the bucket
+// of its own date's month. History is keyed by clientName→iso; sms/pay by cid→iso.
+function _relocateByMonth(){
+  if(gload('dc_relocate_v1', false)) return;
+  var touched={};
+  ['dc_history','dc_sms_days','dc_pay_disabled'].forEach(function(base){
+    var buckets={};
+    Object.keys(localStorage).forEach(function(k){ if(k.indexOf(base+'__')===0){ var mk=k.slice(base.length+2); try{ buckets[mk]=JSON.parse(localStorage.getItem(k))||{}; }catch(e){ buckets[mk]={}; } } });
+    var out={}; Object.keys(buckets).forEach(function(mk){ out[mk]={}; });   // clear existing buckets, refill correctly
+    Object.keys(buckets).forEach(function(mk){
+      var obj=buckets[mk];
+      Object.keys(obj).forEach(function(key){                 // key = clientName (history) or cid (sms/pay)
+        var days=obj[key]; if(!days||typeof days!=='object') return;
+        Object.keys(days).forEach(function(iso){
+          var tm=(typeof iso==='string' && /^\d{4}-\d{2}/.test(iso)) ? iso.slice(0,7) : mk;
+          if(!out[tm]) out[tm]={};
+          if(!out[tm][key]) out[tm][key]={};
+          out[tm][key][iso]=days[iso];
+          touched[tm]=1;
+        });
+      });
+    });
+    Object.keys(out).forEach(function(mk){ localStorage.setItem(base+'__'+mk, JSON.stringify(out[mk])); });
+  });
+  Object.keys(touched).forEach(_ensureMonthListed);
+  gsave('dc_relocate_v1', true);
+}
+
 // ── one-time migration: legacy un-namespaced keys → current-month namespace ──
 (function(){
   const OLD_KEYS = ['dc_clients','dc_log','dc_history','dc_plans','dc_plantasks','dc_manual_done','dc_sms_days','dc_pay_disabled','dc_flows'];

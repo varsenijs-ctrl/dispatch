@@ -56,18 +56,20 @@ function render(){
 }
 
 function togglePayDisabled(cid,iso){
-  const dis=load('dc_pay_disabled',{});
+  const tm=iso.slice(0,7);
+  const dis=(tm===activeMonth)?load('dc_pay_disabled',{}):_loadMonth('dc_pay_disabled',tm);
   if(!dis[cid])dis[cid]={};
   if(dis[cid][iso])delete dis[cid][iso];else dis[cid][iso]=true;
-  save('dc_pay_disabled',dis);render();
+  if(tm===activeMonth)save('dc_pay_disabled',dis);else{_saveMonth('dc_pay_disabled',tm,dis);_ensureMonthListed(tm);}
+  render();
 }
 
 function toggleDaySms(cid,iso){
-  const smsDays=load('dc_sms_days',{});
+  const tm=iso.slice(0,7);
+  const smsDays=(tm===activeMonth)?load('dc_sms_days',{}):_loadMonth('dc_sms_days',tm);
   if(!smsDays[cid])smsDays[cid]={};
-  const was=smsDays[cid][iso]||false;
-  if(was)delete smsDays[cid][iso];else smsDays[cid][iso]=true;
-  save('dc_sms_days',smsDays);
+  if(smsDays[cid][iso])delete smsDays[cid][iso];else smsDays[cid][iso]=true;
+  if(tm===activeMonth)save('dc_sms_days',smsDays);else{_saveMonth('dc_sms_days',tm,smsDays);_ensureMonthListed(tm);}
   renderCalModal(cid);updateSidebar();
 }
 
@@ -483,12 +485,24 @@ let historySelectedClient = null;
 let historySelectedDate = null;   // История: selected action-day (Finance-style master/detail)
 
 function setLog(clientName, iso, val){
-  if(!historyData[clientName]) historyData[clientName]={};
-  if(historyData[clientName][iso]===val) delete historyData[clientName][iso];
-  else historyData[clientName][iso]=val;
-  saveAll();
-  try{ _logAct(clientName, iso, historyData[clientName][iso]||''); }catch(e){}          // → action log (История)
-  try{ if(typeof _sheetPush==='function') _sheetPush(clientName, iso, historyData[clientName][iso]||''); }catch(e){}
+  const tm=iso.slice(0,7);
+  let cur;
+  if(tm===activeMonth){
+    if(!historyData[clientName]) historyData[clientName]={};
+    if(historyData[clientName][iso]===val) delete historyData[clientName][iso];
+    else historyData[clientName][iso]=val;
+    saveAll();
+    cur=historyData[clientName][iso]||'';
+  } else {
+    const hb=_loadMonth('dc_history',tm);
+    if(!hb[clientName]) hb[clientName]={};
+    if(hb[clientName][iso]===val) delete hb[clientName][iso];
+    else hb[clientName][iso]=val;
+    _saveMonth('dc_history',tm,hb); _ensureMonthListed(tm);
+    cur=hb[clientName][iso]||'';
+  }
+  try{ _logAct(clientName, iso, cur); }catch(e){}          // → action log (История)
+  try{ if(typeof _sheetPush==='function') _sheetPush(clientName, iso, cur); }catch(e){}
   render();
 }
 function _setLogCell(el){

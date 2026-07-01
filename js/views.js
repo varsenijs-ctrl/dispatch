@@ -371,7 +371,9 @@ function renderDayToday(){
     const todLate=!over&&(t.tod||t.timeFrom)&&isTodOverdue(t.tod,t.timeFrom,t.startIso);
     const _cl=(t.cid&&clients.find(c=>c.id===t.cid))||(t.clientName&&clients.find(c=>c.name===t.clientName))||null;
     const cname=(_cl&&_cl.name)||t.clientName||'';
-    const clientBadge=cname?`<span style="font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:14px;background:var(--blue-dim);color:var(--blue);margin-left:8px;white-space:nowrap;${_cl?'cursor:pointer':''}" ${_cl?`onclick="event.stopPropagation();openCal('${_cl.id}')"`:''}>${esc(cname)}</span>`:'';
+    // clickable whenever we have any client ref — openCal/openCalByName resolve across zones
+    const _open = _cl?`openCal('${_cl.id}')` : (t.cid?`openCal('${t.cid}')` : (cname?`openCalByName('${jsq(cname)}')`:''));
+    const clientBadge=cname?`<span style="font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:14px;background:var(--blue-dim);color:var(--blue);margin-left:8px;white-space:nowrap;${_open?'cursor:pointer':''}" ${_open?`onclick="event.stopPropagation();${_open}"`:''}>${esc(cname)}</span>`:'';
     const meta=[];
     const dt=new Date(t.startIso+'T00:00:00');
     if(t.startIso!==iso) meta.push(`<span style="color:${over&&!t.deadline?'var(--red)':'var(--text3)'}">📅 ${fmtDate(dt)} ${DAYS_RU[dt.getDay()]}</span>`);
@@ -464,7 +466,8 @@ function markDoneToday(cid){ _sfx.play('done');
   save('dc_manual_done',manual);
   _undoStack.push({type:'manual_done',cid,prev:false});
   if(_undoStack.length>MAX_UNDO)_undoStack.shift();
-  try{ var _c=clients.find(c=>c.id===cid); if(_c&&typeof _sheetPush==='function') _sheetPush(_c.name, isoToday(), 'yes'); }catch(e){}
+  // NB: this is a personal daily "done" tick — it must NOT write a yes/no status to
+  // the Google Sheet (that only comes from the calendar's coloured cells).
   render();
 }
 function undoDoneToday(cid){ _sfx.play('undo');
@@ -473,7 +476,6 @@ function undoDoneToday(cid){ _sfx.play('undo');
   save('dc_manual_done',manual);
   _undoStack.push({type:'manual_done',cid,prev:true});
   if(_undoStack.length>MAX_UNDO)_undoStack.shift();
-  try{ var _c=clients.find(c=>c.id===cid); if(_c&&typeof _sheetPush==='function') _sheetPush(_c.name, isoToday(), ''); }catch(e){}
   render();
 }
 

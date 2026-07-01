@@ -90,6 +90,23 @@ function save(k,v){ localStorage.setItem(k+'__'+activeMonth,JSON.stringify(v)); 
 function gload(k,def){ try{ return JSON.parse(localStorage.getItem(k))??def; }catch{ return def; } }
 function gsave(k,v){ localStorage.setItem(k,JSON.stringify(v)); }
 
+// Escape a string for use inside a single-quoted JS string within a double-quoted
+// HTML attribute (e.g. onclick="fn('...')") — handles quotes/backslashes/&.
+function jsq(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+
+// Find which work zone (month bucket) a client id lives in — active zone first,
+// then every dc_clients__* roster. Returns {mk, client} or null.
+function _findClientZone(cid){
+  var c=(typeof clients!=='undefined'?clients:[]).find(function(x){return x&&x.id===cid;});
+  if(c) return {mk:activeMonth, client:c};
+  var hit=null;
+  Object.keys(localStorage).forEach(function(k){
+    if(hit||k.indexOf('dc_clients__')!==0) return;
+    try{ (JSON.parse(localStorage.getItem(k))||[]).forEach(function(x){ if(!hit&&x&&x.id===cid) hit={mk:k.slice('dc_clients__'.length), client:x}; }); }catch(e){}
+  });
+  return hit;
+}
+
 // ── pay rates ── an email pays EMAIL_RATE; an SMS day adds SMS_EXTRA on top.
 const EMAIL_RATE = 0.50;
 const SMS_EXTRA  = 0.10;                       // SMS = 10¢ (was 50¢)

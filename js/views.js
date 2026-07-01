@@ -611,22 +611,28 @@ function renderHistoryDay(w, D, valFor, smsAll, mm){
   if(!w || !D) return '<div style="color:var(--text3);font-size:13px;padding:24px;text-align:center;font-family:var(--mono)">← выбери дату</div>';
   const ST={yes:{lbl:'отправлено',col:'#34d399'},draft:{lbl:'черновик',col:'#a78bfa'},no:{lbl:'не отправлено',col:'#f87171'}};
   const dt=new Date(w+'T00:00:00');
-  const rows=D.rows.slice().sort((a,b)=>a.c.localeCompare(b.c,'ru')||a.d.localeCompare(b.d));
   const smsFor=(nm,tIso)=>{ const c=clients.find(x=>x.name===nm); return c?!!((smsAll[c.id]||{})[tIso]):false; };
-  let html=`<div style="font-family:var(--mono);font-size:12px;color:var(--text3);margin-bottom:12px">${dt.getDate()} ${MONTHS_RU[mm-1]} ${dt.getFullYear()} · ${DAYS_RU[dt.getDay()]} · всего <span style="color:var(--green)">$${D.earned.toFixed(2)}</span></div>`;
-  rows.forEach(e=>{
-    const s=ST[e.s]||{lbl:e.s,col:'var(--text3)'};
-    const val=valFor(e.c,e.d,e.s);
-    const td=new Date(e.d+'T00:00:00');
-    const planned = e.d!==w;   // marked today for a different (usually future) date
-    const forTag = planned?`<span style="font-family:var(--mono);font-size:10px;color:var(--accent);white-space:nowrap">→ на ${td.getDate()} ${MONTHS_SHORT[td.getMonth()]}</span>`:'';
-    html+=`<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:14px;margin-bottom:5px;background:rgba(255,255,255,.06)">
-      <span style="width:8px;height:8px;border-radius:50%;background:${s.col};flex-shrink:0"></span>
-      <div style="flex:1;min-width:0;font-size:13px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.c)}</div>
-      ${forTag}
-      <span style="font-family:var(--mono);font-size:11px;color:${s.col};white-space:nowrap">${s.lbl}</span>
-      ${smsFor(e.c,e.d)?'<span style="font-size:12px" title="SMS">📱</span>':''}
-      <span style="font-family:var(--mono);font-size:12px;color:${val>0?'var(--green)':'var(--text3)'};font-weight:600;min-width:46px;text-align:right">$${val.toFixed(2)}</span>
+  // one block per client → the list of dates I set for that client, as coloured chips
+  const byClient={}; D.rows.forEach(e=>{ (byClient[e.c]=byClient[e.c]||[]).push(e); });
+  let html=`<div style="margin-bottom:12px">
+    <div style="font-family:var(--mono);font-size:12px;color:var(--text2)">${dt.getDate()} ${MONTHS_RU[mm-1]} ${dt.getFullYear()} · ${DAYS_RU[dt.getDay()]}${w===isoToday()?' · сегодня':''} · всего <span style="color:var(--green)">$${D.earned.toFixed(2)}</span></div>
+    <div style="display:flex;gap:10px;margin-top:6px;font-family:var(--mono);font-size:10px"><span style="color:#34d399">● отправлено</span><span style="color:#a78bfa">● черновик</span><span style="color:#f87171">● не отправлено</span></div>
+  </div>`;
+  Object.keys(byClient).sort((a,b)=>a.localeCompare(b,'ru')).forEach(cn=>{
+    const list=byClient[cn].sort((a,b)=>a.d.localeCompare(b.d));
+    let sum=0; list.forEach(e=>sum+=valFor(e.c,e.d,e.s));
+    const chips=list.map(e=>{
+      const s=ST[e.s]||{lbl:e.s,col:'#9aa0aa'}; const td=new Date(e.d+'T00:00:00');
+      const lbl=td.getDate()+'.'+String(td.getMonth()+1).padStart(2,'0');
+      return `<span title="${lbl} · ${s.lbl}" style="font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:9px;background:${s.col}22;color:${s.col};white-space:nowrap">${lbl}${smsFor(e.c,e.d)?' 📱':''}</span>`;
+    }).join('');
+    html+=`<div style="padding:10px 12px;border-radius:14px;margin-bottom:6px;background:rgba(255,255,255,.06)">
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:7px">
+        <span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(cn)}</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${list.length} ${list.length===1?'дата':(list.length>=2&&list.length<=4?'даты':'дат')}</span>
+        <span style="font-family:var(--mono);font-size:11px;color:${sum>0?'var(--green)':'var(--text3)'};font-weight:600">$${sum.toFixed(2)}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">${chips}</div>
     </div>`;
   });
   return html;

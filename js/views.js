@@ -530,7 +530,7 @@ function renderHistory(){
       if(v!=='yes' && v!=='draft' && v!=='no') return;   // include 'no' — it's also something I marked
       const D=day(iso);
       const sms=!!cidSms[iso];
-      const val=(v==='no'||cidDis[iso])?0:(sms?1.00:0.50);
+      const val=(v==='no'||cidDis[iso])?0:(sms?SMS_DAY_RATE:EMAIL_RATE);
       D.items.push({client:c.name, status:v, sms, val});   // one concrete marking = one email for a date
       if(v==='yes') D.sent.push(c.name); else if(v==='draft') D.draft.push(c.name); else D.no.push(c.name);
       if(sms && v!=='no') D.sms.push(c.name);
@@ -617,7 +617,7 @@ function renderHistory(){
       <span style="width:7px;height:7px;border-radius:50%;background:${dot};flex-shrink:0"></span>
       <span style="flex:1;min-width:0;font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
       ${right}</div>`;
-  const valFor=(nm,tIso,st)=>{ if(st!=='yes'&&st!=='draft')return 0; const c=clients.find(x=>x.name===nm); if(!c)return 0.5; if((disAll[c.id]||{})[tIso])return 0; return (smsAll[c.id]||{})[tIso]?1.00:0.50; };
+  const valFor=(nm,tIso,st)=>{ if(st!=='yes'&&st!=='draft')return 0; const c=clients.find(x=>x.name===nm); if(!c)return EMAIL_RATE; if((disAll[c.id]||{})[tIso])return 0; return (smsAll[c.id]||{})[tIso]?SMS_DAY_RATE:EMAIL_RATE; };
   const smsFor=(nm,tIso)=>{ const c=clients.find(x=>x.name===nm); return c?!!(smsAll[c.id]||{})[tIso]:false; };
   const plural=n=>{const a=n%10,b=n%100;return (a===1&&b!==11)?'отметка':(a>=2&&a<=4&&(b<10||b>=20))?'отметки':'отметок';};
   const pd=n=>{const a=n%10,b=n%100;return (a===1&&b!==11)?'дата':(a>=2&&a<=4&&(b<10||b>=20))?'даты':'дат';};

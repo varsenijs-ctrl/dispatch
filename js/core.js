@@ -90,6 +90,11 @@ function save(k,v){ localStorage.setItem(k+'__'+activeMonth,JSON.stringify(v)); 
 function gload(k,def){ try{ return JSON.parse(localStorage.getItem(k))??def; }catch{ return def; } }
 function gsave(k,v){ localStorage.setItem(k,JSON.stringify(v)); }
 
+// ── pay rates ── an email pays EMAIL_RATE; an SMS day adds SMS_EXTRA on top.
+const EMAIL_RATE = 0.50;
+const SMS_EXTRA  = 0.10;                       // SMS = 10¢ (was 50¢)
+const SMS_DAY_RATE = EMAIL_RATE + SMS_EXTRA;   // 0.60
+
 // ── action log ── records WHEN each status mark was made, so History can show
 // "on <day> I set <client> for <target date> = <status>". Global, going-forward.
 // Entry: {t: ms, w: action-day ISO, c: client name, d: target date ISO, s: status}.

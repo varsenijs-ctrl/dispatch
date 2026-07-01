@@ -24,7 +24,7 @@ function computeAllTimeTotals(){
     const hist=_loadM('dc_history',mk,{}), sms=_loadM('dc_sms_days',mk,{}), dis=_loadM('dc_pay_disabled',mk,{});
     ac.forEach(c=>{
       const cidSms=sms[c.id]||{}, cidDis=dis[c.id]||{}, h=hist[c.name]||{};
-      Object.keys(h).forEach(d=>{ const v=h[d]; if(cidDis[d])return; const rate=cidSms[d]?1.00:0.50;
+      Object.keys(h).forEach(d=>{ const v=h[d]; if(cidDis[d])return; const rate=cidSms[d]?SMS_DAY_RATE:EMAIL_RATE;
         if(v==='yes'||v==='draft'){earned+=rate;potential+=rate;sentCount++;totalCount++;} else if(v==='no'){potential+=rate;totalCount++;} });
     });
   });
@@ -44,7 +44,7 @@ function computeFinanceTotals(scope){
     Object.entries(hist).forEach(([d,v])=>{
       if(scope==='month'&&!d.startsWith(mk))return;
       if(cidDis[d])return;
-      const rate=cidSms[d]?1.00:0.50;
+      const rate=cidSms[d]?SMS_DAY_RATE:EMAIL_RATE;
       if(v==='yes'||v==='draft'){earned+=rate;potential+=rate;sentCount++;totalCount++;}
       else if(v==='no'){potential+=rate;totalCount++;}
     });
@@ -64,10 +64,10 @@ function renderFinance(){
   const earnPct=totalPotentialWithInv?Math.round(totalWithInv/totalPotentialWithInv*100):0;
   let clientRows='';
   ac.forEach(c=>{const cidSms2=smsDays[c.id]||{};const cidDis2=dis[c.id]||{};const hist2=historyData[c.name]||{};let ce=0;
-    Object.entries(hist2).forEach(([d,v])=>{if(financeScope==='month'&&!d.startsWith(mk))return;if(cidDis2[d])return;if(v==='yes'||v==='draft')ce+=(cidSms2[d]?1.00:0.50);});
+    Object.entries(hist2).forEach(([d,v])=>{if(financeScope==='month'&&!d.startsWith(mk))return;if(cidDis2[d])return;if(v==='yes'||v==='draft')ce+=(cidSms2[d]?SMS_DAY_RATE:EMAIL_RATE);});
     const isSel=financeSelectedCid===c.id;
     let cp=0;
-    Object.entries(hist2).forEach(([d,v])=>{if(financeScope==='month'&&!d.startsWith(mk))return;if(cidDis2[d])return;if(v==='yes'||v==='no'||v==='draft')cp+=(cidSms2[d]?1.00:0.50);});
+    Object.entries(hist2).forEach(([d,v])=>{if(financeScope==='month'&&!d.startsWith(mk))return;if(cidDis2[d])return;if(v==='yes'||v==='no'||v==='draft')cp+=(cidSms2[d]?SMS_DAY_RATE:EMAIL_RATE);});
     const cfe=getFlowEarnings(c.id,financeScope);
     ce+=cfe.earned; cp+=cfe.potential;
     let cDone=0, cTotal=0;
@@ -129,7 +129,7 @@ function renderFinanceDetail(cid,scope){
   const entries=Object.entries(hist).sort((a,b)=>b[0].localeCompare(a[0]));
   entries.forEach(([d,v])=>{
     if(scope==='month'&&!d.startsWith(mk))return;
-    const rate=smsDays[d]?1.00:0.50;const disabled=dis[d]||false;
+    const rate=smsDays[d]?SMS_DAY_RATE:EMAIL_RATE;const disabled=dis[d]||false;
     const dayEarned=((v==='yes'||v==='draft')&&!disabled)?rate:0;
     if(!disabled&&(v==='yes'||v==='no'||v==='draft'))potential+=rate;
     earned+=dayEarned;

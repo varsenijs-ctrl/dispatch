@@ -92,8 +92,7 @@ function renderHome(){
   const todayTasksCount=todayTasks.length;const todayTasksDone=todayTasks.filter(t=>t.done).length;
   const _smsDays=load('dc_sms_days',{});const _dis=load('dc_pay_disabled',{});
   // Same source of truth as the Finance tab, so both earnings blocks agree.
-  const _T=computeFinanceTotals('all');
-  const _Tm=computeFinanceTotals('month');
+  const _T=computeFinanceTotals(financeScope);   // active work-zone (month), consistent with Finance
   const earnedAmt=_T.earned, potentialAmt=_T.potential, earnedCount=_T.sentCount, potentialCount=_T.totalCount;
   const flowEarnedAmt=0; // flows are already folded into earnedAmt
   const earnedUSD=earnedAmt.toFixed(2);const potentialUSD=potentialAmt.toFixed(2);
@@ -137,9 +136,9 @@ function renderHome(){
       </div>
     </div>
     <div class="earn-card" style="background:linear-gradient(135deg,rgba(var(--accent-rgb),.12),rgba(var(--accent-rgb),.06));border:1px solid rgba(var(--accent-rgb),.2);border-radius:22px;padding:18px 22px;backdrop-filter:blur(12px);margin-bottom:12px;display:flex;align-items:center;gap:24px;flex-wrap:wrap">
-      <div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Заработано всего</div><div style="font-size:32px;font-weight:700;letter-spacing:-.02em;color:var(--green);line-height:1">$${earnedUSD}</div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:4px">${earnedCount} рассылок · в ${MONTHS_SHORT[getTODAY().getMonth()]} $${_Tm.earned.toFixed(2)}</div></div>
+      <div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Заработано</div><div style="font-size:32px;font-weight:700;letter-spacing:-.02em;color:var(--green);line-height:1">$${earnedUSD}</div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:4px">${earnedCount} рассылок · ${_finZoneLabel()}</div></div>
       <div style="width:1px;height:48px;background:rgba(255,255,255,.1);flex-shrink:0"></div>
-      <div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Максимум всего</div><div style="font-size:32px;font-weight:700;letter-spacing:-.02em;color:var(--text);line-height:1">$${potentialUSD}</div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:4px">${potentialCount} всего записей</div></div>
+      <div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Максимум</div><div style="font-size:32px;font-weight:700;letter-spacing:-.02em;color:var(--text);line-height:1">$${potentialUSD}</div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:4px">${potentialCount} записей</div></div>
       <div style="flex:1;min-width:160px"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:11px;color:var(--text3);font-family:var(--mono)">выполнено</span><span style="font-size:11px;color:var(--green);font-family:var(--mono);font-weight:600">${earnPct}%</span></div><div style="height:6px;background:rgba(255,255,255,.08);border-radius:13px;overflow:hidden"><div style="width:${earnPct}%;height:100%;background:linear-gradient(90deg,var(--green),rgba(48,209,88,.6));border-radius:13px;box-shadow:0 0 8px var(--green-glow);transition:width .6s"></div></div><div style="margin-top:6px;font-size:11px;color:var(--text3);font-family:var(--mono)">осталось: <span style="color:var(--amber)">$${leftAmt}</span></div></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">

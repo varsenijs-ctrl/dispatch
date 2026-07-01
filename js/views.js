@@ -620,6 +620,7 @@ function renderHistory(){
   const valFor=(nm,tIso,st)=>{ if(st!=='yes'&&st!=='draft')return 0; const c=clients.find(x=>x.name===nm); if(!c)return 0.5; if((disAll[c.id]||{})[tIso])return 0; return (smsAll[c.id]||{})[tIso]?1.00:0.50; };
   const smsFor=(nm,tIso)=>{ const c=clients.find(x=>x.name===nm); return c?!!(smsAll[c.id]||{})[tIso]:false; };
   const plural=n=>{const a=n%10,b=n%100;return (a===1&&b!==11)?'отметка':(a>=2&&a<=4&&(b<10||b>=20))?'отметки':'отметок';};
+  const pd=n=>{const a=n%10,b=n%100;return (a===1&&b!==11)?'дата':(a>=2&&a<=4&&(b<10||b>=20))?'даты':'дат';};
   const actLog = gload('dc_actlog',[]);
   const byAct={};
   actLog.forEach(e=>{
@@ -628,7 +629,11 @@ function renderHistory(){
     (byAct[e.w]=byAct[e.w]||[]).push(e);
   });
   const actDays=Object.keys(byAct).sort((a,b)=>b.localeCompare(a));   // newest action-day first
-  html += `<div style="font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin:0 2px 8px">Что и когда я выставлял</div>`;
+  html += `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 2px 8px">
+    <span style="font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)">Что и когда я выставлял</span>
+    <span style="display:flex;gap:9px;font-family:var(--mono);font-size:10px">
+      <span style="color:#34d399">● отправлено</span><span style="color:#a78bfa">● черновик</span><span style="color:#f87171">● не отправлено</span>
+    </span></div>`;
   if(!actDays.length){
     html += `<div class="empty" style="padding:24px"><span class="empty-icon">—</span>В этом месяце ты пока ничего не отмечал.</div>`;
     return html;
@@ -643,16 +648,25 @@ function renderHistory(){
     const d=new Date(w+'T00:00:00');
     const isT=w===isoToday();
     let dayEarned=0; rows.forEach(e=>dayEarned+=valFor(e.c,e.d,e.s));
+    // group this day's markings by client → one block per client with the list of dates I set
+    const byClient={}; rows.forEach(e=>{ (byClient[e.c]=byClient[e.c]||[]).push(e); });
     let det='';
-    rows.forEach(e=>{
-      const s=ST[e.s]; const td=new Date(e.d+'T00:00:00'); const val=valFor(e.c,e.d,e.s);
-      const forWhen = e.d===w ? '<span style="color:var(--text3)">в этот день</span>' : `на ${td.getDate()} ${MONTHS_SHORT[td.getMonth()]}`;
-      const right=`<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-        <span style="font-family:var(--mono);font-size:11px;color:var(--accent)">${forWhen}</span>
-        <span style="font-family:var(--mono);font-size:10px;color:${s.col}">${s.lbl}</span>
-        ${smsFor(e.c,e.d)?'<span style="font-size:11px" title="SMS">📱</span>':''}
-        <span style="font-family:var(--mono);font-size:11px;color:${val>0?'var(--green)':'var(--text3)'};min-width:42px;text-align:right">$${val.toFixed(2)}</span></div>`;
-      det+=line(s.dot, esc(e.c), right);
+    Object.keys(byClient).sort((a,b)=>a.localeCompare(b,'ru')).forEach(cn=>{
+      const list=byClient[cn].sort((a,b)=>a.d.localeCompare(b.d));
+      let sum=0; list.forEach(e=>sum+=valFor(e.c,e.d,e.s));
+      const chips=list.map(e=>{
+        const s=ST[e.s]; const td=new Date(e.d+'T00:00:00');
+        const lbl=td.getDate()+(td.getMonth()!==(mm-1)?('.'+String(td.getMonth()+1).padStart(2,'0')):'');   // show month too if it differs
+        return `<span title="${fmtDate(td)} · ${s.lbl}" style="font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:9px;background:${s.col}22;color:${s.col};white-space:nowrap">${lbl}${smsFor(e.c,e.d)?' 📱':''}</span>`;
+      }).join('');
+      det+=`<div style="padding:9px 0;border-bottom:1px dashed rgba(255,255,255,.05)">
+        <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
+          <span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(cn)}</span>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${list.length} ${pd(list.length)}</span>
+          <span style="font-family:var(--mono);font-size:11px;color:${sum>0?'var(--green)':'var(--text3)'};min-width:42px;text-align:right">$${sum.toFixed(2)}</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">${chips}</div>
+      </div>`;
     });
     const open=idx<7;
     html += `<div style="${idx<actDays.length-1?'border-bottom:.5px solid var(--glass-border);':''}${isT?'background:rgba(var(--accent-rgb),.07)':''}">

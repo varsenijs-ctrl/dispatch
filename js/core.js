@@ -169,6 +169,64 @@ function _relocateByMonth(){
   gsave('dc_relocate_v1', true);
 }
 
+// One-time: consolidate a specific set of clients' entire history (+ SMS / pay-off)
+// into the июнь 2026 work space, pulling their marks out of every other zone.
+// Requested by the user; irreversible. Flag-gated so it runs once.
+function _consolidateClientsToJune(){
+  var FLAG='dc_consolidate_june_v1';
+  try{
+    if(gload(FLAG,false)) return;
+    var TM='2026-06';
+    var WANT=['Rise','kerablend','lunavo','pokesource','wild harvest','nevo','healthy living','spicyLab','clearkind'];
+    var norm=function(s){return String(s||'').toLowerCase().replace(/[^a-z0-9а-я]/gi,'');};
+    var wantNorm={}; WANT.forEach(function(w){ wantNorm[norm(w)]=w; });   // normalized → display name
+
+    var juneRoster=_loadMonth('dc_clients',TM); if(!Array.isArray(juneRoster)) juneRoster=[];
+    var juneHist=_loadMonth('dc_history',TM), juneSms=_loadMonth('dc_sms_days',TM), junePay=_loadMonth('dc_pay_disabled',TM);
+    var _seq=0;
+    function juneClientFor(nk, displayName){
+      var found=juneRoster.find(function(c){return c&&norm(c.name)===nk;});
+      if(found) return found;
+      var nc={id:'c_j'+Date.now()+'_'+(_seq++), name:displayName, active:true, smsEnabled:false, schedule:'', deadline:null};
+      juneRoster.push(nc); return nc;
+    }
+
+    // pull each wanted client's history/sms/pay out of every OTHER month bucket
+    Object.keys(localStorage).forEach(function(k){
+      if(k.indexOf('dc_history__')!==0) return;
+      var mk=k.slice('dc_history__'.length); if(mk===TM) return;
+      var hist; try{ hist=JSON.parse(localStorage.getItem(k))||{}; }catch(e){ return; }
+      var sms=_loadMonth('dc_sms_days',mk), pay=_loadMonth('dc_pay_disabled',mk);
+      var roster=_loadMonth('dc_clients',mk); var nameToCid={}; (Array.isArray(roster)?roster:[]).forEach(function(c){if(c&&c.name)nameToCid[norm(c.name)]=c.id;});
+      var histChanged=false, smsChanged=false, payChanged=false;
+      Object.keys(hist).forEach(function(name){
+        var nk=norm(name); if(!wantNorm[nk]) return;
+        var jc=juneClientFor(nk, wantNorm[nk]);
+        if(!juneHist[jc.name]) juneHist[jc.name]={};
+        Object.assign(juneHist[jc.name], hist[name]); delete hist[name]; histChanged=true;
+        var oldCid=nameToCid[nk];
+        if(oldCid){
+          if(sms[oldCid]){ if(!juneSms[jc.id])juneSms[jc.id]={}; Object.assign(juneSms[jc.id],sms[oldCid]); delete sms[oldCid]; smsChanged=true; }
+          if(pay[oldCid]){ if(!junePay[jc.id])junePay[jc.id]={}; Object.assign(junePay[jc.id],pay[oldCid]); delete pay[oldCid]; payChanged=true; }
+        }
+      });
+      if(histChanged) localStorage.setItem(k, JSON.stringify(hist));
+      if(smsChanged) _saveMonth('dc_sms_days',mk,sms);
+      if(payChanged) _saveMonth('dc_pay_disabled',mk,pay);
+    });
+
+    // make sure every wanted client exists (active) in June, even with no history
+    Object.keys(wantNorm).forEach(function(nk){ var c=juneClientFor(nk, wantNorm[nk]); c.active=true; });
+
+    _saveMonth('dc_clients',TM,juneRoster);
+    _saveMonth('dc_history',TM,juneHist);
+    _saveMonth('dc_sms_days',TM,juneSms);
+    _saveMonth('dc_pay_disabled',TM,junePay);
+    _ensureMonthListed(TM);
+    gsave(FLAG,true);
+  }catch(e){}
+}
+
 // ── one-time migration: legacy un-namespaced keys → current-month namespace ──
 (function(){
   const OLD_KEYS = ['dc_clients','dc_log','dc_history','dc_plans','dc_plantasks','dc_manual_done','dc_sms_days','dc_pay_disabled','dc_flows'];

@@ -486,6 +486,7 @@ function setLog(clientName, iso, val){
   if(historyData[clientName][iso]===val) delete historyData[clientName][iso];
   else historyData[clientName][iso]=val;
   saveAll();
+  try{ _logAct(clientName, iso, historyData[clientName][iso]||''); }catch(e){}          // → action log (История)
   try{ if(typeof _sheetPush==='function') _sheetPush(clientName, iso, historyData[clientName][iso]||''); }catch(e){}
   render();
 }
@@ -609,49 +610,59 @@ function renderHistory(){
     <div style="font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:10px">Активность за ${monthName}</div>
     <div style="display:flex;flex-wrap:wrap;gap:5px">${heat}</div></div>`;
 
-  // ── timeline (newest first) ──
-  // Per-day log (like browser history): one row per day with how much was done +
-  // earnings. Click a row to expand and see WHAT exactly was sent that day.
-  // Each marking rendered as one explicit line: client — status — $ (+ SMS/flow tag).
+  // ── timeline grouped by the DAY I made the mark (action log) ──
+  // Each row = an action-day; expand to see WHICH client I set, FOR which date, status.
   const ST={yes:{lbl:'отправлено',col:'#34d399',dot:'#34d399'},draft:{lbl:'черновик',col:'#a78bfa',dot:'#a78bfa'},no:{lbl:'не отправлено',col:'#f87171',dot:'#f87171'}};
   const line=(dot,name,right)=>`<div style="display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,.05)">
       <span style="width:7px;height:7px;border-radius:50%;background:${dot};flex-shrink:0"></span>
       <span style="flex:1;min-width:0;font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
       ${right}</div>`;
+  const valFor=(nm,tIso,st)=>{ if(st!=='yes'&&st!=='draft')return 0; const c=clients.find(x=>x.name===nm); if(!c)return 0.5; if((disAll[c.id]||{})[tIso])return 0; return (smsAll[c.id]||{})[tIso]?1.00:0.50; };
+  const smsFor=(nm,tIso)=>{ const c=clients.find(x=>x.name===nm); return c?!!(smsAll[c.id]||{})[tIso]:false; };
+  const plural=n=>{const a=n%10,b=n%100;return (a===1&&b!==11)?'отметка':(a>=2&&a<=4&&(b<10||b>=20))?'отметки':'отметок';};
+  const actLog = gload('dc_actlog',[]);
+  const byAct={};
+  actLog.forEach(e=>{
+    if(!e.w || e.w.slice(0,7)!==mk) return;                 // group by action-day within this month
+    if(sel){ const c=clients.find(x=>x.id===sel); if(!c||c.name!==e.c) return; }
+    (byAct[e.w]=byAct[e.w]||[]).push(e);
+  });
+  const actDays=Object.keys(byAct).sort((a,b)=>b.localeCompare(a));   // newest action-day first
+  html += `<div style="font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin:0 2px 8px">Что и когда я выставлял</div>`;
+  if(!actDays.length){
+    html += `<div class="empty" style="padding:24px"><span class="empty-icon">—</span>В этом месяце ты пока ничего не отмечал.</div>`;
+    return html;
+  }
   html += `<div style="background:var(--bg2);border:.5px solid var(--glass-border);border-radius:16px;overflow:hidden">`;
-  isos.forEach((iso,idx)=>{
-    const D=dayMap[iso];
-    const d=new Date(iso+'T00:00:00');
-    const isT=iso===isoToday();
-    const bits=[];
-    if(D.sms.length)   bits.push(D.sms.length+' SMS');
-    if(D.flows.length) bits.push(D.flows.length+' ⚡');
-    if(D.draft.length) bits.push(D.draft.length+' черн.');
-    if(D.no.length)    bits.push(D.no.length+' ✕');
-    if(D.tasks.length) bits.push(D.tasks.length+' задач');
-    if(D.inv)          bits.push(D.inv+' инв.');
-    const sub = bits.length?` <span style="color:var(--text3);font-family:var(--mono);font-size:11px">· ${bits.join(' · ')}</span>`:'';
-    // detail — WHAT exactly was marked that day, one line per email/flow/task
+  actDays.forEach((w,idx)=>{
+    const ents=byAct[w].slice().sort((a,b)=>(a.t||0)-(b.t||0));
+    const finalMap={}; ents.forEach(e=>{ finalMap[e.c+'|'+e.d]=e; });   // last status per client|date wins
+    const rows=Object.values(finalMap).filter(e=>e.s==='yes'||e.s==='draft'||e.s==='no')
+      .sort((a,b)=>a.d.localeCompare(b.d)||a.c.localeCompare(b.c,'ru'));
+    if(!rows.length) return;
+    const d=new Date(w+'T00:00:00');
+    const isT=w===isoToday();
+    let dayEarned=0; rows.forEach(e=>dayEarned+=valFor(e.c,e.d,e.s));
     let det='';
-    // emails: yes first, then draft, then no
-    const order={yes:0,draft:1,no:2};
-    D.items.slice().sort((a,b)=>(order[a.status]-order[b.status])||a.client.localeCompare(b.client,'ru')).forEach(it=>{
-      const s=ST[it.status];
-      const tags=`<span style="font-family:var(--mono);font-size:10px;color:${s.col}">${s.lbl}</span>${it.sms?'<span style="font-size:11px" title="SMS">📱</span>':''}<span style="font-family:var(--mono);font-size:11px;color:${it.val>0?'var(--green)':'var(--text3)'};min-width:42px;text-align:right">$${it.val.toFixed(2)}</span>`;
-      det+=line(s.dot, esc(it.client), `<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">${tags}</div>`);
+    rows.forEach(e=>{
+      const s=ST[e.s]; const td=new Date(e.d+'T00:00:00'); const val=valFor(e.c,e.d,e.s);
+      const forWhen = e.d===w ? '<span style="color:var(--text3)">в этот день</span>' : `на ${td.getDate()} ${MONTHS_SHORT[td.getMonth()]}`;
+      const right=`<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--accent)">${forWhen}</span>
+        <span style="font-family:var(--mono);font-size:10px;color:${s.col}">${s.lbl}</span>
+        ${smsFor(e.c,e.d)?'<span style="font-size:11px" title="SMS">📱</span>':''}
+        <span style="font-family:var(--mono);font-size:11px;color:${val>0?'var(--green)':'var(--text3)'};min-width:42px;text-align:right">$${val.toFixed(2)}</span></div>`;
+      det+=line(s.dot, esc(e.c), right);
     });
-    D.flows.forEach(f=>det+=line('#fbbf24', '⚡ '+esc(f.name)+(f.client?` <span style="color:var(--text3)">· ${esc(f.client)}</span>`:''), `<span style="font-family:var(--mono);font-size:11px;color:var(--green);min-width:42px;text-align:right">$${(f.val||0).toFixed(2)}</span>`));
-    D.tasks.forEach(t=>det+=line('rgba(255,255,255,.4)', '📋 '+esc(t.text)+(t.client?` <span style="color:var(--text3)">· ${esc(t.client)}</span>`:''), ''));
-    if(D.inv) det+=line('#34d399', '🧾 Инвойсы · '+D.inv+' шт', `<span style="font-family:var(--mono);font-size:11px;color:var(--green);min-width:42px;text-align:right">$${(D.inv*0.50).toFixed(2)}</span>`);
-    const open = idx<7;   // recent days expanded by default; older days collapsed
-    html += `<div id="hd-${iso}" style="${idx<isos.length-1?'border-bottom:.5px solid var(--glass-border);':''}${isT?'background:rgba(var(--accent-rgb),.07)':''}">
+    const open=idx<7;
+    html += `<div style="${idx<actDays.length-1?'border-bottom:.5px solid var(--glass-border);':''}${isT?'background:rgba(var(--accent-rgb),.07)':''}">
       <div onclick="var x=this.parentNode.querySelector('.hday-det'),o=x.style.display==='none';x.style.display=o?'block':'none';this.querySelector('.hday-chev').textContent=o?'▾':'▸';" style="display:flex;align-items:center;gap:11px;padding:13px 15px;cursor:pointer">
         <span class="hday-chev" style="color:var(--text3);font-size:10px;width:9px;flex-shrink:0">${open?'▾':'▸'}</span>
-        <div style="min-width:124px;font-family:var(--mono);font-size:12px;color:${isT?'var(--accent)':'var(--text2)'}">${d.getDate()} ${MONTHS_RU[mm-1]} · ${DAYS_RU[d.getDay()]}${isT?' (сегодня)':''}</div>
-        <div style="flex:1;min-width:0"><span style="font-size:16px;font-weight:800;color:var(--green)">${D.sent.length}</span><span style="font-size:12px;color:var(--text3)"> отправлено</span>${sub}</div>
-        <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:${D.earned>0?'var(--green)':'var(--text3)'}">$${D.earned.toFixed(2)}</div>
+        <div style="min-width:150px;font-family:var(--mono);font-size:12px;color:${isT?'var(--accent)':'var(--text2)'}">${d.getDate()} ${MONTHS_RU[mm-1]} · ${DAYS_RU[d.getDay()]}${isT?' (сегодня)':''}</div>
+        <div style="flex:1;min-width:0"><span style="font-size:15px;font-weight:800;color:var(--text)">${rows.length}</span><span style="font-size:12px;color:var(--text3)"> ${plural(rows.length)}</span></div>
+        <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:${dayEarned>0?'var(--green)':'var(--text3)'}">$${dayEarned.toFixed(2)}</div>
       </div>
-      <div class="hday-det" style="display:${open?'block':'none'};padding:0 15px 14px 35px">${det||'<div style="color:var(--text3);font-size:12px">—</div>'}</div>
+      <div class="hday-det" style="display:${open?'block':'none'};padding:0 15px 14px 35px">${det}</div>
     </div>`;
   });
   html += `</div>`;

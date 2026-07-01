@@ -90,6 +90,44 @@ function save(k,v){ localStorage.setItem(k+'__'+activeMonth,JSON.stringify(v)); 
 function gload(k,def){ try{ return JSON.parse(localStorage.getItem(k))??def; }catch{ return def; } }
 function gsave(k,v){ localStorage.setItem(k,JSON.stringify(v)); }
 
+// ── action log ── records WHEN each status mark was made, so History can show
+// "on <day> I set <client> for <target date> = <status>". Global, going-forward.
+// Entry: {t: ms, w: action-day ISO, c: client name, d: target date ISO, s: status}.
+function _logAct(client, targetIso, status){
+  try{
+    if(!client || !targetIso) return;
+    var log = gload('dc_actlog', []);
+    log.push({ t: Date.now(), w: isoToday(), c: client, d: targetIso, s: status||'' });
+    if(log.length > 4000) log = log.slice(log.length-4000);
+    gsave('dc_actlog', log);
+  }catch(e){}
+}
+// One-time seed from existing marks. Real action-day is unknown for old data, so
+// we approximate it with the target date (marks are usually made on/near their day).
+function _seedActLog(){
+  try{
+    if(gload('dc_actlog_seeded_v1', false)) return;
+    var log = gload('dc_actlog', []);
+    var seen = {}; log.forEach(function(e){ seen[e.c+'|'+e.d]=1; });
+    Object.keys(localStorage).forEach(function(k){
+      if(k.indexOf('dc_history__')!==0) return;
+      var hist; try{ hist = JSON.parse(localStorage.getItem(k)||'{}'); }catch(e){ return; }
+      Object.keys(hist).forEach(function(client){
+        var days = hist[client]||{};
+        Object.keys(days).forEach(function(iso){
+          var s = days[iso];
+          if(s!=='yes' && s!=='draft' && s!=='no') return;
+          if(seen[client+'|'+iso]) return;
+          seen[client+'|'+iso]=1;
+          log.push({ t:0, w:iso, c:client, d:iso, s:s, seed:true });
+        });
+      });
+    });
+    gsave('dc_actlog', log);
+    gsave('dc_actlog_seeded_v1', true);
+  }catch(e){}
+}
+
 // ── one-time migration: legacy un-namespaced keys → current-month namespace ──
 (function(){
   const OLD_KEYS = ['dc_clients','dc_log','dc_history','dc_plans','dc_plantasks','dc_manual_done','dc_sms_days','dc_pay_disabled','dc_flows'];

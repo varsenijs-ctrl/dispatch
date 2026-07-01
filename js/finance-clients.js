@@ -9,61 +9,33 @@ function _loadM(base, mk, def){ try{ const v=localStorage.getItem(base+'__'+mk);
 // Label the Finance header with the active work-zone (month), e.g. "июль 2026".
 function _finZoneLabel(){ try{ var p=(activeMonth||'').split('-'); if(p.length<2) return ''; var mi=parseInt(p[1],10)-1; return (MONTHS_RU[mi]||'')+' '+p[0]; }catch(e){ return ''; } }
 
-// Per-client dated entries for a scope. 'all' = across every month bucket (using
-// each month's own name→cid map for SMS/disabled); 'month'/'active' = the active
-// work-zone bucket. Each entry: {iso, v, sms, disabled, cid, rate}.
+// Per-client dated entries for the CURRENT work space (zone) only — zones are
+// independent, so we never read other months' buckets. 'all' = every date in this
+// zone; 'month' = only dates whose calendar month matches the zone.
+// Each entry: {iso, v, sms, disabled, cid, rate}.
 function _clientEntries(name, scope){
   const res=[];
-  const addMonth=(hist, sms, dis, roster)=>{
-    const days=hist[name]; if(!days) return;
-    let cid=null; (Array.isArray(roster)?roster:[]).forEach(c=>{ if(c&&c.name===name) cid=c.id; });
-    const cidSms=(cid&&sms[cid])||{}, cidDis=(cid&&dis[cid])||{};
-    Object.keys(days).forEach(iso=>{ res.push({iso, v:days[iso], sms:!!cidSms[iso], disabled:!!cidDis[iso], cid, rate:cidSms[iso]?SMS_DAY_RATE:EMAIL_RATE}); });
-  };
-  if(scope==='all'){
-    const months={}; Object.keys(localStorage).forEach(k=>{ if(k.indexOf('dc_history__')===0) months[k.slice(12)]=1; });
-    Object.keys(months).forEach(mk=>{ addMonth(_loadM('dc_history',mk,{}), _loadM('dc_sms_days',mk,{}), _loadM('dc_pay_disabled',mk,{}), _loadM('dc_clients',mk,[])); });
-  } else {
-    addMonth(historyData, load('dc_sms_days',{}), load('dc_pay_disabled',{}), clients);
-  }
+  const days=historyData[name]||{};
+  let cid=null; clients.forEach(c=>{ if(c&&c.name===name) cid=c.id; });
+  const sms=load('dc_sms_days',{}), dis=load('dc_pay_disabled',{});
+  const cidSms=(cid&&sms[cid])||{}, cidDis=(cid&&dis[cid])||{};
+  Object.keys(days).forEach(iso=>{
+    if(scope==='month' && iso.slice(0,7)!==activeMonth) return;
+    res.push({iso, v:days[iso], sms:!!cidSms[iso], disabled:!!cidDis[iso], cid, rate:cidSms[iso]?SMS_DAY_RATE:EMAIL_RATE});
+  });
   return res;
 }
 
-// TRUE all-time totals — aggregate every month bucket by its OWN roster (name→cid),
-// so it's consistent no matter which zone is active. Emails + flows + invoices.
-function computeAllTimeTotals(){
-  let earned=0,potential=0,sentCount=0,totalCount=0,invTotal=0;
-  const histMonths={}; let allTasks=[];
-  Object.keys(localStorage).forEach(k=>{
-    if(k.indexOf('dc_history__')===0) histMonths[k.slice(12)]=1;
-    if(k.indexOf('dc_plantasks__')===0){ try{ allTasks=allTasks.concat(Object.values(JSON.parse(localStorage.getItem(k)||'{}'))); }catch(e){} }
-    if(k.indexOf('dc_invoices__')===0){ try{ const arr=JSON.parse(localStorage.getItem(k)||'[]'); if(Array.isArray(arr)) arr.forEach(i=>{ invTotal+=i.count*INV_RATE; }); }catch(e){} }
-  });
-  Object.keys(histMonths).forEach(mk=>{
-    const hist=_loadM('dc_history',mk,{}), sms=_loadM('dc_sms_days',mk,{}), dis=_loadM('dc_pay_disabled',mk,{});
-    const roster=_loadM('dc_clients',mk,[]); const nameToCid={}; (Array.isArray(roster)?roster:[]).forEach(c=>{ if(c&&c.name) nameToCid[c.name]=c.id; });
-    Object.keys(hist).forEach(name=>{
-      const cid=nameToCid[name]; const cidSms=(cid&&sms[cid])||{}, cidDis=(cid&&dis[cid])||{}; const days=hist[name]||{};
-      Object.keys(days).forEach(d=>{ const v=days[d]; if(cidDis[d])return; const rate=cidSms[d]?SMS_DAY_RATE:EMAIL_RATE;
-        if(v==='yes'||v==='draft'){earned+=rate;potential+=rate;sentCount++;totalCount++;} else if(v==='no'){potential+=rate;totalCount++;} });
-    });
-  });
-  // flows: union of client ids across all rosters; earned if a done task exists anywhere
-  const seen={};
-  Object.keys(localStorage).forEach(k=>{ if(k.indexOf('dc_clients__')!==0) return; try{ (JSON.parse(localStorage.getItem(k))||[]).forEach(c=>{ if(!c||!c.id||seen[c.id])return; seen[c.id]=1;
-    getFlows(c.id).forEach(f=>{ const val=f.count*0.60; potential+=val; if(allTasks.some(t=>t.cid===c.id && t.flowId===f.id && t.done)) earned+=val; }); }); }catch(e){} });
-  earned+=invTotal; potential+=invTotal;
-  return {earned,potential,sentCount,totalCount,invTotal};
-}
-
+// Totals for the CURRENT work space (zone) only — zones are independent, never
+// summed together. 'all' = everything in this zone; 'month' = only dates whose
+// calendar month matches the zone.
 function computeFinanceTotals(scope){
-  if(scope==='all') return computeAllTimeTotals();
-  // 'month' = active work-zone. historyData/invoices/flows are already scoped to activeMonth.
   const smsDays=load('dc_sms_days',{});const dis=load('dc_pay_disabled',{});
   let earned=0,potential=0,sentCount=0,totalCount=0;
   clients.filter(c=>c.active).forEach(c=>{
     const cidSms=smsDays[c.id]||{};const cidDis=dis[c.id]||{};const hist=historyData[c.name]||{};
     Object.entries(hist).forEach(([d,v])=>{
+      if(scope==='month' && d.slice(0,7)!==activeMonth) return;
       if(cidDis[d])return;
       const rate=cidSms[d]?SMS_DAY_RATE:EMAIL_RATE;
       if(v==='yes'||v==='draft'){earned+=rate;potential+=rate;sentCount++;totalCount++;}

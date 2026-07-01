@@ -480,6 +480,7 @@ function undoDoneToday(cid){ _sfx.play('undo');
 
 let historyDays = 30;
 let historySelectedClient = null;
+let historySelectedDate = null;   // История: selected action-day (Finance-style master/detail)
 
 function setLog(clientName, iso, val){
   if(!historyData[clientName]) historyData[clientName]={};
@@ -501,185 +502,118 @@ function _setLogCell(el){
   setLog(c.name,iso,next);
 }
 
-// ── History: real day-by-day activity feed for the ACTIVE month ──
-// (switch months with the bottom month bar). Aggregates emails, SMS, flows,
-// completed tasks and invoices into one timeline + summary + heatmap.
+
+// ── History: Finance-style master/detail keyed by the DAY I made the mark ──
+// Left = list of dates (the days I worked). Click a date → see everything done
+// that day (which client, what status, and the target date if it differs).
+// Built from the action log (dc_actlog), grouped by action-day within the month.
 function renderHistory(){
   const mk = activeMonth;                       // 'YYYY-MM'
   const parts = mk.split('-'); const yy=+parts[0], mm=+parts[1];
-  const daysInMonth = new Date(yy, mm, 0).getDate();
   const monthName = (typeof MONTHS_RU!=='undefined'?MONTHS_RU[mm-1]:mk)+' '+yy;
-  const ac = clients.filter(c=>c.active).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
-  const sel = historySelectedClient;
   const smsAll = load('dc_sms_days',{});
   const disAll = load('dc_pay_disabled',{});
-  const tasks  = load('dc_plantasks',{});
-  const invoices = load('dc_invoices',[]);
 
-  // ── aggregate per-day activity ──
-  const dayMap = {};
-  const blank = ()=>({items:[],sent:[],draft:[],no:[],sms:[],flows:[],tasks:[],inv:0,earned:0});
-  const day = iso => (dayMap[iso] || (dayMap[iso]=blank()));
-
-  ac.forEach(c=>{
-    if(sel && c.id!==sel) return;
-    const hist=historyData[c.name]||{}, cidSms=smsAll[c.id]||{}, cidDis=disAll[c.id]||{};
-    Object.keys(hist).forEach(iso=>{
-      if(iso.slice(0,7)!==mk) return;
-      const v=hist[iso];
-      if(v!=='yes' && v!=='draft' && v!=='no') return;   // include 'no' — it's also something I marked
-      const D=day(iso);
-      const sms=!!cidSms[iso];
-      const val=(v==='no'||cidDis[iso])?0:(sms?SMS_DAY_RATE:EMAIL_RATE);
-      D.items.push({client:c.name, status:v, sms, val});   // one concrete marking = one email for a date
-      if(v==='yes') D.sent.push(c.name); else if(v==='draft') D.draft.push(c.name); else D.no.push(c.name);
-      if(sms && v!=='no') D.sms.push(c.name);
-      D.earned += val;
-    });
-  });
-  Object.values(tasks).forEach(t=>{
-    if(!t.done) return;
-    if(sel && t.cid!==sel) return;
-    const iso = t.doneDate || t.startIso;
-    if(!iso || iso.slice(0,7)!==mk) return;
-    if(t.flowId){
-      const flow = t.cid?getFlows(t.cid).find(f=>f.id===t.flowId):null;
-      const val = flow?flow.count*0.60:0;
-      day(iso).flows.push({name:t.text||(flow&&flow.name)||'флоу', client:t.clientName||'', val});
-      day(iso).earned += val;
-    } else {
-      day(iso).tasks.push({text:t.text||'задача', client:t.clientName||''});
-    }
-  });
-  if(!sel){
-    invoices.forEach(i=>{
-      if(!i.date || i.date.slice(0,7)!==mk) return;
-      const D=day(i.date); D.inv += i.count; D.earned += i.count*0.50;
-    });
-  }
-
-  const isos = Object.keys(dayMap).sort((a,b)=>b.localeCompare(a));   // newest first
-  // ── summary ──
-  let totalSent=0,totalEarned=0,bestIso=null,bestEarned=0;
-  isos.forEach(iso=>{const D=dayMap[iso];totalSent+=D.sent.length;totalEarned+=D.earned;if(D.earned>bestEarned){bestEarned=D.earned;bestIso=iso;}});
-  // current streak of active days ending today (only when viewing the current month)
-  let streak=0;
-  if(mk===monthKey(getTODAY())){
-    let d=new Date(getTODAY());
-    while(dayMap[toISO(d)]){ streak++; d.setDate(d.getDate()-1); }
-  }
-  const stat=(label,val,color)=>`<div style="flex:1;min-width:120px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:12px 14px">
-    <div style="font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:5px">${label}</div>
-    <div style="font-size:20px;font-weight:700;color:${color||'var(--text)'};line-height:1">${val}</div></div>`;
-
-  let html = `<div class="section-header" style="margin-bottom:12px"><h2>История</h2>
-    <span style="font-family:var(--mono);font-size:12px;color:var(--text3)">${monthName} · листай месяцы внизу ↓</span></div>`;
-
-  // client filter
-  html += `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px">
-    <button onclick="historySelectedClient=null;render()" style="font-family:var(--mono);font-size:10px;padding:4px 11px;border-radius:16px;border:1px solid ${!sel?'var(--accent)':'rgba(255,255,255,.12)'};background:${!sel?'rgba(var(--accent-rgb),.12)':'none'};color:${!sel?'var(--green)':'var(--text3)'};cursor:pointer">Все</button>
-    ${ac.map(c=>`<button onclick="historySelectedClient='${c.id}';render()" style="font-family:var(--mono);font-size:10px;padding:4px 11px;border-radius:16px;border:1px solid ${sel===c.id?'var(--accent)':'rgba(255,255,255,.12)'};background:${sel===c.id?'rgba(var(--accent-rgb),.12)':'none'};color:${sel===c.id?'var(--green)':'var(--text3)'};cursor:pointer;white-space:nowrap">${esc(c.name.slice(0,14))}</button>`).join('')}
-  </div>`;
-
-  if(!isos.length){
-    html += `<div class="empty"><span class="empty-icon">—</span>${sel?'У этого клиента нет активности в этом месяце.':'В этом месяце пока ничего не отмечено.'}<br>Отмечай отправки в «Рассылках» — здесь появится история.</div>`;
-    return html;
-  }
-
-  // summary tiles
-  html += `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-    ${stat('Отправлено',totalSent,'var(--green)')}
-    ${stat('Заработано','$'+totalEarned.toFixed(2),'var(--green)')}
-    ${stat('Активных дней',isos.length,'var(--text)')}
-    ${stat('Лучший день',bestIso?'$'+bestEarned.toFixed(2):'—','var(--accent)')}
-    ${streak>1?stat('Серия 🔥',streak+' дн','var(--amber)'):''}
-  </div>`;
-
-  // ── activity heatmap (whole month) ──
-  let heat='';
-  for(let dn=1;dn<=daysInMonth;dn++){
-    const iso=`${yy}-${String(mm).padStart(2,'0')}-${String(dn).padStart(2,'0')}`;
-    const D=dayMap[iso];
-    const isT=iso===isoToday();
-    const intensity = D&&bestEarned>0 ? (0.22+0.68*Math.min(1,D.earned/bestEarned)) : 0;
-    const bg = D ? `rgba(48,209,88,${intensity.toFixed(2)})` : 'rgba(255,255,255,.04)';
-    const tip = D? `${fmtDate(new Date(iso+'T00:00:00'))}: ${D.sent.length}✉${D.earned?(' · $'+D.earned.toFixed(2)):''}` : `${fmtDate(new Date(iso+'T00:00:00'))}: нет активности`;
-    heat += `<div title="${tip}" ${D?`onclick="document.getElementById('hd-${iso}')&&document.getElementById('hd-${iso}').scrollIntoView({behavior:'smooth',block:'center'})" style="cursor:pointer;`:'style="'}width:22px;height:22px;border-radius:6px;background:${bg};${isT?'box-shadow:0 0 0 2px var(--accent)':''};display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;color:${D&&intensity>0.5?'#04130a':'var(--text3)'}">${dn}</div>`;
-  }
-  html += `<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:14px;margin-bottom:18px">
-    <div style="font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:10px">Активность за ${monthName}</div>
-    <div style="display:flex;flex-wrap:wrap;gap:5px">${heat}</div></div>`;
-
-  // ── timeline grouped by the DAY I made the mark (action log) ──
-  // Each row = an action-day; expand to see WHICH client I set, FOR which date, status.
-  const ST={yes:{lbl:'отправлено',col:'#34d399',dot:'#34d399'},draft:{lbl:'черновик',col:'#a78bfa',dot:'#a78bfa'},no:{lbl:'не отправлено',col:'#f87171',dot:'#f87171'}};
-  const line=(dot,name,right)=>`<div style="display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,.05)">
-      <span style="width:7px;height:7px;border-radius:50%;background:${dot};flex-shrink:0"></span>
-      <span style="flex:1;min-width:0;font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
-      ${right}</div>`;
   const valFor=(nm,tIso,st)=>{ if(st!=='yes'&&st!=='draft')return 0; const c=clients.find(x=>x.name===nm); if(!c)return EMAIL_RATE; if((disAll[c.id]||{})[tIso])return 0; return (smsAll[c.id]||{})[tIso]?SMS_DAY_RATE:EMAIL_RATE; };
-  const smsFor=(nm,tIso)=>{ const c=clients.find(x=>x.name===nm); return c?!!(smsAll[c.id]||{})[tIso]:false; };
-  const plural=n=>{const a=n%10,b=n%100;return (a===1&&b!==11)?'отметка':(a>=2&&a<=4&&(b<10||b>=20))?'отметки':'отметок';};
-  const pd=n=>{const a=n%10,b=n%100;return (a===1&&b!==11)?'дата':(a>=2&&a<=4&&(b<10||b>=20))?'даты':'дат';};
+
+  // group action-log entries by action-day (this month); collapse to final status per client|target
   const actLog = gload('dc_actlog',[]);
-  const byAct={};
-  actLog.forEach(e=>{
-    if(!e.w || e.w.slice(0,7)!==mk) return;                 // group by action-day within this month
-    if(sel){ const c=clients.find(x=>x.id===sel); if(!c||c.name!==e.c) return; }
-    (byAct[e.w]=byAct[e.w]||[]).push(e);
+  const rawByDay = {};
+  actLog.forEach(e=>{ if(!e.w || e.w.slice(0,7)!==mk) return; (rawByDay[e.w]=rawByDay[e.w]||[]).push(e); });
+  const dayMap = {};
+  Object.keys(rawByDay).forEach(w=>{
+    const ents = rawByDay[w].slice().sort((a,b)=>(a.t||0)-(b.t||0));
+    const finalMap={}; ents.forEach(e=>{ finalMap[e.c+'|'+e.d]=e; });
+    const rows = Object.values(finalMap).filter(e=>e.s==='yes'||e.s==='draft'||e.s==='no');
+    if(!rows.length) return;
+    let earned=0; rows.forEach(e=>earned+=valFor(e.c,e.d,e.s));
+    dayMap[w] = { rows, earned };
   });
-  const actDays=Object.keys(byAct).sort((a,b)=>b.localeCompare(a));   // newest action-day first
-  html += `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 2px 8px">
-    <span style="font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)">Что и когда я выставлял</span>
-    <span style="display:flex;gap:9px;font-family:var(--mono);font-size:10px">
-      <span style="color:#34d399">● отправлено</span><span style="color:#a78bfa">● черновик</span><span style="color:#f87171">● не отправлено</span>
-    </span></div>`;
-  if(!actDays.length){
-    html += `<div class="empty" style="padding:24px"><span class="empty-icon">—</span>В этом месяце ты пока ничего не отмечал.</div>`;
+  const days = Object.keys(dayMap).sort((a,b)=>b.localeCompare(a));   // newest first
+
+  const pluralM=n=>{const a=n%10,b=n%100;return (a===1&&b!==11)?'отметка':(a>=2&&a<=4&&(b<10||b>=20))?'отметки':'отметок';};
+
+  let html = `<div class="section-header" style="margin-bottom:12px"><h2>История 📅</h2><span style="font-family:var(--mono);font-size:11px;color:var(--text3)">${monthName} · листай месяцы внизу ↓</span></div>`;
+
+  if(!days.length){
+    html += `<div class="empty"><span class="empty-icon">—</span>В этом месяце ты пока ничего не отмечал.<br>Отмечай статусы в календаре клиента — здесь появится история по дням.</div>`;
     return html;
   }
-  html += `<div style="background:var(--bg2);border:.5px solid var(--glass-border);border-radius:16px;overflow:hidden">`;
-  actDays.forEach((w,idx)=>{
-    const ents=byAct[w].slice().sort((a,b)=>(a.t||0)-(b.t||0));
-    const finalMap={}; ents.forEach(e=>{ finalMap[e.c+'|'+e.d]=e; });   // last status per client|date wins
-    const rows=Object.values(finalMap).filter(e=>e.s==='yes'||e.s==='draft'||e.s==='no')
-      .sort((a,b)=>a.d.localeCompare(b.d)||a.c.localeCompare(b.c,'ru'));
-    if(!rows.length) return;
-    const d=new Date(w+'T00:00:00');
-    const isT=w===isoToday();
-    let dayEarned=0; rows.forEach(e=>dayEarned+=valFor(e.c,e.d,e.s));
-    // group this day's markings by client → one block per client with the list of dates I set
-    const byClient={}; rows.forEach(e=>{ (byClient[e.c]=byClient[e.c]||[]).push(e); });
-    let det='';
-    Object.keys(byClient).sort((a,b)=>a.localeCompare(b,'ru')).forEach(cn=>{
-      const list=byClient[cn].sort((a,b)=>a.d.localeCompare(b.d));
-      let sum=0; list.forEach(e=>sum+=valFor(e.c,e.d,e.s));
-      const chips=list.map(e=>{
-        const s=ST[e.s]; const td=new Date(e.d+'T00:00:00');
-        const lbl=td.getDate()+(td.getMonth()!==(mm-1)?('.'+String(td.getMonth()+1).padStart(2,'0')):'');   // show month too if it differs
-        return `<span title="${fmtDate(td)} · ${s.lbl}" style="font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:9px;background:${s.col}22;color:${s.col};white-space:nowrap">${lbl}${smsFor(e.c,e.d)?' 📱':''}</span>`;
-      }).join('');
-      det+=`<div style="padding:9px 0;border-bottom:1px dashed rgba(255,255,255,.05)">
-        <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
-          <span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(cn)}</span>
-          <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${list.length} ${pd(list.length)}</span>
-          <span style="font-family:var(--mono);font-size:11px;color:${sum>0?'var(--green)':'var(--text3)'};min-width:42px;text-align:right">$${sum.toFixed(2)}</span>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:5px">${chips}</div>
-      </div>`;
-    });
-    const open=idx<7;
-    html += `<div style="${idx<actDays.length-1?'border-bottom:.5px solid var(--glass-border);':''}${isT?'background:rgba(var(--accent-rgb),.07)':''}">
-      <div onclick="var x=this.parentNode.querySelector('.hday-det'),o=x.style.display==='none';x.style.display=o?'block':'none';this.querySelector('.hday-chev').textContent=o?'▾':'▸';" style="display:flex;align-items:center;gap:11px;padding:13px 15px;cursor:pointer">
-        <span class="hday-chev" style="color:var(--text3);font-size:10px;width:9px;flex-shrink:0">${open?'▾':'▸'}</span>
-        <div style="min-width:150px;font-family:var(--mono);font-size:12px;color:${isT?'var(--accent)':'var(--text2)'}">${d.getDate()} ${MONTHS_RU[mm-1]} · ${DAYS_RU[d.getDay()]}${isT?' (сегодня)':''}</div>
-        <div style="flex:1;min-width:0"><span style="font-size:15px;font-weight:800;color:var(--text)">${rows.length}</span><span style="font-size:12px;color:var(--text3)"> ${plural(rows.length)}</span></div>
-        <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:${dayEarned>0?'var(--green)':'var(--text3)'}">$${dayEarned.toFixed(2)}</div>
+
+  // month totals
+  let totalMarks=0, totalEarned=0;
+  days.forEach(w=>{ totalMarks+=dayMap[w].rows.length; totalEarned+=dayMap[w].earned; });
+
+  // selected day (default = newest)
+  let selDay = historySelectedDate;
+  if(!selDay || !dayMap[selDay]) selDay = days[0];
+
+  html += `<div class="earn-card" style="background:linear-gradient(135deg,rgba(var(--accent-rgb),.1),rgba(48,209,88,.05));border:1px solid rgba(var(--accent-rgb),.2);border-radius:22px;padding:18px 22px;margin-bottom:16px;display:flex;gap:28px;align-items:center;flex-wrap:wrap">
+    <div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Отмечено</div><div style="font-size:30px;font-weight:700;color:var(--text);line-height:1">${totalMarks}</div></div>
+    <div style="width:1px;height:40px;background:rgba(255,255,255,.1)"></div>
+    <div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Заработано</div><div style="font-size:30px;font-weight:700;color:var(--green);line-height:1">$${totalEarned.toFixed(2)}</div></div>
+    <div style="width:1px;height:40px;background:rgba(255,255,255,.1)"></div>
+    <div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Активных дней</div><div style="font-size:30px;font-weight:700;color:var(--text);line-height:1">${days.length}</div></div>
+  </div>`;
+
+  // ── left: list of dates ──
+  let dateRows='';
+  days.forEach(w=>{
+    const D=dayMap[w]; const dt=new Date(w+'T00:00:00'); const isT=w===isoToday(); const isSel=w===selDay;
+    dateRows+=`<div onclick="_sfx.play('click');historySelectedDate='${w}';render()" style="display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05);transition:background .15s;background:${isSel?'rgba(var(--accent-rgb),.1)':'none'}">
+      <div style="flex:1;overflow:hidden">
+        <div style="font-size:13px;font-weight:${isSel?600:500};color:${isSel?'var(--green)':isT?'var(--accent)':'var(--text)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${dt.getDate()} ${MONTHS_RU[mm-1]} · ${DAYS_RU[dt.getDay()]}${isT?' · сегодня':''}</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:2px">${D.rows.length} ${pluralM(D.rows.length)}</div>
       </div>
-      <div class="hday-det" style="display:${open?'block':'none'};padding:0 15px 14px 35px">${det}</div>
+      <div style="font-family:var(--mono);font-size:12px;color:${D.earned>0?'var(--green)':'var(--text3)'};font-weight:600;flex-shrink:0">$${D.earned.toFixed(2)}</div>
     </div>`;
   });
-  html += `</div>`;
+
+  const detailHtml = renderHistoryDay(selDay, dayMap[selDay], valFor, smsAll, mm);
+
+  // Mobile: show the selected day full-width with a back button (like Finance).
+  const _mob = typeof window!=='undefined' && window.matchMedia && window.matchMedia('(max-width:720px)').matches;
+  if(_mob && historySelectedDate && dayMap[historySelectedDate]){
+    const dt=new Date(historySelectedDate+'T00:00:00');
+    return `<div style="max-width:860px">
+      <div class="section-header" style="margin-bottom:14px;align-items:center;gap:10px">
+        <button class="toggle-btn" style="font-size:12px;padding:5px 12px" onclick="historySelectedDate=null;render()">← Даты</button>
+        <h2 style="font-size:18px;margin:0">${dt.getDate()} ${MONTHS_RU[mm-1]} · ${DAYS_RU[dt.getDay()]}</h2>
+      </div>
+      <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:16px">${detailHtml}</div>
+    </div>`;
+  }
+
+  html += `<div style="display:grid;grid-template-columns:260px 1fr;gap:12px;align-items:start">
+    <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:20px;overflow:hidden;max-height:70vh;overflow-y:auto">${dateRows}</div>
+    <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:16px;min-height:200px">${detailHtml}</div>
+  </div>`;
   return html;
 }
 
+// Detail for one action-day: everything done that day, one row per marking
+// (client · status · target date if it differs · $).
+function renderHistoryDay(w, D, valFor, smsAll, mm){
+  if(!w || !D) return '<div style="color:var(--text3);font-size:13px;padding:24px;text-align:center;font-family:var(--mono)">← выбери дату</div>';
+  const ST={yes:{lbl:'отправлено',col:'#34d399'},draft:{lbl:'черновик',col:'#a78bfa'},no:{lbl:'не отправлено',col:'#f87171'}};
+  const dt=new Date(w+'T00:00:00');
+  const rows=D.rows.slice().sort((a,b)=>a.c.localeCompare(b.c,'ru')||a.d.localeCompare(b.d));
+  const smsFor=(nm,tIso)=>{ const c=clients.find(x=>x.name===nm); return c?!!((smsAll[c.id]||{})[tIso]):false; };
+  let html=`<div style="font-family:var(--mono);font-size:12px;color:var(--text3);margin-bottom:12px">${dt.getDate()} ${MONTHS_RU[mm-1]} ${dt.getFullYear()} · ${DAYS_RU[dt.getDay()]} · всего <span style="color:var(--green)">$${D.earned.toFixed(2)}</span></div>`;
+  rows.forEach(e=>{
+    const s=ST[e.s]||{lbl:e.s,col:'var(--text3)'};
+    const val=valFor(e.c,e.d,e.s);
+    const td=new Date(e.d+'T00:00:00');
+    const planned = e.d!==w;   // marked today for a different (usually future) date
+    const forTag = planned?`<span style="font-family:var(--mono);font-size:10px;color:var(--accent);white-space:nowrap">→ на ${td.getDate()} ${MONTHS_SHORT[td.getMonth()]}</span>`:'';
+    html+=`<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:14px;margin-bottom:5px;background:rgba(255,255,255,.06)">
+      <span style="width:8px;height:8px;border-radius:50%;background:${s.col};flex-shrink:0"></span>
+      <div style="flex:1;min-width:0;font-size:13px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.c)}</div>
+      ${forTag}
+      <span style="font-family:var(--mono);font-size:11px;color:${s.col};white-space:nowrap">${s.lbl}</span>
+      ${smsFor(e.c,e.d)?'<span style="font-size:12px" title="SMS">📱</span>':''}
+      <span style="font-family:var(--mono);font-size:12px;color:${val>0?'var(--green)':'var(--text3)'};font-weight:600;min-width:46px;text-align:right">$${val.toFixed(2)}</span>
+    </div>`;
+  });
+  return html;
+}

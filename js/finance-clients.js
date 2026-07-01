@@ -1,4 +1,4 @@
-let financeSelectedCid=null;let financeScope='active';   // Finance shows the current work-zone (active month) — history/invoices/flows are already scoped to activeMonth, so we sum the loaded buckets with no extra date filter
+let financeSelectedCid=null;let financeScope='all';   // 'all' = все месяцы вместе (default) · 'month' = активная зона. Toggle in the Finance header.
 
 // Single source of truth for earnings totals — used by BOTH Finance and Home so
 // the two earnings blocks always agree. Counts email (yes/draft) + flows +
@@ -9,11 +9,30 @@ function _loadM(base, mk, def){ try{ const v=localStorage.getItem(base+'__'+mk);
 // Label the Finance header with the active work-zone (month), e.g. "июль 2026".
 function _finZoneLabel(){ try{ var p=(activeMonth||'').split('-'); if(p.length<2) return ''; var mi=parseInt(p[1],10)-1; return (MONTHS_RU[mi]||'')+' '+p[0]; }catch(e){ return ''; } }
 
-// TRUE all-time totals — aggregate every month bucket (history/sms/invoices) +
-// global flows. Used so Finance & Home show real all-time, not just this month.
+// Per-client dated entries for a scope. 'all' = across every month bucket (using
+// each month's own name→cid map for SMS/disabled); 'month'/'active' = the active
+// work-zone bucket. Each entry: {iso, v, sms, disabled, cid, rate}.
+function _clientEntries(name, scope){
+  const res=[];
+  const addMonth=(hist, sms, dis, roster)=>{
+    const days=hist[name]; if(!days) return;
+    let cid=null; (Array.isArray(roster)?roster:[]).forEach(c=>{ if(c&&c.name===name) cid=c.id; });
+    const cidSms=(cid&&sms[cid])||{}, cidDis=(cid&&dis[cid])||{};
+    Object.keys(days).forEach(iso=>{ res.push({iso, v:days[iso], sms:!!cidSms[iso], disabled:!!cidDis[iso], cid, rate:cidSms[iso]?SMS_DAY_RATE:EMAIL_RATE}); });
+  };
+  if(scope==='all'){
+    const months={}; Object.keys(localStorage).forEach(k=>{ if(k.indexOf('dc_history__')===0) months[k.slice(12)]=1; });
+    Object.keys(months).forEach(mk=>{ addMonth(_loadM('dc_history',mk,{}), _loadM('dc_sms_days',mk,{}), _loadM('dc_pay_disabled',mk,{}), _loadM('dc_clients',mk,[])); });
+  } else {
+    addMonth(historyData, load('dc_sms_days',{}), load('dc_pay_disabled',{}), clients);
+  }
+  return res;
+}
+
+// TRUE all-time totals — aggregate every month bucket by its OWN roster (name→cid),
+// so it's consistent no matter which zone is active. Emails + flows + invoices.
 function computeAllTimeTotals(){
   let earned=0,potential=0,sentCount=0,totalCount=0,invTotal=0;
-  const ac=clients.filter(c=>c.active);
   const histMonths={}; let allTasks=[];
   Object.keys(localStorage).forEach(k=>{
     if(k.indexOf('dc_history__')===0) histMonths[k.slice(12)]=1;
@@ -22,35 +41,37 @@ function computeAllTimeTotals(){
   });
   Object.keys(histMonths).forEach(mk=>{
     const hist=_loadM('dc_history',mk,{}), sms=_loadM('dc_sms_days',mk,{}), dis=_loadM('dc_pay_disabled',mk,{});
-    ac.forEach(c=>{
-      const cidSms=sms[c.id]||{}, cidDis=dis[c.id]||{}, h=hist[c.name]||{};
-      Object.keys(h).forEach(d=>{ const v=h[d]; if(cidDis[d])return; const rate=cidSms[d]?SMS_DAY_RATE:EMAIL_RATE;
+    const roster=_loadM('dc_clients',mk,[]); const nameToCid={}; (Array.isArray(roster)?roster:[]).forEach(c=>{ if(c&&c.name) nameToCid[c.name]=c.id; });
+    Object.keys(hist).forEach(name=>{
+      const cid=nameToCid[name]; const cidSms=(cid&&sms[cid])||{}, cidDis=(cid&&dis[cid])||{}; const days=hist[name]||{};
+      Object.keys(days).forEach(d=>{ const v=days[d]; if(cidDis[d])return; const rate=cidSms[d]?SMS_DAY_RATE:EMAIL_RATE;
         if(v==='yes'||v==='draft'){earned+=rate;potential+=rate;sentCount++;totalCount++;} else if(v==='no'){potential+=rate;totalCount++;} });
     });
   });
-  ac.forEach(c=>{ getFlows(c.id).forEach(f=>{ const val=f.count*0.60; potential+=val;
-    if(allTasks.some(t=>t.cid===c.id && t.flowId===f.id && t.done)) earned+=val; }); });
+  // flows: union of client ids across all rosters; earned if a done task exists anywhere
+  const seen={};
+  Object.keys(localStorage).forEach(k=>{ if(k.indexOf('dc_clients__')!==0) return; try{ (JSON.parse(localStorage.getItem(k))||[]).forEach(c=>{ if(!c||!c.id||seen[c.id])return; seen[c.id]=1;
+    getFlows(c.id).forEach(f=>{ const val=f.count*0.60; potential+=val; if(allTasks.some(t=>t.cid===c.id && t.flowId===f.id && t.done)) earned+=val; }); }); }catch(e){} });
   earned+=invTotal; potential+=invTotal;
   return {earned,potential,sentCount,totalCount,invTotal};
 }
 
 function computeFinanceTotals(scope){
   if(scope==='all') return computeAllTimeTotals();
-  const mk=monthKey(getTODAY());
+  // 'month' = active work-zone. historyData/invoices/flows are already scoped to activeMonth.
   const smsDays=load('dc_sms_days',{});const dis=load('dc_pay_disabled',{});
   let earned=0,potential=0,sentCount=0,totalCount=0;
   clients.filter(c=>c.active).forEach(c=>{
     const cidSms=smsDays[c.id]||{};const cidDis=dis[c.id]||{};const hist=historyData[c.name]||{};
     Object.entries(hist).forEach(([d,v])=>{
-      if(scope==='month'&&!d.startsWith(mk))return;
       if(cidDis[d])return;
       const rate=cidSms[d]?SMS_DAY_RATE:EMAIL_RATE;
       if(v==='yes'||v==='draft'){earned+=rate;potential+=rate;sentCount++;totalCount++;}
       else if(v==='no'){potential+=rate;totalCount++;}
     });
-    const fe=getFlowEarnings(c.id,scope);earned+=fe.earned;potential+=fe.potential;
+    const fe=getFlowEarnings(c.id,'active');earned+=fe.earned;potential+=fe.potential;
   });
-  const invTotal=invoiceTotalForScope(scope);
+  const invTotal=invoiceTotalForScope('active');
   earned+=invTotal;potential+=invTotal;
   return {earned:earned,potential:potential,sentCount:sentCount,totalCount:totalCount,invTotal:invTotal};
 }
@@ -63,15 +84,14 @@ function renderFinance(){
   const totalPotentialWithInv=_T.potential;
   const earnPct=totalPotentialWithInv?Math.round(totalWithInv/totalPotentialWithInv*100):0;
   let clientRows='';
-  ac.forEach(c=>{const cidSms2=smsDays[c.id]||{};const cidDis2=dis[c.id]||{};const hist2=historyData[c.name]||{};let ce=0;
-    Object.entries(hist2).forEach(([d,v])=>{if(financeScope==='month'&&!d.startsWith(mk))return;if(cidDis2[d])return;if(v==='yes'||v==='draft')ce+=(cidSms2[d]?SMS_DAY_RATE:EMAIL_RATE);});
-    const isSel=financeSelectedCid===c.id;
-    let cp=0;
-    Object.entries(hist2).forEach(([d,v])=>{if(financeScope==='month'&&!d.startsWith(mk))return;if(cidDis2[d])return;if(v==='yes'||v==='no'||v==='draft')cp+=(cidSms2[d]?SMS_DAY_RATE:EMAIL_RATE);});
-    const cfe=getFlowEarnings(c.id,financeScope);
+  ac.forEach(c=>{
+    const entries=_clientEntries(c.name, financeScope); let ce=0,cp=0,cDone=0,cTotal=0;
+    entries.forEach(e=>{ cTotal++;
+      if(e.v==='yes'||e.v==='draft'){ cDone++; if(!e.disabled) ce+=e.rate; }
+      if(!e.disabled&&(e.v==='yes'||e.v==='no'||e.v==='draft')) cp+=e.rate; });
+    const cfe=getFlowEarnings(c.id, financeScope==='all'?'all':'active');
     ce+=cfe.earned; cp+=cfe.potential;
-    let cDone=0, cTotal=0;
-    Object.entries(hist2).forEach(([d,v])=>{if(financeScope==='month'&&!d.startsWith(mk))return;cTotal++;if(v==='yes'||v==='draft')cDone++;});
+    const isSel=financeSelectedCid===c.id;
     clientRows+=`<div onclick="_sfx.play('click');financeSelectedCid='${c.id}';render()" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05);transition:background .15s;background:${isSel?'rgba(var(--accent-rgb),.1)':'none'}">
       <div style="flex:1;overflow:hidden">
         <div style="font-size:12px;font-weight:${isSel?600:400};color:${isSel?'var(--green)':'var(--text)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</div>
@@ -97,7 +117,11 @@ function renderFinance(){
       <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:16px">${detailHtml}</div>
     </div>`;
   }
-    return `<div style="max-width:860px"><div class="section-header" style="margin-bottom:12px"><h2>Финансы 💰</h2><span style="font-family:var(--mono);font-size:11px;color:var(--text3)">${_finZoneLabel()}</span></div>
+    return `<div style="max-width:860px"><div class="section-header" style="margin-bottom:12px;align-items:center;gap:10px"><h2>Финансы 💰</h2>
+      <div style="display:flex;gap:6px">
+        <button onclick="financeScope='all';render()" class="scope-btn ${financeScope==='all'?'active':''}">Всё время</button>
+        <button onclick="financeScope='month';render()" class="scope-btn ${financeScope==='month'?'active':''}">${_finZoneLabel()}</button>
+      </div></div>
     <div class="earn-card" style="background:linear-gradient(135deg,rgba(var(--accent-rgb),.1),rgba(48,209,88,.05));border:1px solid rgba(var(--accent-rgb),.2);border-radius:22px;padding:18px 22px;margin-bottom:16px;display:flex;gap:28px;align-items:center;flex-wrap:wrap">
       <div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Заработано</div><div style="font-size:30px;font-weight:700;color:var(--green);line-height:1">$${totalWithInv.toFixed(2)}</div></div>
       <div style="width:1px;height:40px;background:rgba(255,255,255,.1)"></div>
@@ -111,10 +135,8 @@ function renderFinance(){
 }
 function renderFinanceDetail(cid,scope){
   const c=clients.find(x=>x.id===cid);if(!c)return '';
-  const mk=monthKey(getTODAY());const smsDays=load('dc_sms_days',{})[cid]||{};
-  const dis=(load('dc_pay_disabled',{})[cid]||{});const hist=historyData[c.name]||{};
   const valColor={'yes':'var(--green)','no':'var(--red)','draft':'var(--purple)'};
-  const fe=getFlowEarnings(cid,scope);
+  const fe=getFlowEarnings(cid, scope==='all'?'all':'active');
   let earned=fe.earned,potential=fe.potential,rowsHtml='';
   // One row per flow (issued or not) — count matches the client's actual flows.
   fe.tasks.forEach(function(ft){
@@ -126,16 +148,16 @@ function renderFinanceDetail(cid,scope){
       <div style="font-family:var(--mono);font-size:13px;color:${ft.done?'var(--green)':'var(--text3)'};font-weight:${ft.done?600:400}">$${ft.done?ft.val.toFixed(2):'0.00'}</div>
     </div>`;
   });
-  const entries=Object.entries(hist).sort((a,b)=>b[0].localeCompare(a[0]));
-  entries.forEach(([d,v])=>{
-    if(scope==='month'&&!d.startsWith(mk))return;
-    const rate=smsDays[d]?SMS_DAY_RATE:EMAIL_RATE;const disabled=dis[d]||false;
+  const entries=_clientEntries(c.name, scope).sort((a,b)=>b.iso.localeCompare(a.iso));
+  entries.forEach(e=>{
+    const v=e.v, rate=e.rate, disabled=e.disabled;
     const dayEarned=((v==='yes'||v==='draft')&&!disabled)?rate:0;
     if(!disabled&&(v==='yes'||v==='no'||v==='draft'))potential+=rate;
     earned+=dayEarned;
-    const dt=new Date(d+'T00:00:00');
-    const smsTag=smsDays[d]?'<span style="font-size:9px;padding:1px 6px;border-radius:13px;background:rgba(var(--accent-rgb),.12);color:var(--green);font-family:var(--mono);font-weight:600">SMS</span>':'<span style="min-width:30px;display:inline-block"></span>';
-    const disBtn=`<button onclick="togglePayDisabled('${cid}','${d}')" style="font-family:var(--mono);font-size:10px;padding:3px 9px;border-radius:14px;border:1px solid ${disabled?'rgba(var(--accent-rgb),.3)':'rgba(255,255,255,.12)'};background:${disabled?'rgba(var(--accent-rgb),.1)':'none'};color:${disabled?'var(--green)':'var(--text3)'};cursor:pointer;white-space:nowrap">${disabled?'включить':'откл.'}</button>`;
+    const dt=new Date(e.iso+'T00:00:00');
+    const smsTag=e.sms?'<span style="font-size:9px;padding:1px 6px;border-radius:13px;background:rgba(var(--accent-rgb),.12);color:var(--green);font-family:var(--mono);font-weight:600">SMS</span>':'<span style="min-width:30px;display:inline-block"></span>';
+    const disCid=e.cid||cid;
+    const disBtn=`<button onclick="togglePayDisabled('${disCid}','${e.iso}')" style="font-family:var(--mono);font-size:10px;padding:3px 9px;border-radius:14px;border:1px solid ${disabled?'rgba(var(--accent-rgb),.3)':'rgba(255,255,255,.12)'};background:${disabled?'rgba(var(--accent-rgb),.1)':'none'};color:${disabled?'var(--green)':'var(--text3)'};cursor:pointer;white-space:nowrap">${disabled?'включить':'откл.'}</button>`;
     rowsHtml+=`<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:14px;margin-bottom:4px;background:rgba(255,255,255,.06);${disabled?'opacity:.4':''}"><div style="font-family:var(--mono);font-size:11px;color:var(--text3);min-width:90px">${fmtDate(dt)} ${DAYS_RU[dt.getDay()]}</div><div style="font-size:11px;font-weight:600;color:${valColor[v]||'var(--text3)'};min-width:36px">${v}</div>${smsTag}<div style="font-family:var(--mono);font-size:12px;color:${disabled?'var(--text3)':dayEarned>0?'var(--green)':'var(--text3)'};font-weight:${dayEarned>0?600:400};min-width:50px">${disabled?'—':dayEarned>0?'$'+dayEarned.toFixed(2):'$0.00'}</div><div style="flex:1"></div>${disBtn}</div>`;
   });
   return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:14px;font-weight:600">${esc(c.name)}</div><div style="font-family:var(--mono);font-size:13px;color:var(--green);font-weight:700">$${earned.toFixed(2)} <span style="color:var(--text3);font-weight:400;font-size:11px">/ $${potential.toFixed(2)}</span></div></div><div style="max-height:480px;overflow-y:auto">${rowsHtml||'<div style="color:var(--text3);font-size:12px;font-family:var(--mono)">Нет данных</div>'}</div>`;

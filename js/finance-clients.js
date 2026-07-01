@@ -1,10 +1,13 @@
-let financeSelectedCid=null;let financeScope='all';   // Finance tab always shows all-time
+let financeSelectedCid=null;let financeScope='active';   // Finance shows the current work-zone (active month) — history/invoices/flows are already scoped to activeMonth, so we sum the loaded buckets with no extra date filter
 
 // Single source of truth for earnings totals — used by BOTH Finance and Home so
 // the two earnings blocks always agree. Counts email (yes/draft) + flows +
 // invoices; skips pay-disabled days; SMS days pay the higher rate.
 // read a month-namespaced key for a specific month (not just the active one)
 function _loadM(base, mk, def){ try{ const v=localStorage.getItem(base+'__'+mk); return v==null?def:(JSON.parse(v)??def); }catch(e){ return def; } }
+
+// Label the Finance header with the active work-zone (month), e.g. "июль 2026".
+function _finZoneLabel(){ try{ var p=(activeMonth||'').split('-'); if(p.length<2) return ''; var mi=parseInt(p[1],10)-1; return (MONTHS_RU[mi]||'')+' '+p[0]; }catch(e){ return ''; } }
 
 // TRUE all-time totals — aggregate every month bucket (history/sms/invoices) +
 // global flows. Used so Finance & Home show real all-time, not just this month.
@@ -94,7 +97,7 @@ function renderFinance(){
       <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:16px">${detailHtml}</div>
     </div>`;
   }
-    return `<div style="max-width:860px"><div class="section-header" style="margin-bottom:12px"><h2>Финансы 💰</h2><span style="font-family:var(--mono);font-size:11px;color:var(--text3)">всё время</span></div>
+    return `<div style="max-width:860px"><div class="section-header" style="margin-bottom:12px"><h2>Финансы 💰</h2><span style="font-family:var(--mono);font-size:11px;color:var(--text3)">${_finZoneLabel()}</span></div>
     <div class="earn-card" style="background:linear-gradient(135deg,rgba(var(--accent-rgb),.1),rgba(48,209,88,.05));border:1px solid rgba(var(--accent-rgb),.2);border-radius:22px;padding:18px 22px;margin-bottom:16px;display:flex;gap:28px;align-items:center;flex-wrap:wrap">
       <div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Заработано</div><div style="font-size:30px;font-weight:700;color:var(--green);line-height:1">$${totalWithInv.toFixed(2)}</div></div>
       <div style="width:1px;height:40px;background:rgba(255,255,255,.1)"></div>

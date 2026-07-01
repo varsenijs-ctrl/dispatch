@@ -371,7 +371,7 @@ function renderDayToday(){
   function taskRow(t){
     const over=_overdue(t);
     const todLate=!over&&(t.tod||t.timeFrom)&&isTodOverdue(t.tod,t.timeFrom,t.startIso);
-    const _cl=t.cid?clients.find(c=>c.id===t.cid):t.clientName?clients.find(c=>c.name===t.clientName):null;
+    const _cl=(t.cid&&clients.find(c=>c.id===t.cid))||(t.clientName&&clients.find(c=>c.name===t.clientName))||null;
     const cname=(_cl&&_cl.name)||t.clientName||'';
     const clientBadge=cname?`<span style="font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:14px;background:var(--blue-dim);color:var(--blue);margin-left:8px;white-space:nowrap;${_cl?'cursor:pointer':''}" ${_cl?`onclick="event.stopPropagation();openCal('${_cl.id}')"`:''}>${esc(cname)}</span>`:'';
     const meta=[];

@@ -195,24 +195,17 @@ function sheetPushAll(){
     showToast('⬆ Отправил '+bulk.length+' отметок в таблицу');
   }catch(e){ showToast('Ошибка отправки'); }
 }
-// Full MIRROR of the active work zone into the sheet: for every active client and
-// every day of the zone's month, write the app's status (or '' to clear). This makes
-// the sheet exactly match the app for that month — fixes divergence from migrations.
+// Push the active work zone's actual statuses to the sheet. Only writes yes/draft/no
+// that exist in the app — NEVER clears cells (the sheet's manual 'no' must survive).
 function sheetMirrorZone(){
   const url=_sheetUrl(); if(!url){ showToast('Сначала укажи URL таблицы'); return; }
-  const mk=activeMonth; const parts=mk.split('-'); const yy=+parts[0], mm=+parts[1];
-  const dim=new Date(yy,mm,0).getDate();
   const ac=clients.filter(c=>c.active);
-  const bulk=[]; const seen={};
-  ac.forEach(c=>{
-    const h=historyData[c.name]||{};
-    for(let d=1;d<=dim;d++){ const iso=`${mk}-${String(d).padStart(2,'0')}`; bulk.push({client:c.name,iso:iso,status:h[iso]||''}); seen[c.name+'|'+iso]=1; }
-    Object.keys(h).forEach(iso=>{ if(!seen[c.name+'|'+iso]) bulk.push({client:c.name,iso:iso,status:h[iso]||''}); });   // entries with other-month dates in this zone
-  });
-  if(!bulk.length){ showToast('В этой зоне нет клиентов'); return; }
+  const bulk=[];
+  ac.forEach(c=>{ const h=historyData[c.name]||{}; Object.keys(h).forEach(iso=>{ if(h[iso]) bulk.push({client:c.name,iso:iso,status:h[iso]}); }); });
+  if(!bulk.length){ showToast('Нет статусов в этой зоне'); return; }
   try{
     fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({bulk:bulk})});
-    showToast('↻ Переписал таблицу под '+(typeof _finZoneLabel==='function'?_finZoneLabel():mk)+' ('+bulk.length+' ячеек)');
+    showToast('⬆ Отправил '+bulk.length+' статусов зоны '+(typeof _finZoneLabel==='function'?_finZoneLabel():activeMonth));
   }catch(e){ showToast('Ошибка отправки'); }
 }
 function saveSheetUrl(){
@@ -236,10 +229,10 @@ function renderSheetSyncPanel(){
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
       <button class="btn-add" onclick="saveSheetUrl()">Сохранить</button>
-      ${on?`<button class="toggle-btn" onclick="sheetMirrorZone()">↻ Переписать таблицу из этой зоны</button>`:''}
+      ${on?`<button class="toggle-btn" onclick="sheetMirrorZone()">⬆ Отправить статусы этой зоны</button>`:''}
       ${on?`<button class="toggle-btn" onclick="sheetPushAll()">⬆ Отправить все статусы</button>`:''}
     </div>
-    ${on?`<div style="font-size:11px;color:var(--text3);margin-top:8px;line-height:1.5">«Переписать из этой зоны» приводит вкладку месяца в таблице в точное соответствие с приложением (и ставит, и очищает лишнее). Запусти для каждой зоны отдельно, переключая месяц внизу.</div>`:''}
+    ${on?`<div style="font-size:11px;color:var(--text3);margin-top:8px;line-height:1.5">Отправляет твои отметки (yes/draft/no) в таблицу. Ничего не стирает — ячейки, которых нет в приложении, в таблице остаются как есть.</div>`:''}
   </div>`;
 }
 

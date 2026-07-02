@@ -94,6 +94,16 @@ function gsave(k,v){ localStorage.setItem(k,JSON.stringify(v)); }
 // HTML attribute (e.g. onclick="fn('...')") — handles quotes/backslashes/&.
 function jsq(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 
+// All clients across every work zone, deduped by name (active zone wins). Used by
+// the edit-task client picker so a task can be reassigned to any client, even one
+// that lives in another zone. Returns [{id,name,active}].
+function _clientsUnion(){
+  var out=[], seen={};
+  (typeof clients!=='undefined'?clients:[]).forEach(function(c){ if(c&&c.name&&!seen[c.name]){ seen[c.name]=1; out.push({id:c.id,name:c.name,active:c.active!==false}); } });
+  Object.keys(localStorage).forEach(function(k){ if(k.indexOf('dc_clients__')!==0) return; try{ (JSON.parse(localStorage.getItem(k))||[]).forEach(function(c){ if(c&&c.name&&!seen[c.name]){ seen[c.name]=1; out.push({id:c.id,name:c.name,active:c.active!==false}); } }); }catch(e){} });
+  return out;
+}
+
 // Find which work zone (month bucket) a client id lives in — active zone first,
 // then every dc_clients__* roster. Returns {mk, client} or null.
 function _findClientZone(cid){

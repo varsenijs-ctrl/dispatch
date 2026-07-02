@@ -235,17 +235,20 @@ function _editTask(id){
   // reassign a task to anyone), preselecting the task's current client.
   var etCl = document.getElementById('et-client');
   if(etCl){
-    var cur = t.cid || '';
-    if(!cur && t.clientName){ var byName=clients.find(function(c){return c.name===t.clientName;}); if(byName) cur=byName.id; }
-    var list = clients.slice().sort(function(a,b){return a.name.localeCompare(b.name,'ru');});
+    // clients from EVERY zone (deduped by name) so robot tasks pointing at another
+    // zone's client still resolve to a NAME, not a raw id.
+    var list = _clientsUnion();
+    // resolve the task's current client to a name
+    var curName = '';
+    if(t.cid){ var byId=list.find(function(c){return c.id===t.cid;}); if(byId) curName=byId.name; }
+    if(!curName && t.clientName) curName=t.clientName;
+    if(curName && !list.some(function(c){return c.name===curName;})) list.push({id:t.cid||curName, name:curName, active:true});
+    list.sort(function(a,b){return a.name.localeCompare(b.name,'ru');});
     var html = '<option value="">— без клиента —</option>' +
-      list.map(function(c){return '<option value="'+c.id+'"'+(c.id===cur?' selected':'')+'>'+esc(c.name)+(c.active===false?' (пауза)':'')+'</option>';}).join('');
-    // keep the task's own client selectable even if it's no longer in the list
-    if(cur && !list.some(function(c){return c.id===cur;})){
-      html += '<option value="'+esc(cur)+'" selected>'+esc(t.clientName||cur)+'</option>';
-    }
+      list.map(function(c){return '<option value="'+esc(c.id)+'"'+(c.name===curName?' selected':'')+'>'+esc(c.name)+(c.active===false?' (пауза)':'')+'</option>';}).join('');
     etCl.innerHTML = html;
-    etCl.value = cur;
+    var selc = list.find(function(c){return c.name===curName;});
+    etCl.value = selc ? selc.id : '';
   }
   // Set tod buttons
   document.querySelectorAll('#edit-task-modal .tod-btn').forEach(function(b){
@@ -289,9 +292,10 @@ function saveEditTask(){
   // Client (re)assignment
   var etCl = document.getElementById('et-client');
   if(etCl){
-    var newCid = etCl.value||'';
-    t.cid = newCid;
-    t.clientName = newCid ? ((clients.find(function(c){return c.id===newCid;})||{}).name||'') : '';
+    t.cid = etCl.value||'';
+    var opt = etCl.options[etCl.selectedIndex];
+    // the option's text IS the client name (works even if the client is in another zone)
+    t.clientName = (opt && opt.value) ? opt.textContent.replace(/\s*\(пауза\)\s*$/,'').trim() : '';
   }
   save('dc_plantasks',tasks);
   closeEditTask();

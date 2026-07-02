@@ -11,7 +11,7 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-07-01T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-07-02T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
@@ -28,16 +28,22 @@
       "due": "1782954000000"
     },
     {
-      "id": "869dnvbhd",
-      "name": "LifeList Lab - Jul-2026 - Campaigns",
-      "list": "LifeList Lab",
-      "due": "1782954000000"
-    },
-    {
       "id": "869da21ty",
       "name": "Retros: post purchase survey ",
       "list": "Drinkretros.com",
       "due": "1782954000000"
+    },
+    {
+      "id": "869dynzr9",
+      "name": "Nexova | Publish emails",
+      "list": "Nexova",
+      "due": "1783026000000"
+    },
+    {
+      "id": "869dnvbm5",
+      "name": "BloomieBlankets - Jul-2026 - Campaigns",
+      "list": "BloomieBlankets",
+      "due": "1783040400000"
     },
     {
       "id": "869dwq75b",
@@ -76,10 +82,28 @@
       "due": "1783296000000"
     },
     {
+      "id": "869dyuanp",
+      "name": "[Poke Source]: July: New Email Request: #2: Build",
+      "list": "pokesource",
+      "due": "1783468800000"
+    },
+    {
+      "id": "869dyu5fc",
+      "name": "[Poke Source]: July: New Email Request: Build",
+      "list": "pokesource",
+      "due": "1783468800000"
+    },
+    {
       "id": "869dwqdjw",
       "name": "macrobeauty - Jul-2026 - Campaigns - Build",
       "list": "Imported From Trello",
       "due": "1783468800000"
+    },
+    {
+      "id": "869dnvbhd",
+      "name": "LifeList Lab - Jul-2026 - Campaigns",
+      "list": "LifeList Lab",
+      "due": "1783472400000"
     },
     {
       "id": "869dwqdpy",

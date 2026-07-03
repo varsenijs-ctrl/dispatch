@@ -128,9 +128,9 @@ function _findClientZone(cid){
 }
 
 // ── pay rates ── an email pays EMAIL_RATE; an SMS day adds SMS_EXTRA on top.
-const EMAIL_RATE = 0.50;
+const EMAIL_RATE = 0.40;                        // email = 40¢ (was 50¢)
 const SMS_EXTRA  = 0.10;                       // SMS = 10¢ (was 50¢)
-const SMS_DAY_RATE = EMAIL_RATE + SMS_EXTRA;   // 0.60
+const SMS_DAY_RATE = EMAIL_RATE + SMS_EXTRA;   // 0.50
 
 // ── action log ── records WHEN each status mark was made, so History can show
 // "on <day> I set <client> for <target date> = <status>". Global, going-forward.

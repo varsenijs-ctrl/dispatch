@@ -17,10 +17,82 @@
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
     {
-      "id": "869dwqdpy",
-      "name": "Garden's Pulse - Campaigns - July - Build",
+      "id": "869dw4aqx",
+      "name": "Lemeli - Flows (Retainer) -Build",
       "list": "Imported From Trello",
-      "due": "1783641600000"
+      "due": "1782954000000"
+    },
+    {
+      "id": "869da21ty",
+      "name": "Retros: post purchase survey ",
+      "list": "Drinkretros.com",
+      "due": "1782954000000"
+    },
+    {
+      "id": "869dynzr9",
+      "name": "Nexova | Publish emails",
+      "list": "Nexova",
+      "due": "1783026000000"
+    },
+    {
+      "id": "869dnvbm5",
+      "name": "BloomieBlankets - Jul-2026 - Campaigns",
+      "list": "BloomieBlankets",
+      "due": "1783040400000"
+    },
+    {
+      "id": "869dzenjt",
+      "name": "Mizuro - Jul-2026 - Campaigns.- Build",
+      "list": "Imported From Trello",
+      "due": "1783123200000"
+    },
+    {
+      "id": "869dwq4jg",
+      "name": "Wild Harvest© - Jul-2026 - Campaigns - Build",
+      "list": "Wild Harvest©",
+      "due": "1783123200000"
+    },
+    {
+      "id": "869dww9xg",
+      "name": "[PokeSource]: Flows: Build",
+      "list": "pokesource",
+      "due": "1783126800000"
+    },
+    {
+      "id": "869dwqejp",
+      "name": "FaithIsMade - Jul-2026 - Campaigns - Build",
+      "list": "Imported From Trello",
+      "due": "1783126800000"
+    },
+    {
+      "id": "869dwqctg",
+      "name": "[FaithIsMade] New Post Purchase Flow: Build",
+      "list": "FaithIsMade",
+      "due": "1783126800000"
+    },
+    {
+      "id": "869dnvbpb",
+      "name": "BareRitual - Jul-2026 - Campaigns",
+      "list": "BareRitual",
+      "due": "1783213200000"
+    },
+    {
+      "id": "869dnvbh7",
+      "name": "Ovia - Jul-2026 - Campaigns",
+      "list": "Ovia",
+      "due": "1783213200000"
+    },
+    {
+      "id": "869dzbkjq",
+      "name": "Sabel Life | Built",
+      "list": "Sabel Life",
+      "due": "1783285200000"
+    },
+    {
+      "id": "869dw2j9e",
+      "name": "Orvia Labs - Delivery Flow - Build",
+      "list": "Orvia Labs",
+      "due": "1783296000000"
     },
     {
       "id": "869dyuanp",
@@ -47,82 +119,10 @@
       "due": "1783472400000"
     },
     {
-      "id": "869dw2j9e",
-      "name": "Orvia Labs - Delivery Flow - Build",
-      "list": "Orvia Labs",
-      "due": "1783296000000"
-    },
-    {
-      "id": "869dzbkjq",
-      "name": "Sabel Life | Built",
-      "list": "Sabel Life",
-      "due": "1783285200000"
-    },
-    {
-      "id": "869dnvbpb",
-      "name": "BareRitual - Jul-2026 - Campaigns",
-      "list": "BareRitual",
-      "due": "1783213200000"
-    },
-    {
-      "id": "869dnvbh7",
-      "name": "Ovia - Jul-2026 - Campaigns",
-      "list": "Ovia",
-      "due": "1783213200000"
-    },
-    {
-      "id": "869dwqejp",
-      "name": "FaithIsMade - Jul-2026 - Campaigns - Build",
+      "id": "869dwqdpy",
+      "name": "Garden's Pulse - Campaigns - July - Build",
       "list": "Imported From Trello",
-      "due": "1783126800000"
-    },
-    {
-      "id": "869dwqctg",
-      "name": "[FaithIsMade] New Post Purchase Flow: Build",
-      "list": "FaithIsMade",
-      "due": "1783126800000"
-    },
-    {
-      "id": "869dww9xg",
-      "name": "[PokeSource]: Flows: Build",
-      "list": "pokesource",
-      "due": "1783126800000"
-    },
-    {
-      "id": "869dzenjt",
-      "name": "Mizuro - Jul-2026 - Campaigns.- Build",
-      "list": "Imported From Trello",
-      "due": "1783123200000"
-    },
-    {
-      "id": "869dwq4jg",
-      "name": "Wild Harvest© - Jul-2026 - Campaigns - Build",
-      "list": "Wild Harvest©",
-      "due": "1783123200000"
-    },
-    {
-      "id": "869dnvbm5",
-      "name": "BloomieBlankets - Jul-2026 - Campaigns",
-      "list": "BloomieBlankets",
-      "due": "1783040400000"
-    },
-    {
-      "id": "869dynzr9",
-      "name": "Nexova | Publish emails",
-      "list": "Nexova",
-      "due": "1783026000000"
-    },
-    {
-      "id": "869da21ty",
-      "name": "Retros: post purchase survey ",
-      "list": "Drinkretros.com",
-      "due": "1782954000000"
-    },
-    {
-      "id": "869dw4aqx",
-      "name": "Lemeli - Flows (Retainer) -Build",
-      "list": "Imported From Trello",
-      "due": "1782954000000"
+      "due": "1783641600000"
     }
   ]/*RAW_END*/;
 

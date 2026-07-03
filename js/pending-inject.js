@@ -5,81 +5,22 @@
 // Client matching happens HERE, in the browser, against your real client list
 // (localStorage dc_clients__*), so each task gets a proper client (cid + badge)
 // exactly as if you'd picked it from the dropdown — not just text in a note.
-//   • startIso  = the day the task first appears in Dispatch (today)
+//   • startIso  = the ClickUp due day (so overdue/today/next sort correctly)
 //   • deadline  = the ClickUp due date (when it turns red)
-//   • until     = same as deadline (carry-over window)
+//   • bucket    = the CURRENT work zone (activeMonth) — every task lands where
+//                 you're working, so nothing hides in another month's zone.
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-07-02T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-07-03T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
     {
-      "id": "869dwpwcv",
-      "name": "Nexova | Publish emails",
-      "list": "Nexova",
-      "due": "1782939600000"
-    },
-    {
-      "id": "869dw4aqx",
-      "name": "Lemeli - Flows (Retainer) -Build",
+      "id": "869dwqdpy",
+      "name": "Garden's Pulse - Campaigns - July - Build",
       "list": "Imported From Trello",
-      "due": "1782954000000"
-    },
-    {
-      "id": "869da21ty",
-      "name": "Retros: post purchase survey ",
-      "list": "Drinkretros.com",
-      "due": "1782954000000"
-    },
-    {
-      "id": "869dynzr9",
-      "name": "Nexova | Publish emails",
-      "list": "Nexova",
-      "due": "1783026000000"
-    },
-    {
-      "id": "869dnvbm5",
-      "name": "BloomieBlankets - Jul-2026 - Campaigns",
-      "list": "BloomieBlankets",
-      "due": "1783040400000"
-    },
-    {
-      "id": "869dwq75b",
-      "name": "pokesource - Jul-2026 - Campaigns - Build",
-      "list": "Imported From Trello",
-      "due": "1783123200000"
-    },
-    {
-      "id": "869dwq4jg",
-      "name": "Wild Harvest© - Jul-2026 - Campaigns - Build",
-      "list": "Wild Harvest©",
-      "due": "1783123200000"
-    },
-    {
-      "id": "869dww9xg",
-      "name": "[PokeSource]: Flows: Build",
-      "list": "pokesource",
-      "due": "1783126800000"
-    },
-    {
-      "id": "869dwqejp",
-      "name": "FaithIsMade - Jul-2026 - Campaigns - Build",
-      "list": "Imported From Trello",
-      "due": "1783126800000"
-    },
-    {
-      "id": "869dwqctg",
-      "name": "[FaithIsMade] New Post Purchase Flow: Build",
-      "list": "FaithIsMade",
-      "due": "1783126800000"
-    },
-    {
-      "id": "869dw2j9e",
-      "name": "Orvia Labs - Delivery Flow - Build",
-      "list": "Orvia Labs",
-      "due": "1783296000000"
+      "due": "1783641600000"
     },
     {
       "id": "869dyuanp",
@@ -106,10 +47,82 @@
       "due": "1783472400000"
     },
     {
-      "id": "869dwqdpy",
-      "name": "Garden's Pulse - Campaigns - July - Build",
+      "id": "869dw2j9e",
+      "name": "Orvia Labs - Delivery Flow - Build",
+      "list": "Orvia Labs",
+      "due": "1783296000000"
+    },
+    {
+      "id": "869dzbkjq",
+      "name": "Sabel Life | Built",
+      "list": "Sabel Life",
+      "due": "1783285200000"
+    },
+    {
+      "id": "869dnvbpb",
+      "name": "BareRitual - Jul-2026 - Campaigns",
+      "list": "BareRitual",
+      "due": "1783213200000"
+    },
+    {
+      "id": "869dnvbh7",
+      "name": "Ovia - Jul-2026 - Campaigns",
+      "list": "Ovia",
+      "due": "1783213200000"
+    },
+    {
+      "id": "869dwqejp",
+      "name": "FaithIsMade - Jul-2026 - Campaigns - Build",
       "list": "Imported From Trello",
-      "due": "1783641600000"
+      "due": "1783126800000"
+    },
+    {
+      "id": "869dwqctg",
+      "name": "[FaithIsMade] New Post Purchase Flow: Build",
+      "list": "FaithIsMade",
+      "due": "1783126800000"
+    },
+    {
+      "id": "869dww9xg",
+      "name": "[PokeSource]: Flows: Build",
+      "list": "pokesource",
+      "due": "1783126800000"
+    },
+    {
+      "id": "869dzenjt",
+      "name": "Mizuro - Jul-2026 - Campaigns.- Build",
+      "list": "Imported From Trello",
+      "due": "1783123200000"
+    },
+    {
+      "id": "869dwq4jg",
+      "name": "Wild Harvest© - Jul-2026 - Campaigns - Build",
+      "list": "Wild Harvest©",
+      "due": "1783123200000"
+    },
+    {
+      "id": "869dnvbm5",
+      "name": "BloomieBlankets - Jul-2026 - Campaigns",
+      "list": "BloomieBlankets",
+      "due": "1783040400000"
+    },
+    {
+      "id": "869dynzr9",
+      "name": "Nexova | Publish emails",
+      "list": "Nexova",
+      "due": "1783026000000"
+    },
+    {
+      "id": "869da21ty",
+      "name": "Retros: post purchase survey ",
+      "list": "Drinkretros.com",
+      "due": "1782954000000"
+    },
+    {
+      "id": "869dw4aqx",
+      "name": "Lemeli - Flows (Retainer) -Build",
+      "list": "Imported From Trello",
+      "due": "1782954000000"
     }
   ]/*RAW_END*/;
 
@@ -119,12 +132,14 @@
   var _t = new Date();
   var _p = function(n){ return String(n).padStart(2,'0'); };
   var TODAY_ISO = _t.getFullYear()+'-'+_p(_t.getMonth()+1)+'-'+_p(_t.getDate());
-  var MONTH = _t.getFullYear()+'-'+_p(_t.getMonth()+1);
+  // bucket everything into the CURRENT work zone so nothing hides in another month
+  var ZONE = (typeof activeMonth!=='undefined' && activeMonth) ? activeMonth
+           : _t.getFullYear()+'-'+_p(_t.getMonth()+1);
 
-  // One-time cleanup: earlier auto-injected tasks used a different placement.
-  // Drop ONLY auto-injected tasks (those with injectId) + the seen-set so every
-  // ClickUp task re-lands on its correct deadline day. Manual tasks are untouched.
-  if(!localStorage.getItem('dc_inject_reset_v2')){
+  // One-time cleanup (v3): re-place every auto-injected task into the current work
+  // zone. Drop ONLY auto-injected tasks (those with injectId) + the seen-set so all
+  // ClickUp tasks re-land in one place. Manual tasks are untouched.
+  if(!localStorage.getItem('dc_inject_reset_v3')){
     Object.keys(localStorage).filter(function(k){return k.indexOf('dc_plantasks__')===0;}).forEach(function(k){
       try { var o=JSON.parse(localStorage.getItem(k)||'{}'), changed=false;
         Object.keys(o).forEach(function(id){ if(o[id]&&o[id].injectId){ delete o[id]; changed=true; } });
@@ -133,7 +148,7 @@
     });
     localStorage.removeItem('dc_inject_seen');
     Object.keys(localStorage).forEach(function(k){ if(k.indexOf('dc_inject_v__')===0) localStorage.removeItem(k); });
-    localStorage.setItem('dc_inject_reset_v2','1');
+    localStorage.setItem('dc_inject_reset_v3','1');
   }
 
   // ms → YYYY-MM-DD in the user's own timezone (so it matches the ClickUp date)
@@ -199,48 +214,43 @@
     return cleanText(text);
   }
 
-  // ── existing tasks: dedupe by ClickUp id (all months) + by text+client per month ──
-  var seenIds = {}, monthTexts = {};
+  // ── existing tasks: dedupe by ClickUp id (all months) + by text+client in the zone ──
+  var seenIds = {}, zoneTexts = {};
   Object.keys(localStorage).filter(function(k){return k.indexOf('dc_plantasks__')===0;}).forEach(function(k){
     var m = k.slice('dc_plantasks__'.length);
     try { Object.values(JSON.parse(localStorage.getItem(k)||'{}')).forEach(function(t){
       if(!t) return;
       if(t.injectId) seenIds[t.injectId] = 1;
-      if(!monthTexts[m]) monthTexts[m] = {};
-      monthTexts[m][norm(t.text)+'|'+(t.cid||'')] = 1;
+      if(m===ZONE){ zoneTexts[norm(t.text)+'|'+(t.cid||'')] = 1; }
     }); } catch(e){}
   });
   // also skip ClickUp ids injected on earlier days (even if the task was later deleted)
   try { (JSON.parse(localStorage.getItem('dc_inject_seen')||'[]')||[]).forEach(function(id){ seenIds[id]=1; }); } catch(e){}
 
-  // place each task ON ITS DEADLINE DAY, in that day's month (June tasks in June,
-  // July in July) — so the planner reads like a real schedule.
-  var buckets = {};
-  function bucket(m){ if(!buckets[m]){ try{ buckets[m]=JSON.parse(localStorage.getItem('dc_plantasks__'+m)||'{}'); }catch(e){ buckets[m]={}; } } return buckets[m]; }
+  // load the current zone's task bucket once
+  var zoneBucket; try{ zoneBucket = JSON.parse(localStorage.getItem('dc_plantasks__'+ZONE)||'{}'); }catch(e){ zoneBucket = {}; }
 
-  var added = 0, matched = 0, perMonth = {};
+  var added = 0, matched = 0;
   RAW.forEach(function(r){
     if(!r || !r.id || seenIds[r.id]) return;                  // same ClickUp task already injected
     var c = matchClient(r.name, r.list);
     var deadline = isoFromMs(r.due);
-    var startIso = deadline || TODAY_ISO;          // task sits on its deadline day
-    var month = startIso.slice(0,7);               // …in that day's month
+    var startIso = deadline || TODAY_ISO;                      // real due day → sorts as overdue/today/next
     var text = c ? stripName(r.name, c.name) : r.name; if(!text) text = r.name;
     var key = norm(text)+'|'+(c?c.id:'');
-    if(monthTexts[month] && monthTexts[month][key]) return;    // identical task already in that month
+    if(zoneTexts[key]) return;                                 // identical task already in this zone
     var id = 'inject_' + r.id;
     var hint = (r.list && r.list !== 'Imported From Trello') ? r.list : firstSeg(r.name);
-    bucket(month)[id] = {
+    zoneBucket[id] = {
       id: id, injectId: r.id, text: text,
       cid: c ? c.id : '', clientName: c ? c.name : '',
       startIso: startIso, until: deadline || startIso, deadline: deadline || '',
       done: false, note: c ? 'ClickUp' : ('ClickUp: ' + hint)
     };
-    if(!monthTexts[month]) monthTexts[month] = {}; monthTexts[month][key] = 1;
-    seenIds[r.id] = 1; added++; if(c) matched++; perMonth[month] = (perMonth[month]||0) + 1;
+    zoneTexts[key] = 1; seenIds[r.id] = 1; added++; if(c) matched++;
   });
 
-  Object.keys(buckets).forEach(function(m){ localStorage.setItem('dc_plantasks__'+m, JSON.stringify(buckets[m])); });
+  localStorage.setItem('dc_plantasks__'+ZONE, JSON.stringify(zoneBucket));
   localStorage.setItem('dc_inject_seen', JSON.stringify(Object.keys(seenIds)));
-  console.log('Dispatch ← ClickUp: +'+added+' tasks ('+matched+' matched) → '+JSON.stringify(perMonth)+' · '+INJECT_VERSION);
+  console.log('Dispatch ← ClickUp: +'+added+' tasks ('+matched+' matched) → zone '+ZONE+' · '+INJECT_VERSION);
 })();

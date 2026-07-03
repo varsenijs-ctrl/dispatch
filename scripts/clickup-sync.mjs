@@ -25,6 +25,12 @@ async function get(path) {
 
 const DONE_STATUSES = new Set(['done', 'complete', 'completed', 'closed', 'cancelled', 'canceled']);
 
+// ClickUp priority → level: urgent 4 · high 3 · normal 2 · low 1 · none 0
+function prioLevel(p) {
+  const s = p && (typeof p === 'object' ? p.priority : p);
+  return ({ urgent: 4, high: 3, normal: 2, low: 1 })[String(s || '').toLowerCase()] || 0;
+}
+
 try {
   // 1) who owns the token
   const me = await get('/user');
@@ -73,6 +79,7 @@ try {
       name: t.name,
       list: (t.list && t.list.name) || '',
       due: String(t.due_date),
+      prio: prioLevel(t.priority),
     }));
 
   console.log(`Keeping ${raw.length} open tasks due within ${DAYS} days.`);

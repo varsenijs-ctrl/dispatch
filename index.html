@@ -19,7 +19,7 @@
 
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css?v=20260703a">
+<link rel="stylesheet" href="css/styles.css?v=20260703b">
 </head>
 <body>
 <!-- Liquid-glass refraction filter: warps the backdrop behind .month-bar like glass bending light -->
@@ -224,6 +224,14 @@
     <select id="et-client" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:16px;color:var(--text);font-size:13px;padding:9px 12px;outline:none;font-family:Inter,sans-serif;margin-bottom:14px">
       <option value="">— без клиента —</option>
     </select>
+    <label class="dm-label">Приоритет</label>
+    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap" id="et-prio-row">
+      <button type="button" data-prio="4" onclick="_etSetPrio(this)" class="tod-btn"><span style="color:#ff453a">⚑</span> срочно</button>
+      <button type="button" data-prio="3" onclick="_etSetPrio(this)" class="tod-btn"><span style="color:#ff9f0a">⚑</span> высокий</button>
+      <button type="button" data-prio="2" onclick="_etSetPrio(this)" class="tod-btn"><span style="color:#5e9eff">⚑</span> обычный</button>
+      <button type="button" data-prio="1" onclick="_etSetPrio(this)" class="tod-btn"><span style="color:#8e8e93">⚑</span> низкий</button>
+      <button type="button" data-prio="0" onclick="_etSetPrio(this)" class="tod-btn">нет</button>
+    </div>
     <label class="dm-label">Время дня</label>
     <div style="display:flex;gap:6px;margin-bottom:14px">
       <button type="button" data-tod="morning" onclick="_etSetTod(this)" class="tod-btn">🌅 утро</button>
@@ -267,16 +275,16 @@
 <div class="month-bar" id="month-bar"></div>
 <!-- ?v= is bumped on every deploy so browsers/PWA never serve a stale js/*.js.
      Keep this in sync with BUILD in js/main.js. -->
-<script src="js/core.js?v=20260703a"></script>
-<script src="js/state.js?v=20260703a"></script>
-<script src="js/views.js?v=20260703a"></script>
-<script src="js/planner.js?v=20260703a"></script>
-<script src="js/finance-clients.js?v=20260703a"></script>
-<script src="js/flows.js?v=20260703a"></script>
-<script src="js/clients-calendar.js?v=20260703a"></script>
-<script src="js/sync.js?v=20260703a"></script>
-<script src="js/ui.js?v=20260703a"></script>
-<script src="js/pending-inject.js?v=20260703a"></script>
-<script src="js/main.js?v=20260703a"></script>
+<script src="js/core.js?v=20260703b"></script>
+<script src="js/state.js?v=20260703b"></script>
+<script src="js/views.js?v=20260703b"></script>
+<script src="js/planner.js?v=20260703b"></script>
+<script src="js/finance-clients.js?v=20260703b"></script>
+<script src="js/flows.js?v=20260703b"></script>
+<script src="js/clients-calendar.js?v=20260703b"></script>
+<script src="js/sync.js?v=20260703b"></script>
+<script src="js/ui.js?v=20260703b"></script>
+<script src="js/pending-inject.js?v=20260703b"></script>
+<script src="js/main.js?v=20260703b"></script>
 </body>
 </html>

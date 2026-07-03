@@ -94,6 +94,16 @@ function gsave(k,v){ localStorage.setItem(k,JSON.stringify(v)); }
 // HTML attribute (e.g. onclick="fn('...')") — handles quotes/backslashes/&.
 function jsq(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 
+// ── task priority (ClickUp-style): 0 none · 1 low · 2 normal · 3 high · 4 urgent ──
+const PRIO_META = {
+  4:{lbl:'Срочно',  col:'#ff453a'},
+  3:{lbl:'Высокий', col:'#ff9f0a'},
+  2:{lbl:'Обычный', col:'#5e9eff'},
+  1:{lbl:'Низкий',  col:'#8e8e93'}
+};
+function prioFlag(p){ p=+p||0; var m=PRIO_META[p]; if(!m) return ''; return '<span title="'+m.lbl+'" style="color:'+m.col+';font-size:12px;flex-shrink:0;line-height:1;margin-right:4px">⚑</span>'; }
+function prioFromClickUp(p){ var s=p&&(typeof p==='object'?p.priority:p); return {urgent:4,high:3,normal:2,low:1}[String(s||'').toLowerCase()]||0; }
+
 // All clients across every work zone, deduped by name (active zone wins). Used by
 // the edit-task client picker so a task can be reassigned to any client, even one
 // that lives in another zone. Returns [{id,name,active}].

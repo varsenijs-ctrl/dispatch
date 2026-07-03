@@ -250,9 +250,14 @@ function _editTask(id){
     var selc = list.find(function(c){return c.name===curName;});
     etCl.value = selc ? selc.id : '';
   }
-  // Set tod buttons
-  document.querySelectorAll('#edit-task-modal .tod-btn').forEach(function(b){
+  // Set tod buttons (exclude the priority buttons, which share the .tod-btn style)
+  document.querySelectorAll('#edit-task-modal .tod-btn:not([data-prio])').forEach(function(b){
     b.classList.toggle('active', b.dataset.tod===(t.tod||''));
+  });
+  // Set priority button
+  var curPrio = String(+t.prio||0);
+  document.querySelectorAll('#et-prio-row .tod-btn').forEach(function(b){
+    b.classList.toggle('active', b.dataset.prio===curPrio);
   });
   var modal = document.getElementById('edit-task-modal');
   modal.style.display='flex';
@@ -261,8 +266,12 @@ function _editTask(id){
 }
 function _etSetTod(btn){
   var wasActive = btn.classList.contains('active');
-  document.querySelectorAll('#edit-task-modal .tod-btn').forEach(function(b){b.classList.remove('active');});
+  document.querySelectorAll('#edit-task-modal .tod-btn:not([data-prio])').forEach(function(b){b.classList.remove('active');});
   if(!wasActive) btn.classList.add('active');
+}
+function _etSetPrio(btn){
+  document.querySelectorAll('#et-prio-row .tod-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
 }
 function closeEditTask(){
   document.getElementById('edit-task-modal').style.display='none';
@@ -279,8 +288,10 @@ function saveEditTask(){
   t.timeFrom  = document.getElementById('et-from').value||'';
   t.timeTo    = document.getElementById('et-to').value||'';
   t.note      = document.getElementById('et-note').value||'';
-  var activeTod = document.querySelector('#edit-task-modal .tod-btn.active');
+  var activeTod = document.querySelector('#edit-task-modal .tod-btn.active:not([data-prio])');
   t.tod = activeTod ? activeTod.dataset.tod : '';
+  var activePrio = document.querySelector('#et-prio-row .tod-btn.active');
+  t.prio = activePrio ? (+activePrio.dataset.prio||0) : 0;
   var untilVal = document.getElementById('et-until').value||null;
   // Night: auto-extend to next day if no explicit until
   if(t.tod==='night'&&!untilVal){
@@ -347,10 +358,12 @@ function renderDayToday(){
     else if(t.startIso===iso || t.deadline===iso) G.today.push(t);
     else G.next.push(t);                                       // everything else upcoming (with or without a deadline)
   });
-  G.overdue.sort((a,b)=>due(a).localeCompare(due(b)));
-  G.today.sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
-  G.next.sort((a,b)=>due(a).localeCompare(due(b)));
-  withDeadline.sort((a,b)=>(a.deadline||'').localeCompare(b.deadline||''));
+  // sort by priority DESC first, then by date / manual order
+  const _pr=t=>+t.prio||0;
+  G.overdue.sort((a,b)=>_pr(b)-_pr(a) || due(a).localeCompare(due(b)));
+  G.today.sort((a,b)=>_pr(b)-_pr(a) || (a.sortOrder||0)-(b.sortOrder||0));
+  G.next.sort((a,b)=>_pr(b)-_pr(a) || due(a).localeCompare(due(b)));
+  withDeadline.sort((a,b)=>_pr(b)-_pr(a) || (a.deadline||'').localeCompare(b.deadline||''));
   const totalPending=G.overdue.length+G.today.length+G.next.length;
 
   let html=`<div class="section-header"><h2>Сегодня — ${fmtDate(d)}, ${DAYS_RU[d.getDay()]}</h2><button class="toggle-btn" style="font-size:10px;padding:3px 10px" onclick="openDayModal('${iso}')">+ задача</button></div>`;
@@ -393,7 +406,7 @@ function renderDayToday(){
       <div style="cursor:grab;color:var(--text3);font-size:13px;line-height:1.5;user-select:none" title="Перетащить">⠿</div>
       <div onclick="toggleDayTask('${t.id}');render()" style="width:18px;height:18px;border-radius:9px;border:2px solid ${over?'rgba(255,69,58,.6)':'rgba(255,255,255,.25)'};margin-top:1px;flex-shrink:0;cursor:pointer;background:rgba(255,255,255,.06)"></div>
       <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:center;flex-wrap:wrap">${todIcon}<span class="task-text" ondblclick="event.stopPropagation();_editTask('${t.id}')" style="font-size:13px;font-weight:600;cursor:pointer;${over?'color:var(--red)':''}" title="Двойной клик — редактировать">${esc(t.text)}</span>${clientBadge}</div>
+        <div style="display:flex;align-items:center;flex-wrap:wrap">${prioFlag(t.prio)}${todIcon}<span class="task-text" ondblclick="event.stopPropagation();_editTask('${t.id}')" style="font-size:13px;font-weight:600;cursor:pointer;${over?'color:var(--red)':''}" title="Двойной клик — редактировать">${esc(t.text)}</span>${clientBadge}</div>
         ${metaHtml}${note}
       </div>
       <input type="date" value="${t.startIso}" onclick="event.stopPropagation()" onchange="moveTask('${t.id}',this.value)" title="Перенести на другой день" style="color-scheme:dark;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:9px;color:var(--text3);font-size:10px;padding:3px 5px;cursor:pointer;outline:none">

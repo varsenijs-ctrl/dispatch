@@ -20,31 +20,36 @@
       "id": "869dw4aqx",
       "name": "Lemeli - Flows (Retainer) -Build",
       "list": "Imported From Trello",
-      "due": "1782954000000"
+      "due": "1782954000000",
+      "prio": 3
     },
     {
       "id": "869da21ty",
       "name": "Retros: post purchase survey ",
       "list": "Drinkretros.com",
-      "due": "1782954000000"
+      "due": "1782954000000",
+      "prio": 3
     },
     {
       "id": "869dynzr9",
       "name": "Nexova | Publish emails",
       "list": "Nexova",
-      "due": "1783026000000"
+      "due": "1783026000000",
+      "prio": 3
     },
     {
       "id": "869dnvbm5",
       "name": "BloomieBlankets - Jul-2026 - Campaigns",
       "list": "BloomieBlankets",
-      "due": "1783040400000"
+      "due": "1783040400000",
+      "prio": 2
     },
     {
       "id": "869dzenjt",
       "name": "Mizuro - Jul-2026 - Campaigns.- Build",
       "list": "Imported From Trello",
-      "due": "1783123200000"
+      "due": "1783123200000",
+      "prio": 4
     },
     {
       "id": "869dwq4jg",
@@ -116,7 +121,8 @@
       "id": "869dnvbhd",
       "name": "LifeList Lab - Jul-2026 - Campaigns",
       "list": "LifeList Lab",
-      "due": "1783472400000"
+      "due": "1783472400000",
+      "prio": 2
     },
     {
       "id": "869dwqdpy",
@@ -139,7 +145,7 @@
   // One-time cleanup (v3): re-place every auto-injected task into the current work
   // zone. Drop ONLY auto-injected tasks (those with injectId) + the seen-set so all
   // ClickUp tasks re-land in one place. Manual tasks are untouched.
-  if(!localStorage.getItem('dc_inject_reset_v3')){
+  if(!localStorage.getItem('dc_inject_reset_v4')){
     Object.keys(localStorage).filter(function(k){return k.indexOf('dc_plantasks__')===0;}).forEach(function(k){
       try { var o=JSON.parse(localStorage.getItem(k)||'{}'), changed=false;
         Object.keys(o).forEach(function(id){ if(o[id]&&o[id].injectId){ delete o[id]; changed=true; } });
@@ -148,7 +154,7 @@
     });
     localStorage.removeItem('dc_inject_seen');
     Object.keys(localStorage).forEach(function(k){ if(k.indexOf('dc_inject_v__')===0) localStorage.removeItem(k); });
-    localStorage.setItem('dc_inject_reset_v3','1');
+    localStorage.setItem('dc_inject_reset_v4','1');
   }
 
   // ms → YYYY-MM-DD in the user's own timezone (so it matches the ClickUp date)
@@ -245,6 +251,7 @@
       id: id, injectId: r.id, text: text,
       cid: c ? c.id : '', clientName: c ? c.name : '',
       startIso: startIso, until: deadline || startIso, deadline: deadline || '',
+      prio: +r.prio || 0,                              // ClickUp priority (0-4)
       done: false, note: c ? 'ClickUp' : ('ClickUp: ' + hint)
     };
     zoneTexts[key] = 1; seenIds[r.id] = 1; added++; if(c) matched++;

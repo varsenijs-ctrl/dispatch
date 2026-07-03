@@ -37,7 +37,7 @@ jobs:
         run: |
           git config user.name  "dispatch-bot"
           git config user.email "dispatch-bot@users.noreply.github.com"
-          git add js/pending-inject.js
+          git add js/pending-inject.js index.html
           if git diff --cached --quiet; then
             echo "No changes — nothing to deploy."
           else

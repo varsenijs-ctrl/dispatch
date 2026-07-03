@@ -92,6 +92,16 @@ try {
   src = src.replace(/\/\*RAW_START\*\/[\s\S]*?\/\*RAW_END\*\//, `/*RAW_START*/${block}/*RAW_END*/`);
 
   writeFileSync(path, src);
+
+  // Bump the cache-bust for pending-inject.js in index.html so browsers/PWA fetch
+  // the fresh list (otherwise the fixed ?v= would serve a cached, stale file).
+  try {
+    let html = readFileSync('index.html', 'utf8');
+    const bust = version.replace(/[^0-9A-Za-z]/g, '');   // e.g. 20260703T001 → 20260703001
+    const next = html.replace(/js\/pending-inject\.js\?v=[^"']*/, `js/pending-inject.js?v=${bust}`);
+    if (next !== html) { writeFileSync('index.html', next); console.log(`↻ index.html pending-inject ?v=${bust}`); }
+  } catch (e) { console.error('index.html version bump skipped:', e.message); }
+
   console.log(`✅ Wrote ${raw.length} tasks · version ${version}`);
 } catch (err) {
   console.error('❌ Sync failed:', err.message);

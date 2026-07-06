@@ -361,14 +361,13 @@ function getFlowEarnings(cid, scope){
   // done task (in scope); earned = issued flows, potential = all flows.
   const flows=getFlows(cid);
   if(!flows.length) return {earned:0,potential:0,tasks:[]};
-  const mk=monthKey(getTODAY());
   const tasks=load('dc_plantasks',{});
   let earned=0, potential=0;
   const list=[];
   flows.forEach(f=>{
     const val=f.count*0.60;
     const issuedTask=Object.values(tasks).find(t=>
-      t.cid===cid && t.flowId===f.id && t.done && (scope!=='month'||t.startIso.slice(0,7)===mk));
+      t.cid===cid && t.flowId===f.id && t.done && (scope!=='month'||_inZone(t.startIso)));   // active zone only
     potential+=val;
     if(issuedTask) earned+=val;
     list.push({flow:f, val, done:!!issuedTask, task:issuedTask||null});

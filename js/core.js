@@ -85,11 +85,13 @@ function saveMonths(m){localStorage.setItem('dc_months',JSON.stringify(m));}
 function getActiveMonth(){
   const stored=localStorage.getItem('dc_active_month');
   if(stored && stored !== 'null') return stored;
-  const months = getMonths();
-  const mk = months.length ? months[0] : (new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'));
+  const mk = new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');  // default: current month zone
   localStorage.setItem('dc_active_month', mk);
   return mk;
 }
+// A date belongs to the active zone iff its month matches the zone label. Zones are
+// independent — every view shows ONLY the active zone's slice (no cross-zone mixing).
+function _inZone(iso){ return typeof iso==='string' && iso.slice(0,7)===activeMonth; }
 function setActiveMonth(mk){localStorage.setItem('dc_active_month',mk);}
 
 let activeMonth = getActiveMonth();

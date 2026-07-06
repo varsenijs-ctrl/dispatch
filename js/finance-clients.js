@@ -13,14 +13,14 @@ function _finZoneLabel(){ try{ var p=(activeMonth||'').split('-'); if(p.length<2
 // independent, so we never read other months' buckets. 'all' = every date in this
 // zone; 'month' = only dates whose calendar month matches the zone.
 // Each entry: {iso, v, sms, disabled, cid, rate}.
-function _clientEntries(name, scope){
+function _clientEntries(name){
   const res=[];
   const days=historyData[name]||{};
   let cid=null; clients.forEach(c=>{ if(c&&c.name===name) cid=c.id; });
   const sms=load('dc_sms_days',{}), dis=load('dc_pay_disabled',{});
   const cidSms=(cid&&sms[cid])||{}, cidDis=(cid&&dis[cid])||{};
   Object.keys(days).forEach(iso=>{
-    if(scope==='month' && iso.slice(0,7)!==activeMonth) return;
+    if(!_inZone(iso)) return;   // active zone only — dates of THIS zone's month
     res.push({iso, v:days[iso], sms:!!cidSms[iso], disabled:!!cidDis[iso], cid, rate:cidSms[iso]?SMS_DAY_RATE:EMAIL_RATE});
   });
   return res;
@@ -29,21 +29,23 @@ function _clientEntries(name, scope){
 // Totals for the CURRENT work space (zone) only — zones are independent, never
 // summed together. 'all' = everything in this zone; 'month' = only dates whose
 // calendar month matches the zone.
+// Totals for the ACTIVE zone only (this month's slice) — fully independent of other
+// zones. scope is ignored; a zone always shows only what was done in it.
 function computeFinanceTotals(scope){
   const smsDays=load('dc_sms_days',{});const dis=load('dc_pay_disabled',{});
   let earned=0,potential=0,sentCount=0,totalCount=0;
   clients.filter(c=>c.active&&!c.paused).forEach(c=>{
     const cidSms=smsDays[c.id]||{};const cidDis=dis[c.id]||{};const hist=historyData[c.name]||{};
     Object.entries(hist).forEach(([d,v])=>{
-      if(scope==='month' && d.slice(0,7)!==activeMonth) return;
+      if(!_inZone(d)) return;                 // this zone's month only
       if(cidDis[d])return;
       const rate=cidSms[d]?SMS_DAY_RATE:EMAIL_RATE;
       if(v==='yes'||v==='draft'){earned+=rate;potential+=rate;sentCount++;totalCount++;}
       else if(v==='no'){potential+=rate;totalCount++;}
     });
-    const fe=getFlowEarnings(c.id,'active');earned+=fe.earned;potential+=fe.potential;
+    const fe=getFlowEarnings(c.id,'month');earned+=fe.earned;potential+=fe.potential;
   });
-  const invTotal=invoiceTotalForScope('active');
+  const invTotal=invoiceTotalForScope('month');
   earned+=invTotal;potential+=invTotal;
   return {earned:earned,potential:potential,sentCount:sentCount,totalCount:totalCount,invTotal:invTotal};
 }
@@ -57,12 +59,13 @@ function renderFinance(){
   const earnPct=totalPotentialWithInv?Math.round(totalWithInv/totalPotentialWithInv*100):0;
   let clientRows='';
   ac.forEach(c=>{
-    const entries=_clientEntries(c.name, financeScope); let ce=0,cp=0,cDone=0,cTotal=0;
+    const entries=_clientEntries(c.name); let ce=0,cp=0,cDone=0,cTotal=0;
     entries.forEach(e=>{ cTotal++;
       if(e.v==='yes'||e.v==='draft'){ cDone++; if(!e.disabled) ce+=e.rate; }
       if(!e.disabled&&(e.v==='yes'||e.v==='no'||e.v==='draft')) cp+=e.rate; });
-    const cfe=getFlowEarnings(c.id, financeScope==='all'?'all':'active');
+    const cfe=getFlowEarnings(c.id, 'month');
     ce+=cfe.earned; cp+=cfe.potential;
+    if(cTotal===0 && cfe.potential===0) return;   // no activity in this zone → don't show the client here
     const isSel=financeSelectedCid===c.id;
     clientRows+=`<div onclick="_sfx.play('click');financeSelectedCid='${c.id}';render()" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05);transition:background .15s;background:${isSel?'rgba(var(--accent-rgb),.1)':'none'}">
       <div style="flex:1;overflow:hidden">
@@ -89,11 +92,7 @@ function renderFinance(){
       <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:16px">${detailHtml}</div>
     </div>`;
   }
-    return `<div style="max-width:860px"><div class="section-header" style="margin-bottom:12px;align-items:center;gap:10px"><h2>Финансы 💰</h2>
-      <div style="display:flex;gap:6px">
-        <button onclick="financeScope='all';render()" class="scope-btn ${financeScope==='all'?'active':''}">Всё время</button>
-        <button onclick="financeScope='month';render()" class="scope-btn ${financeScope==='month'?'active':''}">${_finZoneLabel()}</button>
-      </div></div>
+    return `<div style="max-width:860px"><div class="section-header" style="margin-bottom:12px;align-items:center;gap:10px"><h2>Финансы 💰</h2><span style="font-family:var(--mono);font-size:12px;color:var(--text3)">${_finZoneLabel()}</span></div>
     <div class="earn-card" style="background:linear-gradient(135deg,rgba(var(--accent-rgb),.1),rgba(48,209,88,.05));border:1px solid rgba(var(--accent-rgb),.2);border-radius:22px;padding:18px 22px;margin-bottom:16px;display:flex;gap:28px;align-items:center;flex-wrap:wrap">
       <div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Заработано</div><div style="font-size:30px;font-weight:700;color:var(--green);line-height:1">$${totalWithInv.toFixed(2)}</div></div>
       <div style="width:1px;height:40px;background:rgba(255,255,255,.1)"></div>
@@ -108,7 +107,7 @@ function renderFinance(){
 function renderFinanceDetail(cid,scope){
   const c=clients.find(x=>x.id===cid);if(!c)return '';
   const valColor={'yes':'var(--green)','no':'var(--red)','draft':'var(--purple)'};
-  const fe=getFlowEarnings(cid, scope==='all'?'all':'active');
+  const fe=getFlowEarnings(cid, 'month');
   let earned=fe.earned,potential=fe.potential,rowsHtml='';
   // One row per flow (issued or not) — count matches the client's actual flows.
   fe.tasks.forEach(function(ft){
@@ -120,7 +119,7 @@ function renderFinanceDetail(cid,scope){
       <div style="font-family:var(--mono);font-size:13px;color:${ft.done?'var(--green)':'var(--text3)'};font-weight:${ft.done?600:400}">$${ft.done?ft.val.toFixed(2):'0.00'}</div>
     </div>`;
   });
-  const entries=_clientEntries(c.name, scope).sort((a,b)=>b.iso.localeCompare(a.iso));
+  const entries=_clientEntries(c.name).sort((a,b)=>b.iso.localeCompare(a.iso));
   entries.forEach(e=>{
     const v=e.v, rate=e.rate, disabled=e.disabled;
     const dayEarned=((v==='yes'||v==='draft')&&!disabled)?rate:0;
@@ -228,9 +227,8 @@ function deleteInvoice(id){_sfx.play('delete');
   render();
 }
 function invoiceTotalForScope(scope){
-  var mk=monthKey(getTODAY());
   return loadInvoices()
-    .filter(function(i){return scope==='month'?i.date.startsWith(mk):true;})
+    .filter(function(i){return scope==='month'?_inZone(i.date):true;})   // active zone only
     .reduce(function(s,i){return s+i.count*INV_RATE;},0);
 }
 function _addInvoice(){_sfx.play('invoice');

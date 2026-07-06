@@ -72,7 +72,7 @@ function toggleDaySms(cid,iso){
 
 // ── Home ─────────────────────────────────────────────────────
 function renderHome(){
-  const iso=isoToday();const mk=monthKey(getTODAY());
+  const iso=isoToday();const mk=activeMonth;   // Home reflects the ACTIVE zone
   const ac=clients.filter(c=>c.active&&!c.paused);
   const manual=load('dc_manual_done',{});
   const doneTodayCount=ac.filter(c=>manual[c.id]).length;
@@ -97,8 +97,8 @@ function renderHome(){
   const earnedUSD=earnedAmt.toFixed(2);const potentialUSD=potentialAmt.toFixed(2);
   const earnPct=potentialAmt?Math.round(earnedAmt/potentialAmt*100):0;
   const leftAmt=(potentialAmt-earnedAmt).toFixed(2);
-  const overdueHome=Object.values(_tasks).filter(t=>!_isTaskClientPaused(t)&&_overdue(t)).length;
-  const upcomingTasks=Object.values(_tasks).filter(t=>{if(t.done||_isTaskClientPaused(t))return false;const d=new Date(t.startIso+'T00:00:00');const diff=Math.ceil((d-new Date(getTODAY().toDateString()))/86400000);return diff>=0&&diff<=6;}).sort((a,b)=>a.startIso.localeCompare(b.startIso)).slice(0,6);
+  const overdueHome=Object.values(_tasks).filter(t=>!_isTaskClientPaused(t)&&_inZone(t.startIso)&&_overdue(t)).length;
+  const upcomingTasks=Object.values(_tasks).filter(t=>{if(t.done||_isTaskClientPaused(t)||!_inZone(t.startIso))return false;const d=new Date(t.startIso+'T00:00:00');const diff=Math.ceil((d-new Date(getTODAY().toDateString()))/86400000);return diff>=0&&diff<=6;}).sort((a,b)=>a.startIso.localeCompare(b.startIso)).slice(0,6);
   const h=new Date().getHours();const greet=h<12?'Доброе утро':h<17?'Добрый день':'Добрый вечер';
 
   let deadlineRows='';
@@ -353,6 +353,7 @@ function renderDayToday(){
   const G={overdue:[],today:[],next:[]}; const done=[]; const withDeadline=[];
   Object.values(tasks).forEach(t=>{
     if(_isTaskClientPaused(t)) return;                         // paused client → hidden everywhere but Clients tab
+    if(!_inZone(t.startIso)) return;                           // active zone only — this zone's tasks
     if(t.done){ if(t.doneDate===iso||t.startIso===iso) done.push(t); return; }
     if(t.deadline) withDeadline.push(t);                       // lens: any task that has a deadline
     if(_overdue(t)) G.overdue.push(t);

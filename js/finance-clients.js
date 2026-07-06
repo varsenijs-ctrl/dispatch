@@ -32,7 +32,7 @@ function _clientEntries(name, scope){
 function computeFinanceTotals(scope){
   const smsDays=load('dc_sms_days',{});const dis=load('dc_pay_disabled',{});
   let earned=0,potential=0,sentCount=0,totalCount=0;
-  clients.filter(c=>c.active).forEach(c=>{
+  clients.filter(c=>c.active&&!c.paused).forEach(c=>{
     const cidSms=smsDays[c.id]||{};const cidDis=dis[c.id]||{};const hist=historyData[c.name]||{};
     Object.entries(hist).forEach(([d,v])=>{
       if(scope==='month' && d.slice(0,7)!==activeMonth) return;
@@ -49,7 +49,7 @@ function computeFinanceTotals(scope){
 }
 function renderFinance(){
   const mk=monthKey(getTODAY());const smsDays=load('dc_sms_days',{});const dis=load('dc_pay_disabled',{});
-  const ac=clients.filter(c=>c.active).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+  const ac=clients.filter(c=>c.active&&!c.paused).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
   const _T=computeFinanceTotals(financeScope);
   const invTotal=_T.invTotal;
   const totalWithInv=_T.earned;

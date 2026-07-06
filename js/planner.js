@@ -4,7 +4,7 @@ function renderPlanner(){
   const daysInMonth=new Date(y,m+1,0).getDate();
   const firstDow=new Date(y,m,1).getDay();const offset=(firstDow+6)%7;
   const tasks=load('dc_plantasks',{});const byDate={};
-  Object.values(tasks).forEach(t=>{if(!byDate[t.startIso])byDate[t.startIso]=[];byDate[t.startIso].push(t);});
+  Object.values(tasks).forEach(t=>{if(_isTaskClientPaused(t))return;if(!byDate[t.startIso])byDate[t.startIso]=[];byDate[t.startIso].push(t);});
   const mn=MONTHS_RU[m]+' '+y;
   let html=`<div class="section-header"><h2>Планировщик</h2></div><div class="pcal-nav"><button class="pcal-nav-btn" onclick="shiftPlannerMonth(-1)">‹</button><div class="pcal-month-label">${mn}</div><button class="pcal-nav-btn" onclick="shiftPlannerMonth(1)">›</button><button class="pcal-nav-btn" onclick="shiftPlannerMonth(0)" style="width:auto;padding:0 8px;font-size:11px;font-family:var(--mono)">сегодня</button></div><div class="pcal-grid">${['пн','вт','ср','чт','пт','сб','вс'].map(d=>`<div class="pcal-dow">${d}</div>`).join('')}`;
   for(let i=0;i<offset;i++)html+=`<div></div>`;
@@ -68,7 +68,7 @@ function updateFlowSelect(){
 }
 
 function renderDayTasks(iso){
-  const tasks=load('dc_plantasks',{});const dayTasks=Object.values(tasks).filter(t=>t.startIso===iso||(!t.done&&t.startIso<iso&&t.until&&t.until>=iso))
+  const tasks=load('dc_plantasks',{});const dayTasks=Object.values(tasks).filter(t=>!_isTaskClientPaused(t)&&(t.startIso===iso||(!t.done&&t.startIso<iso&&t.until&&t.until>=iso)))
   // split into tasks carried over from earlier days vs. tasks of this day
   const _pr=t=>+t.prio||0;   // priority DESC first
   const carried = dayTasks.filter(t=>t.startIso<iso).sort((a,b)=>_pr(b)-_pr(a) || a.startIso.localeCompare(b.startIso));

@@ -68,7 +68,19 @@ function fmtDate(d){ return d.getDate().toString().padStart(2,'0')+'.'+( d.getMo
 function todayKey(){ return fmtDate(getTODAY()); }
 function monthKey(d){ return d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0'); }
 
-function getMonths(){try{return JSON.parse(localStorage.getItem('dc_months')||'[]');}catch{return [];}}
+// Months for the bottom bar = every month that has data (history/tasks) + the
+// current month + any manually-added. Derived so a task/mark for another month
+// (e.g. doing something in July for August) makes that month selectable.
+function getMonths(){
+  var set={};
+  try{ (JSON.parse(localStorage.getItem('dc_months')||'[]')||[]).forEach(function(m){ set[m]=1; }); }catch(e){}
+  try{ var h=JSON.parse(localStorage.getItem('dc_history')||'{}'); Object.keys(h).forEach(function(n){ var d=h[n]||{}; Object.keys(d).forEach(function(iso){ if(iso&&iso.length>=7) set[iso.slice(0,7)]=1; }); }); }catch(e){}
+  try{ var t=JSON.parse(localStorage.getItem('dc_plantasks')||'{}'); Object.keys(t).forEach(function(id){ var x=t[id]; if(!x)return; if(x.startIso) set[x.startIso.slice(0,7)]=1; if(x.deadline) set[x.deadline.slice(0,7)]=1; }); }catch(e){}
+  var now=new Date(); set[now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')]=1;
+  return Object.keys(set).filter(function(m){ return /^\d{4}-\d{2}$/.test(m); }).sort();
+}
+function _pausedClientNames(){ var s={}; (typeof clients!=='undefined'?clients:[]).forEach(function(c){ if(c&&c.paused) s[String(c.name).toLowerCase()]=1; }); return s; }
+function _isTaskClientPaused(t){ if(!t) return false; var p=_pausedClientNames(); if(t.clientName && p[String(t.clientName).toLowerCase()]) return true; if(t.cid){ var c=(typeof clients!=='undefined'?clients:[]).find(function(x){return x&&x.id===t.cid;}); if(c&&c.paused) return true; } return false; }
 function saveMonths(m){localStorage.setItem('dc_months',JSON.stringify(m));}
 function getActiveMonth(){
   const stored=localStorage.getItem('dc_active_month');

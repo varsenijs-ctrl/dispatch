@@ -164,14 +164,15 @@
   var _t = new Date();
   var _p = function(n){ return String(n).padStart(2,'0'); };
   var TODAY_ISO = _t.getFullYear()+'-'+_p(_t.getMonth()+1)+'-'+_p(_t.getDate());
-  // bucket everything into the CURRENT work zone so nothing hides in another month
-  var ZONE = (typeof activeMonth!=='undefined' && activeMonth) ? activeMonth
-           : _t.getFullYear()+'-'+_p(_t.getMonth()+1);
+  // bucket everything into the zone of the CURRENT calendar month (where "today"
+  // lives) — not the last-viewed zone — so July tasks land in the July zone even if
+  // you were browsing June.
+  var ZONE = _t.getFullYear()+'-'+_p(_t.getMonth()+1);
 
   // One-time cleanup (v3): re-place every auto-injected task into the current work
   // zone. Drop ONLY auto-injected tasks (those with injectId) + the seen-set so all
   // ClickUp tasks re-land in one place. Manual tasks are untouched.
-  if(!localStorage.getItem('dc_inject_reset_v4')){
+  if(!localStorage.getItem('dc_inject_reset_v5')){
     Object.keys(localStorage).filter(function(k){return k.indexOf('dc_plantasks__')===0;}).forEach(function(k){
       try { var o=JSON.parse(localStorage.getItem(k)||'{}'), changed=false;
         Object.keys(o).forEach(function(id){ if(o[id]&&o[id].injectId){ delete o[id]; changed=true; } });
@@ -180,7 +181,20 @@
     });
     localStorage.removeItem('dc_inject_seen');
     Object.keys(localStorage).forEach(function(k){ if(k.indexOf('dc_inject_v__')===0) localStorage.removeItem(k); });
-    localStorage.setItem('dc_inject_reset_v4','1');
+    // make sure the current-month zone has the client roster (so badges/finance work
+    // there), then land the app in it — otherwise you'd stare at an empty old zone.
+    try {
+      var curRoster = JSON.parse(localStorage.getItem('dc_clients__'+ZONE)||'[]');
+      if((!Array.isArray(curRoster) || !curRoster.length) && typeof _clientsUnion==='function'){
+        var uni = _clientsUnion().map(function(c){ return {id:c.id,name:c.name,active:c.active!==false,smsEnabled:false,schedule:'',deadline:null}; });
+        if(uni.length) localStorage.setItem('dc_clients__'+ZONE, JSON.stringify(uni));
+      }
+      localStorage.setItem('dc_active_month', ZONE);
+      if(typeof activeMonth!=='undefined') activeMonth = ZONE;
+      if(typeof clients!=='undefined') clients = JSON.parse(localStorage.getItem('dc_clients__'+ZONE)||'[]');
+      var _ms = JSON.parse(localStorage.getItem('dc_months')||'[]'); if(_ms.indexOf(ZONE)<0){ _ms.push(ZONE); _ms.sort(); localStorage.setItem('dc_months', JSON.stringify(_ms)); }
+    } catch(e){}
+    localStorage.setItem('dc_inject_reset_v5','1');
   }
 
   // ms → YYYY-MM-DD in the user's own timezone (so it matches the ClickUp date)

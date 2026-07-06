@@ -1,6 +1,6 @@
 // Build stamp — bump on each deploy so you can tell at a glance whether the
 // running app has the latest files (если метки нет — крутится старый JS из кэша).
-const BUILD='07.07 · зоны-изолированы';
+const BUILD='07.07 · флоу-по-зоне';
 console.log('Dispatch build: '+BUILD+' — _overdue '+(typeof _overdue==='function'?'OK':'ОТСУТСТВУЕТ (старый код)'));
 try{ const _bt=document.getElementById('build-tag'); if(_bt) _bt.textContent=BUILD; }catch(e){}
 document.getElementById('topbar-date').textContent=fmtDate(getTODAY())+' '+DAYS_RU[getTODAY().getDay()]+' · '+MONTHS_RU[getTODAY().getMonth()];

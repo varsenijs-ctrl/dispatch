@@ -1,14 +1,16 @@
 function renderFlows(){
   var iso=isoToday();
-  var ac=clients.filter(function(c){return c.active&&!c.paused;}).sort(function(a,b){return a.name.localeCompare(b.name,'ru');});
   var tasks=load('dc_plantasks',{});
+  var ac=clients.filter(function(c){return c.active&&!c.paused;}).sort(function(a,b){return a.name.localeCompare(b.name,'ru');})
+    // active ZONE only: keep clients with history or a task in this month
+    .filter(function(c){ var h=historyData[c.name]||{}; for(var k in h){ if(_inZone(k)) return true; } return Object.values(tasks).some(function(t){return t.cid===c.id&&_inZone(t.startIso);}); });
 
   var totalDone=0,totalPlanned=0,totalEarned=0,totalPotential=0;
   ac.forEach(function(c){
     getFlows(c.id).forEach(function(f){
       totalPlanned++;
       var val=f.count*0.60; totalPotential+=val;
-      var issued=Object.values(tasks).some(function(t){return t.cid===c.id&&t.flowId===f.id&&t.done;});
+      var issued=Object.values(tasks).some(function(t){return t.cid===c.id&&t.flowId===f.id&&t.done&&_inZone(t.startIso);});
       if(issued){totalEarned+=val;totalDone++;}
     });
   });
@@ -124,7 +126,7 @@ function renderFlows(){
 
   } else {
     var hm=_flowsHistoryMode||'date';
-    var doneTasks=Object.values(tasks).filter(function(t){return t.flowId&&t.done;}).sort(function(a,b){return b.startIso.localeCompare(a.startIso);});
+    var doneTasks=Object.values(tasks).filter(function(t){return t.flowId&&t.done&&_inZone(t.startIso);}).sort(function(a,b){return b.startIso.localeCompare(a.startIso);});
     h+='<div style="display:flex;gap:6px;margin-bottom:16px">';
     h+='<button onclick="_flowsHistoryMode=this.dataset.m;render()" data-m="date" style="padding:5px 14px;border-radius:20px;cursor:pointer;font-family:Inter,sans-serif;font-size:11px;border:1px solid '+(hm!=='client'?'rgba(var(--accent-rgb),.4)':'rgba(255,255,255,.1)')+';background:'+(hm!=='client'?'rgba(var(--accent-rgb),.12)':'rgba(255,255,255,.04)')+';color:'+(hm!=='client'?'var(--accent)':'var(--text3)')+'">По дате</button>';
     h+='<button onclick="_flowsHistoryMode=this.dataset.m;render()" data-m="client" style="padding:5px 14px;border-radius:20px;cursor:pointer;font-family:Inter,sans-serif;font-size:11px;border:1px solid '+(hm==='client'?'rgba(var(--accent-rgb),.4)':'rgba(255,255,255,.1)')+';background:'+(hm==='client'?'rgba(var(--accent-rgb),.12)':'rgba(255,255,255,.04)')+';color:'+(hm==='client'?'var(--accent)':'var(--text3)')+'">По клиентам</button>';

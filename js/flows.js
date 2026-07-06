@@ -1,17 +1,20 @@
 function renderFlows(){
   var iso=isoToday();
   var tasks=load('dc_plantasks',{});
-  var ac=clients.filter(function(c){return c.active&&!c.paused;}).sort(function(a,b){return a.name.localeCompare(b.name,'ru');})
-    // active ZONE only: keep clients with history or a task in this month
-    .filter(function(c){ var h=historyData[c.name]||{}; for(var k in h){ if(_inZone(k)) return true; } return Object.values(tasks).some(function(t){return t.cid===c.id&&_inZone(t.startIso);}); });
+  var ac=clients.filter(function(c){return c.active&&!c.paused;}).sort(function(a,b){return a.name.localeCompare(b.name,'ru');});
 
+  // Per-zone flow accounting: a flow issued in THIS zone counts here; a flow never
+  // issued anywhere is still "to do"; a flow issued in ANOTHER zone belongs there and
+  // is ignored (so June-issued flows don't inflate July's potential).
   var totalDone=0,totalPlanned=0,totalEarned=0,totalPotential=0;
   ac.forEach(function(c){
     getFlows(c.id).forEach(function(f){
-      totalPlanned++;
-      var val=f.count*0.60; totalPotential+=val;
-      var issued=Object.values(tasks).some(function(t){return t.cid===c.id&&t.flowId===f.id&&t.done&&_inZone(t.startIso);});
-      if(issued){totalEarned+=val;totalDone++;}
+      var ft=Object.values(tasks).filter(function(t){return t.cid===c.id&&t.flowId===f.id;});
+      var doneInZone=ft.some(function(t){return t.done&&_inZone(t.startIso);});
+      var doneAnywhere=ft.some(function(t){return t.done;});
+      var val=f.count*0.60;
+      if(doneInZone){ totalDone++; totalPlanned++; totalEarned+=val; totalPotential+=val; }
+      else if(!doneAnywhere){ totalPlanned++; totalPotential+=val; }   // pending → still to issue
     });
   });
 

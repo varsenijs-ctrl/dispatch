@@ -62,13 +62,9 @@ function collectAllDates(cid){
   return all;
 }
 function openCal(cid){ _sfx.play('open');
-  let c=clients.find(x=>x.id===cid);
-  if(!c){                                  // client not in the active zone → find its zone and switch there
-    const res=_findClientZone(cid);
-    if(res){ if(res.mk!==activeMonth && typeof switchMonth==='function'){ switchMonth(res.mk); showToast('→ '+MONTHS_RU[(+res.mk.split('-')[1])-1]+' '+res.mk.split('-')[0]); } c=clients.find(x=>x.id===cid)||clients.find(x=>x.name===res.client.name)||res.client; cid=c.id; }
-  }
+  var c=clients.find(x=>x.id===cid) || (clients.find(x=>x.name===cid));  // never switch zones
   if(!c) return;
-  calCurrentCid=cid;
+  calCurrentCid=c.id; cid=c.id;
   document.getElementById('cal-title').textContent=c.name;
   document.getElementById('cal-legend').innerHTML=`<span class="badge badge-done">yes</span><span class="badge badge-draft">draft</span><span class="badge badge-blocked">no</span><span style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-left:4px">— кликни по дню чтобы изменить</span>`;
   renderCalModal(cid);
@@ -77,14 +73,8 @@ function openCal(cid){ _sfx.play('open');
 // Open a client's calendar by NAME (for task badges whose stored cid may be stale
 // or belong to another zone). Finds the client in the active zone, else any zone.
 function openCalByName(name){
-  let c=clients.find(x=>x.name===name);
-  if(c){ openCal(c.id); return; }
-  let hitMk=null, hitClient=null;
-  Object.keys(localStorage).forEach(function(k){
-    if(hitClient||k.indexOf('dc_clients__')!==0) return;
-    try{ (JSON.parse(localStorage.getItem(k))||[]).forEach(function(x){ if(!hitClient&&x&&x.name===name){ hitClient=x; hitMk=k.slice('dc_clients__'.length); } }); }catch(e){}
-  });
-  if(hitClient){ if(hitMk!==activeMonth && typeof switchMonth==='function'){ switchMonth(hitMk); showToast('→ '+MONTHS_RU[(+hitMk.split('-')[1])-1]+' '+hitMk.split('-')[0]); } const c2=clients.find(x=>x.name===name)||hitClient; openCal(c2.id); }
+  var c=clients.find(x=>x.name===name);   // open in the current zone; never switch
+  if(c) openCal(c.id);
 }
 function buildCalDay(cls,isToday,cid,iso,d,dot,smsBtn,flowDay,flowInfo,flows,val){
   var parts=[];

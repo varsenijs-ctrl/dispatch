@@ -12,7 +12,7 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-07-05T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-07-06T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
@@ -31,25 +31,11 @@
       "prio": 3
     },
     {
-      "id": "869dynzr9",
-      "name": "Nexova | Publish emails",
-      "list": "Nexova",
-      "due": "1783026000000",
-      "prio": 3
-    },
-    {
       "id": "869dnvbm5",
       "name": "BloomieBlankets - Jul-2026 - Campaigns",
       "list": "BloomieBlankets",
       "due": "1783040400000",
       "prio": 2
-    },
-    {
-      "id": "869dzenjt",
-      "name": "Mizuro - Jul-2026 - Campaigns.- Build",
-      "list": "Imported From Trello",
-      "due": "1783123200000",
-      "prio": 4
     },
     {
       "id": "869dwq4jg",
@@ -91,14 +77,14 @@
       "name": "BareRitual - Jul-2026 - Campaigns",
       "list": "BareRitual",
       "due": "1783213200000",
-      "prio": 0
+      "prio": 2
     },
     {
       "id": "869dnvbh7",
       "name": "Ovia - Jul-2026 - Campaigns",
       "list": "Ovia",
       "due": "1783213200000",
-      "prio": 0
+      "prio": 2
     },
     {
       "id": "869dw2j9e",
@@ -108,10 +94,38 @@
       "prio": 0
     },
     {
+      "id": "869dw8yhx",
+      "name": "Pilloway | Create flows",
+      "list": "Pilloway",
+      "due": "1783299600000",
+      "prio": 3
+    },
+    {
       "id": "869dzzydj",
       "name": "Revive | Publish emails",
       "list": "Revive",
       "due": "1783371600000",
+      "prio": 0
+    },
+    {
+      "id": "869e0qjdc",
+      "name": "Clearkind | Publish Emails",
+      "list": "ClearKind",
+      "due": "1783386000000",
+      "prio": 4
+    },
+    {
+      "id": "869dnvbjz",
+      "name": "orvani - Jul-2026 - Campaigns",
+      "list": "orvani",
+      "due": "1783386000000",
+      "prio": 3
+    },
+    {
+      "id": "869e0rkuz",
+      "name": "Nura Relief | Publish emails",
+      "list": "Nura Relief",
+      "due": "1783458000000",
       "prio": 0
     },
     {
@@ -148,6 +162,13 @@
       "list": "LifeList Lab",
       "due": "1783472400000",
       "prio": 2
+    },
+    {
+      "id": "869e0gghm",
+      "name": "Sabel Life | Build campaigns",
+      "list": "Sabel Life",
+      "due": "1783544400000",
+      "prio": 0
     },
     {
       "id": "869dwqdpy",

@@ -184,11 +184,9 @@ function _sheetPush(client, iso, status){
 function sheetPushAll(){
   const url=_sheetUrl(); if(!url){ showToast('Сначала укажи URL таблицы'); return; }
   const bulk=[];
-  // historyData is the active month; gather across all month namespaces
-  Object.keys(localStorage).filter(k=>k.indexOf('dc_history__')===0).forEach(k=>{
-    let obj={}; try{ obj=JSON.parse(localStorage.getItem(k)||'{}'); }catch(e){}
-    Object.keys(obj).forEach(name=>{ const days=obj[name]||{}; Object.keys(days).forEach(iso=>{ if(days[iso]) bulk.push({client:name,iso:iso,status:days[iso]}); }); });
-  });
+  // one global history store
+  const hist=load('dc_history',{});
+  Object.keys(hist).forEach(name=>{ const days=hist[name]||{}; Object.keys(days).forEach(iso=>{ if(days[iso]) bulk.push({client:name,iso:iso,status:days[iso]}); }); });
   if(!bulk.length){ showToast('Нет отмеченных статусов'); return; }
   try{
     fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({bulk:bulk})});

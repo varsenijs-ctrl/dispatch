@@ -152,7 +152,7 @@ function removeDayTask(id){_sfx.play('delete');
 // task into that month's «рабочую зону» (its own data bucket), creating the month if needed.
 function moveTask(id,newIso){
   if(!newIso) return;
-  const tasks=load('dc_plantasks',{});
+  const tasks=load('dc_plantasks',{});   // global store — just change the date
   const t=tasks[id]; if(!t) return;
   if(t.startIso===newIso) return;
   const wasSingleDay = !t.until || t.until===t.startIso;
@@ -160,25 +160,6 @@ function moveTask(id,newIso){
   if(wasSingleDay) t.until=newIso;          // single-day task follows its date
   else if(t.until<newIso) t.until=newIso;   // keep the deadline, but never before the start
   _sfx.play('swipe');
-  const newMonth=newIso.slice(0,7);
-  if(newMonth!==activeMonth){
-    // relocate to the target month's bucket
-    delete tasks[id];
-    save('dc_plantasks',tasks);                                  // current month minus the task (cache+sync handled)
-    const key='dc_plantasks__'+newMonth;
-    let target={}; try{ target=JSON.parse(localStorage.getItem(key)||'{}'); }catch(e){}
-    target[id]=t; localStorage.setItem(key, JSON.stringify(target));
-    // make sure the month shows up in the month bar
-    try{ const ms=getMonths(); if(ms.indexOf(newMonth)<0){ ms.push(newMonth); ms.sort(); saveMonths(ms); } }catch(e){}
-    if(typeof _cacheInvalidate==='function') _cacheInvalidate();
-    if(typeof _syncSchedulePush==='function') _syncSchedulePush();
-    const dm=document.getElementById('day-modal');
-    if(dm && dm.style.display!=='none') renderDayTasks(currentDayIso);
-    renderMonthBar(); render();
-    const mn=MONTHS_RU[parseInt(newMonth.slice(5,7),10)-1]+' '+newMonth.slice(0,4);
-    showToast('📦 Перенесено в «'+mn+'»');
-    return;
-  }
   save('dc_plantasks',tasks);
   const dm=document.getElementById('day-modal');
   if(dm && dm.style.display!=='none') renderDayTasks(currentDayIso);

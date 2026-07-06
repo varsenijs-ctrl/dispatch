@@ -82,10 +82,11 @@ function setActiveMonth(mk){localStorage.setItem('dc_active_month',mk);}
 
 let activeMonth = getActiveMonth();
 
-function load(k,def){
-  try{ return JSON.parse(localStorage.getItem(k+'__'+activeMonth))??def; }catch{ return def; }
-}
-function save(k,v){ localStorage.setItem(k+'__'+activeMonth,JSON.stringify(v)); }
+// Data is GLOBAL now (no per-month buckets). The month bar is just a view filter for
+// Finance/History; clients, statuses and tasks all live in one place. This killed the
+// endless "wrong zone / disappeared / teleport" bugs.
+function load(k,def){ try{ return JSON.parse(localStorage.getItem(k))??def; }catch{ return def; } }
+function save(k,v){ localStorage.setItem(k,JSON.stringify(v)); }
 
 function gload(k,def){ try{ return JSON.parse(localStorage.getItem(k))??def; }catch{ return def; } }
 function gsave(k,v){ localStorage.setItem(k,JSON.stringify(v)); }
@@ -181,6 +182,7 @@ function _ensureMonthListed(mk){ try{ if(typeof getMonths==='function'&&typeof s
 // emails appear in the wrong month ("duplicates"). Move every entry into the bucket
 // of its own date's month. History is keyed by clientName→iso; sms/pay by cid→iso.
 function _relocateByMonth(){
+  if(localStorage.getItem('dc_globalized_v1')) return;   // obsolete once data is global
   if(gload('dc_relocate_v1', false)) return;
   var touched={};
   ['dc_history','dc_sms_days','dc_pay_disabled'].forEach(function(base){
@@ -212,6 +214,7 @@ function _relocateByMonth(){
 function _consolidateClientsToJune(){
   var FLAG='dc_consolidate_june_v1';
   try{
+    if(localStorage.getItem('dc_globalized_v1')) return;   // obsolete once data is global
     if(gload(FLAG,false)) return;
     var TM='2026-06';
     var WANT=['Rise','kerablend','lunavo','pokesource','wild harvest','nevo','healthy living','spicyLab','clearkind'];
@@ -278,4 +281,44 @@ function _consolidateClientsToJune(){
     }
   });
   if(migrated) console.log('Migrated old data to 2026-06 namespace');
+})();
+
+// ── one-time: collapse ALL per-month buckets into single GLOBAL keys ──
+// Runs before state.js reads anything, so load('dc_*') returns the merged data.
+// Non-destructive: the old <key>__<month> buckets are left in place.
+(function _globalize(){
+  try{
+    if(localStorage.getItem('dc_globalized_v1')) return;
+    function buckets(base){ var out=[]; Object.keys(localStorage).forEach(function(k){ if(k.indexOf(base+'__')===0){ try{ out.push(JSON.parse(localStorage.getItem(k))); }catch(e){} } }); return out; }
+    // clients — array, dedup by name (existing global first, then buckets)
+    (function(){
+      var seen={}, arr=[];
+      function add(c){ if(c&&c.name){ var key=String(c.name).toLowerCase(); if(!seen[key]){ seen[key]=1; arr.push(c); } } }
+      try{ (JSON.parse(localStorage.getItem('dc_clients'))||[]).forEach(add); }catch(e){}
+      buckets('dc_clients').forEach(function(b){ (Array.isArray(b)?b:[]).forEach(add); });
+      if(arr.length) localStorage.setItem('dc_clients', JSON.stringify(arr));
+    })();
+    // nested  key -> { iso -> value } : history, sms days, pay-disabled
+    ['dc_history','dc_sms_days','dc_pay_disabled'].forEach(function(base){
+      var g={}; try{ g=JSON.parse(localStorage.getItem(base))||{}; }catch(e){ g={}; }
+      buckets(base).forEach(function(b){ if(!b||typeof b!=='object') return;
+        Object.keys(b).forEach(function(key){ if(!g[key])g[key]={}; var days=b[key]||{}; Object.keys(days).forEach(function(iso){ if(g[key][iso]===undefined) g[key][iso]=days[iso]; }); });
+      });
+      localStorage.setItem(base, JSON.stringify(g));
+    });
+    // flat  id -> value : tasks, manual-done, log, flows
+    ['dc_plantasks','dc_manual_done','dc_log','dc_flows'].forEach(function(base){
+      var g={}; try{ g=JSON.parse(localStorage.getItem(base))||{}; }catch(e){ g={}; }
+      buckets(base).forEach(function(b){ if(!b||typeof b!=='object') return; Object.keys(b).forEach(function(id){ if(g[id]===undefined) g[id]=b[id]; }); });
+      localStorage.setItem(base, JSON.stringify(g));
+    });
+    // invoices — array, concat
+    (function(){
+      var arr=[]; try{ arr=JSON.parse(localStorage.getItem('dc_invoices'))||[]; if(!Array.isArray(arr))arr=[]; }catch(e){ arr=[]; }
+      buckets('dc_invoices').forEach(function(b){ if(Array.isArray(b)) arr=arr.concat(b); });
+      localStorage.setItem('dc_invoices', JSON.stringify(arr));
+    })();
+    localStorage.setItem('dc_globalized_v1','1');
+    console.log('Dispatch: data globalized — zones merged into one store.');
+  }catch(e){ console.error('globalize failed', e); }
 })();

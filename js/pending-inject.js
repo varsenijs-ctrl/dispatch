@@ -179,47 +179,12 @@
     }
   ]/*RAW_END*/;
 
-  // No once-per-day gate: RAW is re-processed on every load, but any ClickUp id
-  // ever injected (persisted in dc_inject_seen) is skipped — so new tasks always
-  // appear, nothing duplicates, and a task you deleted is not resurrected.
+  // RAW is re-processed on every load; any ClickUp id ever injected (dc_inject_seen)
+  // is skipped — new tasks appear, nothing duplicates, deleted tasks stay deleted.
+  // Data is global now — one task store, no zones.
   var _t = new Date();
   var _p = function(n){ return String(n).padStart(2,'0'); };
   var TODAY_ISO = _t.getFullYear()+'-'+_p(_t.getMonth()+1)+'-'+_p(_t.getDate());
-  // bucket everything into the zone where the user's data (clients+history) actually
-  // lives — the month bucket with the most marked history — so tasks sit WITH the data
-  // and nothing looks "lost". Falls back to the current calendar month if no history.
-  function _dataZone(){
-    var best=null,bestN=-1;
-    Object.keys(localStorage).forEach(function(k){ if(k.indexOf('dc_history__')!==0) return;
-      var mk=k.slice('dc_history__'.length), n=0;
-      try{ var o=JSON.parse(localStorage.getItem(k))||{}; Object.keys(o).forEach(function(c){ n+=Object.keys(o[c]||{}).length; }); }catch(e){}
-      if(n>bestN){ bestN=n; best=mk; }
-    });
-    return best;
-  }
-  var ZONE = _dataZone() || (_t.getFullYear()+'-'+_p(_t.getMonth()+1));
-
-  // One-time cleanup (v6): put every auto-injected task into the DATA zone (where the
-  // clients+history live) and LAND the app there — undoes the earlier force-to-July
-  // that hid the June history. Drops only injectId tasks + the seen-set; manual tasks
-  // and all history are untouched.
-  if(!localStorage.getItem('dc_inject_reset_v6')){
-    Object.keys(localStorage).filter(function(k){return k.indexOf('dc_plantasks__')===0;}).forEach(function(k){
-      try { var o=JSON.parse(localStorage.getItem(k)||'{}'), changed=false;
-        Object.keys(o).forEach(function(id){ if(o[id]&&o[id].injectId){ delete o[id]; changed=true; } });
-        if(changed) localStorage.setItem(k, JSON.stringify(o));
-      } catch(e){}
-    });
-    localStorage.removeItem('dc_inject_seen');
-    Object.keys(localStorage).forEach(function(k){ if(k.indexOf('dc_inject_v__')===0) localStorage.removeItem(k); });
-    try {
-      localStorage.setItem('dc_active_month', ZONE);
-      if(typeof activeMonth!=='undefined') activeMonth = ZONE;
-      if(typeof clients!=='undefined') clients = JSON.parse(localStorage.getItem('dc_clients__'+ZONE)||'[]');
-      if(typeof historyData!=='undefined') historyData = JSON.parse(localStorage.getItem('dc_history__'+ZONE)||'{}');
-    } catch(e){}
-    localStorage.setItem('dc_inject_reset_v6','1');
-  }
 
   // ms → YYYY-MM-DD in the user's own timezone (so it matches the ClickUp date)
   function isoFromMs(ms){
@@ -228,12 +193,8 @@
     catch(e){ var d=new Date(Number(ms)); return d.getFullYear()+'-'+_p(d.getMonth()+1)+'-'+_p(d.getDate()); }
   }
 
-  // collect every client across all months (clients are stored per-month)
-  var clientMap = {};
-  Object.keys(localStorage).filter(function(k){return k.indexOf('dc_clients__')===0;}).forEach(function(k){
-    try { JSON.parse(localStorage.getItem(k)||'[]').forEach(function(c){ if(c&&c.id&&!clientMap[c.id]) clientMap[c.id]=c; }); } catch(e){}
-  });
-  var clientList = Object.values(clientMap);
+  // clients — the single global list
+  var clientList = []; try{ clientList = JSON.parse(localStorage.getItem('dc_clients')||'[]')||[]; }catch(e){ clientList=[]; }
 
   function norm(s){ return (s||'').toLowerCase().replace(/[^a-z0-9а-я]/gi,''); }
   function bigrams(s){ s=norm(s); var b=[]; for(var i=0;i<s.length-1;i++) b.push(s.slice(i,i+2)); return b; }
@@ -284,21 +245,11 @@
     return cleanText(text);
   }
 
-  // ── existing tasks: dedupe by ClickUp id (all months) + by text+client in the zone ──
-  var seenIds = {}, zoneTexts = {};
-  Object.keys(localStorage).filter(function(k){return k.indexOf('dc_plantasks__')===0;}).forEach(function(k){
-    var m = k.slice('dc_plantasks__'.length);
-    try { Object.values(JSON.parse(localStorage.getItem(k)||'{}')).forEach(function(t){
-      if(!t) return;
-      if(t.injectId) seenIds[t.injectId] = 1;
-      if(m===ZONE){ zoneTexts[norm(t.text)+'|'+(t.cid||'')] = 1; }
-    }); } catch(e){}
-  });
-  // also skip ClickUp ids injected on earlier days (even if the task was later deleted)
+  // ── existing tasks (single global store): dedupe by ClickUp id + by text+client ──
+  var tasks; try{ tasks = JSON.parse(localStorage.getItem('dc_plantasks')||'{}')||{}; }catch(e){ tasks={}; }
+  var seenIds = {}, texts = {};
+  Object.values(tasks).forEach(function(t){ if(!t) return; if(t.injectId) seenIds[t.injectId]=1; texts[norm(t.text)+'|'+(t.cid||'')]=1; });
   try { (JSON.parse(localStorage.getItem('dc_inject_seen')||'[]')||[]).forEach(function(id){ seenIds[id]=1; }); } catch(e){}
-
-  // load the current zone's task bucket once
-  var zoneBucket; try{ zoneBucket = JSON.parse(localStorage.getItem('dc_plantasks__'+ZONE)||'{}'); }catch(e){ zoneBucket = {}; }
 
   var added = 0, matched = 0;
   RAW.forEach(function(r){
@@ -308,20 +259,20 @@
     var startIso = deadline || TODAY_ISO;                      // real due day → sorts as overdue/today/next
     var text = c ? stripName(r.name, c.name) : r.name; if(!text) text = r.name;
     var key = norm(text)+'|'+(c?c.id:'');
-    if(zoneTexts[key]) return;                                 // identical task already in this zone
+    if(texts[key]) return;                                     // identical task already present
     var id = 'inject_' + r.id;
     var hint = (r.list && r.list !== 'Imported From Trello') ? r.list : firstSeg(r.name);
-    zoneBucket[id] = {
+    tasks[id] = {
       id: id, injectId: r.id, text: text,
       cid: c ? c.id : '', clientName: c ? c.name : '',
       startIso: startIso, until: deadline || startIso, deadline: deadline || '',
       prio: +r.prio || 0,                              // ClickUp priority (0-4)
       done: false, note: c ? 'ClickUp' : ('ClickUp: ' + hint)
     };
-    zoneTexts[key] = 1; seenIds[r.id] = 1; added++; if(c) matched++;
+    texts[key] = 1; seenIds[r.id] = 1; added++; if(c) matched++;
   });
 
-  localStorage.setItem('dc_plantasks__'+ZONE, JSON.stringify(zoneBucket));
+  localStorage.setItem('dc_plantasks', JSON.stringify(tasks));
   localStorage.setItem('dc_inject_seen', JSON.stringify(Object.keys(seenIds)));
-  console.log('Dispatch ← ClickUp: +'+added+' tasks ('+matched+' matched) → zone '+ZONE+' · '+INJECT_VERSION);
+  console.log('Dispatch ← ClickUp: +'+added+' tasks ('+matched+' matched) · '+INJECT_VERSION);
 })();

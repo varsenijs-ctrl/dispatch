@@ -539,9 +539,9 @@ function renderHistory(){
 
   // group action-log entries by action-day (this month); collapse to final status per client|target
   const actLog = gload('dc_actlog',[]);
-  const _pausedN = _pausedClientNames();
+  const _zNames = _zoneClientNames();          // only clients added to THIS zone
   const rawByDay = {};
-  actLog.forEach(e=>{ if(!e.w || e.w.slice(0,7)!==mk) return; if(e.c && _pausedN[String(e.c).toLowerCase()]) return; (rawByDay[e.w]=rawByDay[e.w]||[]).push(e); });
+  actLog.forEach(e=>{ if(!e.w || e.w.slice(0,7)!==mk) return; if(!e.c || !_zNames[String(e.c).toLowerCase()]) return; (rawByDay[e.w]=rawByDay[e.w]||[]).push(e); });
   const dayMap = {};
   Object.keys(rawByDay).forEach(w=>{
     const ents = rawByDay[w].slice().sort((a,b)=>(a.t||0)-(b.t||0));

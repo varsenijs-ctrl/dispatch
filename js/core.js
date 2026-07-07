@@ -112,6 +112,9 @@ function _removeFromRoster(cid, mk){ mk=mk||activeMonth; var m=_rosterMap(); if(
 function _zoneClients(mk){ var ids=_zoneRoster(mk); return ids.map(function(id){ return clients.find(function(c){return c.id===id;}); }).filter(Boolean); }
 // Active, non-paused zone clients — the common case for money/marking views.
 function _zac(){ return _zoneClients().filter(function(c){return c.active&&!c.paused;}); }
+// Lower-cased names of the active zone's clients — for filtering name-keyed data
+// (history / action log) to this zone only.
+function _zoneClientNames(){ var set={}; _zac().forEach(function(c){ if(c&&c.name) set[String(c.name).toLowerCase()]=1; }); return set; }
 // Pool clients NOT yet added to the active zone (for the "add to zone" picker).
 function _poolNotInZone(){ var r=_zoneRoster(); return clients.filter(function(c){return c.active&&r.indexOf(c.id)<0;}); }
 

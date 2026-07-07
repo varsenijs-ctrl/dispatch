@@ -129,7 +129,7 @@ function renderFlows(){
 
   } else {
     var hm=_flowsHistoryMode||'date';
-    var doneTasks=Object.values(tasks).filter(function(t){return t.flowId&&t.done&&_inZone(t.startIso);}).sort(function(a,b){return b.startIso.localeCompare(a.startIso);});
+    var doneTasks=Object.values(tasks).filter(function(t){return t.flowId&&t.done&&_inZone(t.startIso)&&_inRoster(t.cid);}).sort(function(a,b){return b.startIso.localeCompare(a.startIso);});
     h+='<div style="display:flex;gap:6px;margin-bottom:16px">';
     h+='<button onclick="_flowsHistoryMode=this.dataset.m;render()" data-m="date" style="padding:5px 14px;border-radius:20px;cursor:pointer;font-family:Inter,sans-serif;font-size:11px;border:1px solid '+(hm!=='client'?'rgba(var(--accent-rgb),.4)':'rgba(255,255,255,.1)')+';background:'+(hm!=='client'?'rgba(var(--accent-rgb),.12)':'rgba(255,255,255,.04)')+';color:'+(hm!=='client'?'var(--accent)':'var(--text3)')+'">По дате</button>';
     h+='<button onclick="_flowsHistoryMode=this.dataset.m;render()" data-m="client" style="padding:5px 14px;border-radius:20px;cursor:pointer;font-family:Inter,sans-serif;font-size:11px;border:1px solid '+(hm==='client'?'rgba(var(--accent-rgb),.4)':'rgba(255,255,255,.1)')+';background:'+(hm==='client'?'rgba(var(--accent-rgb),.12)':'rgba(255,255,255,.04)')+';color:'+(hm==='client'?'var(--accent)':'var(--text3)')+'">По клиентам</button>';

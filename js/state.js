@@ -13,6 +13,7 @@ function switchMonth(mk){
   saveAll();
   activeMonth = mk;
   setActiveMonth(mk);
+  try{ _cacheInvalidate(); }catch(e){}   // zone changed → drop cached (home/clients) renders
   clients = load('dc_clients',[]);
   log = load('dc_log',{});
   historyData = load('dc_history',{});
@@ -134,6 +135,7 @@ function deleteMonth(mk){
   if(!confirm(`Удалить «${mk}»? Все данные этого месяца удалятся.`)) return;
   const KEYS = ['dc_clients','dc_log','dc_history','dc_plans','dc_plantasks','dc_manual_done','dc_sms_days','dc_pay_disabled','dc_flows'];
   KEYS.forEach(k => localStorage.removeItem(k+'__'+mk));
+  try{ const _rm=load('dc_zone_roster',{}); delete _rm[mk]; save('dc_zone_roster',_rm); }catch(e){}   // drop this zone's client list (records stay in the pool)
   const newMonths = months.filter(m => m !== mk);
   saveMonths(newMonths);
   if(activeMonth === mk){

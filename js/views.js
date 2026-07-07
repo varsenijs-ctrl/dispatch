@@ -1,6 +1,6 @@
 function updateSidebar(){
 
-  const activeCl2=clients.filter(c=>c.active&&!c.paused);
+  const activeCl2=_zac();
   const manual2=load('dc_manual_done',{});
   const doneToday=activeCl2.filter(c=>manual2[c.id]).length;
   const pendingToday=activeCl2.length-doneToday;
@@ -9,7 +9,7 @@ function updateSidebar(){
   const _sb=document.getElementById('s-blocked'); if(_sb)_sb.textContent=0;
   const mk=monthKey(getTODAY());
   const _sdSms=load('dc_sms_days',{});
-  const activeCl=clients.filter(c=>c.active&&!c.paused);
+  const activeCl=_zac();
   let em=0, sm=0;
   activeCl.forEach(c=>{
     const hist=historyData[c.name]||{};
@@ -73,7 +73,7 @@ function toggleDaySms(cid,iso){
 // ── Home ─────────────────────────────────────────────────────
 function renderHome(){
   const iso=isoToday();const mk=activeMonth;   // Home reflects the ACTIVE zone
-  const ac=clients.filter(c=>c.active&&!c.paused);
+  const ac=_zac();                              // only THIS zone's clients
   const manual=load('dc_manual_done',{});
   const doneTodayCount=ac.filter(c=>manual[c.id]).length;
   const totalToday=ac.length;const pendingToday=totalToday-doneTodayCount;
@@ -450,7 +450,7 @@ function renderDayToday(){
 
 function renderToday(){
   const iso=isoToday();
-  const ac=clients.filter(c=>c.active&&!c.paused).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+  const ac=_zac().sort((a,b)=>a.name.localeCompare(b.name,'ru'));   // only THIS zone's clients
   function isDone(c){return !!load('dc_manual_done',{})[c.id];}
   const pending=ac.filter(c=>!isDone(c));const done=ac.filter(c=>isDone(c));
   const pct=ac.length?Math.round(done.length/ac.length*100):0;

@@ -1,7 +1,7 @@
 function renderFlows(){
   var iso=isoToday();
   var tasks=load('dc_plantasks',{});
-  var ac=clients.filter(function(c){return c.active&&!c.paused;}).sort(function(a,b){return a.name.localeCompare(b.name,'ru');});
+  var ac=_zac().sort(function(a,b){return a.name.localeCompare(b.name,'ru');});   // only THIS zone's clients
 
   // Per-zone flow accounting: a flow issued in THIS zone counts here; a flow never
   // issued anywhere is still "to do"; a flow issued in ANOTHER zone belongs there and
@@ -362,8 +362,10 @@ function getFlowDays(cid){
 }
 
 function getFlowEarnings(cid, scope){
-  // One-time model: each flow counts ONCE. A flow is "issued" once it has a
-  // done task (in scope); earned = issued flows, potential = all flows.
+  // One-time model: each flow counts ONCE. Per-zone ('month' scope): a flow counts
+  // in THIS zone only if it was issued here (→ earned + potential) or has never been
+  // issued anywhere (→ potential, still to-do). A flow issued in ANOTHER zone belongs
+  // there and is ignored here — so June-issued flows don't inflate July's Максимум.
   const flows=getFlows(cid);
   if(!flows.length) return {earned:0,potential:0,tasks:[]};
   const tasks=load('dc_plantasks',{});
@@ -371,11 +373,18 @@ function getFlowEarnings(cid, scope){
   const list=[];
   flows.forEach(f=>{
     const val=f.count*0.60;
-    const issuedTask=Object.values(tasks).find(t=>
-      t.cid===cid && t.flowId===f.id && t.done && (scope!=='month'||_inZone(t.startIso)));   // active zone only
-    potential+=val;
-    if(issuedTask) earned+=val;
-    list.push({flow:f, val, done:!!issuedTask, task:issuedTask||null});
+    const ft=Object.values(tasks).filter(t=>t.cid===cid && t.flowId===f.id);
+    const doneInZone=ft.some(t=>t.done && _inZone(t.startIso));
+    const doneAnywhere=ft.some(t=>t.done);
+    if(scope==='month'){
+      if(doneInZone){ earned+=val; potential+=val; list.push({flow:f, val, done:true, task:ft.find(t=>t.done)||null}); }
+      else if(!doneAnywhere){ potential+=val; list.push({flow:f, val, done:false, task:null}); }
+      // issued in another zone → belongs there, skip entirely
+    } else {
+      potential+=val;
+      if(doneAnywhere) earned+=val;
+      list.push({flow:f, val, done:doneAnywhere, task:ft.find(t=>t.done)||null});
+    }
   });
   return {earned,potential,tasks:list};
 }

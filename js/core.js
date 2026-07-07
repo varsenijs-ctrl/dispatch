@@ -96,6 +96,25 @@ function setActiveMonth(mk){localStorage.setItem('dc_active_month',mk);}
 
 let activeMonth = getActiveMonth();
 
+// ── Per-zone client rosters ────────────────────────────────────────────────
+// Each work-zone (month) has its OWN, MANUALLY built client list. Nothing shows
+// automatically: a client appears in a zone only if the user explicitly added it
+// there. Stored as ONE global map { "2026-07":[cid,…], "2026-06":[cid,…] }.
+// The dc_clients pool (client records: name / deadline / SMS / …) stays shared and
+// is NEVER moved or deleted — the roster only decides which of them a zone shows.
+function _rosterMap(){ return load('dc_zone_roster', {}); }
+function _zoneRoster(mk){ mk=mk||activeMonth; var m=_rosterMap(); return Array.isArray(m[mk])?m[mk]:[]; }
+function _inRoster(cid, mk){ return _zoneRoster(mk).indexOf(cid)>=0; }
+function _addToRoster(cid, mk){ mk=mk||activeMonth; var m=_rosterMap(); if(!Array.isArray(m[mk])) m[mk]=[]; if(m[mk].indexOf(cid)<0){ m[mk].push(cid); save('dc_zone_roster', m); } }
+function _removeFromRoster(cid, mk){ mk=mk||activeMonth; var m=_rosterMap(); if(Array.isArray(m[mk])){ m[mk]=m[mk].filter(function(x){return x!==cid;}); save('dc_zone_roster', m); } }
+// Client objects in THIS zone's roster, in the order they were added. Skips ids
+// that no longer exist in the pool.
+function _zoneClients(mk){ var ids=_zoneRoster(mk); return ids.map(function(id){ return clients.find(function(c){return c.id===id;}); }).filter(Boolean); }
+// Active, non-paused zone clients — the common case for money/marking views.
+function _zac(){ return _zoneClients().filter(function(c){return c.active&&!c.paused;}); }
+// Pool clients NOT yet added to the active zone (for the "add to zone" picker).
+function _poolNotInZone(){ var r=_zoneRoster(); return clients.filter(function(c){return c.active&&r.indexOf(c.id)<0;}); }
+
 // Data is GLOBAL now (no per-month buckets). The month bar is just a view filter for
 // Finance/History; clients, statuses and tasks all live in one place. This killed the
 // endless "wrong zone / disappeared / teleport" bugs.
@@ -282,7 +301,10 @@ function _consolidateClientsToJune(){
 }
 
 // ── one-time migration: legacy un-namespaced keys → current-month namespace ──
+// Obsolete: data is global now. Guarded so it can NEVER move/copy data again once
+// globalization has run (the user forbade any automatic data relocation).
 (function(){
+  if(localStorage.getItem('dc_globalized_v1')) return;
   const OLD_KEYS = ['dc_clients','dc_log','dc_history','dc_plans','dc_plantasks','dc_manual_done','dc_sms_days','dc_pay_disabled','dc_flows'];
   const TARGET = '2026-06';
   let migrated = false;

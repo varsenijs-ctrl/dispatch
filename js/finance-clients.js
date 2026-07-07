@@ -34,7 +34,7 @@ function _clientEntries(name){
 function computeFinanceTotals(scope){
   const smsDays=load('dc_sms_days',{});const dis=load('dc_pay_disabled',{});
   let earned=0,potential=0,sentCount=0,totalCount=0;
-  clients.filter(c=>c.active&&!c.paused).forEach(c=>{
+  _zac().forEach(c=>{                              // only clients added to THIS zone
     const cidSms=smsDays[c.id]||{};const cidDis=dis[c.id]||{};const hist=historyData[c.name]||{};
     Object.entries(hist).forEach(([d,v])=>{
       if(!_inZone(d)) return;                 // this zone's month only
@@ -51,7 +51,7 @@ function computeFinanceTotals(scope){
 }
 function renderFinance(){
   const mk=monthKey(getTODAY());const smsDays=load('dc_sms_days',{});const dis=load('dc_pay_disabled',{});
-  const ac=clients.filter(c=>c.active&&!c.paused).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+  const ac=_zac().sort((a,b)=>a.name.localeCompare(b.name,'ru'));   // only THIS zone's clients
   const _T=computeFinanceTotals(financeScope);
   const invTotal=_T.invTotal;
   const totalWithInv=_T.earned;
@@ -65,7 +65,7 @@ function renderFinance(){
       if(!e.disabled&&(e.v==='yes'||e.v==='no'||e.v==='draft')) cp+=e.rate; });
     const cfe=getFlowEarnings(c.id, 'month');
     ce+=cfe.earned; cp+=cfe.potential;
-    if(cTotal===0 && cfe.potential===0) return;   // no activity in this zone → don't show the client here
+    // every client added to this zone is shown (even at $0 — you'll mark it here)
     const isSel=financeSelectedCid===c.id;
     clientRows+=`<div onclick="_sfx.play('click');financeSelectedCid='${c.id}';render()" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05);transition:background .15s;background:${isSel?'rgba(var(--accent-rgb),.1)':'none'}">
       <div style="flex:1;overflow:hidden">
@@ -146,23 +146,29 @@ function flowDeadlineBadge(deadline){
 }
 let clientsSort='alpha';
 function renderClients(){
-  const active=clients.filter(c=>c.active);
+  // Per-zone: this tab shows ONLY the clients you added to the active zone. The
+  // global pool (dc_clients) is untouched — clients are pulled from it into a zone
+  // via the picker below. Removing here only takes a client OUT of this zone.
+  const active=_zoneClients().filter(c=>c.active);
   const sorted=[...active].sort((a,b)=>{
     if(clientsSort==='alpha')return a.name.localeCompare(b.name,'ru');
     if(clientsSort==='count')return clientSentCount(a)-clientSentCount(b);
     if(clientsSort==='deadline'){const da=a.deadline?new Date(a.deadline+'T00:00:00').getTime():Infinity;const db=b.deadline?new Date(b.deadline+'T00:00:00').getTime():Infinity;return da-db;}
     return 0;
   });
-  let html=`<div class="section-header"><h2>Клиенты</h2><span class="badge badge-done">${active.length}</span></div>`;
+  let html=`<div class="section-header"><h2>Клиенты</h2><span class="badge badge-done">${active.length}</span><span style="font-family:var(--mono);font-size:12px;color:var(--text3);margin-left:8px">${_finZoneLabel()} · только эта зона</span></div>`;
   html+=renderImportBox();
   html+=`<div class="sort-tabs"><span style="font-size:10px;color:var(--text3);align-self:center;font-family:var(--mono)">сортировка:</span><button class="sort-tab ${clientsSort==='alpha'?'active':''}" onclick="setClientsSort('alpha')">А→Я</button><button class="sort-tab ${clientsSort==='count'?'active':''}" onclick="setClientsSort('count')">меньше отправлено</button><button class="sort-tab ${clientsSort==='deadline'?'active':''}" onclick="setClientsSort('deadline')">дедлайн</button></div>`;
+  if(!sorted.length){
+    html+=`<div style="text-align:center;padding:26px 18px;color:var(--text3);font-family:var(--mono);font-size:13px;line-height:1.6;background:rgba(255,255,255,.04);border:1px dashed rgba(255,255,255,.12);border-radius:18px;margin-bottom:14px">В зоне «${_finZoneLabel()}» пока нет клиентов.<br>Добавь нужных ниже — список берётся из твоей общей базы,<br>старые данные никуда не делись.</div>`;
+  }
   sorted.forEach(c=>{
     const hasHistory=historyData[c.name]&&Object.keys(historyData[c.name]).length>0;
     const ld=lastDoneInfo(c);
     const isPaused = c.paused||false;
     const clientFlows=getFlows(c.id);
     html+=`<div class="client-row${isPaused?' completed-today':''}" onclick="openCal('${c.id}')" style="${isPaused?'opacity:.45':''}">
-      <div onclick="event.stopPropagation()" style="display:flex;align-items:center;justify-content:center"><button class="del-btn" data-action="delete-client" data-id="${c.id}" title="Удалить клиента">✕</button></div>
+      <div onclick="event.stopPropagation()" style="display:flex;align-items:center;justify-content:center"><button class="del-btn" onclick="event.stopPropagation();removeClientFromZone('${c.id}')" title="Убрать из этой зоны (данные не удаляются)">✕</button></div>
       <div><div style="display:flex;align-items:center;gap:4px"><span class="client-name">${esc(c.name)}</span>${deadlineBadge(c,true)}${isPaused?'<span class="badge badge-pending" style="margin-left:4px">пауза</span>':''}${hasHistory?`<span class="badge badge-done" style="margin-left:4px">история</span>`:''}</div><div class="client-sub">${ld.text} · ${clientSentCount(c)} отпр.</div></div>
       <div onclick="event.stopPropagation()" style="display:flex;flex-direction:column;gap:4px"><input type="date" class="deadline-edit" data-id="${c.id}" value="${c.deadline||''}" style="background:var(--glass);border:1px solid var(--glass-border2);color:var(--text);font-size:11px;padding:3px 6px;border-radius:10px;outline:none;color-scheme:dark" title="дедлайн"><div style="font-size:10px;color:${c.deadline?'var(--amber)':'var(--text3)'};font-family:var(--mono)">${c.deadline?'до '+fmtDate(new Date(c.deadline+'T00:00:00')):'нет дедлайна'}</div></div>
       <div onclick="event.stopPropagation()" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px">
@@ -178,7 +184,38 @@ function renderClients(){
 
     </div>`;
   });
+  html+=renderZonePool();
   html+=renderAddForm();return html;
+}
+
+// Picker: pull existing clients from the global pool into the ACTIVE zone. Nothing
+// is added automatically — the user clicks each one (or "добавить всех").
+function renderZonePool(){
+  const pool=_poolNotInZone().sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+  let h=`<div class="add-section" style="margin-bottom:14px"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px"><h3 style="margin:0">Добавить клиента в зону <span style="font-family:var(--mono);font-size:11px;color:var(--text3);font-weight:400">(${_finZoneLabel()})</span></h3>`;
+  if(pool.length) h+=`<button class="toggle-btn" style="font-size:11px;padding:4px 10px" onclick="addAllToZone()">＋ добавить всех (${pool.length})</button>`;
+  h+=`</div>`;
+  if(!pool.length){ h+=`<div style="font-size:12px;color:var(--text3);font-family:var(--mono)">Все клиенты из базы уже в этой зоне.</div></div>`; return h; }
+  h+=`<input id="zone-pool-search" placeholder="поиск клиента из базы…" oninput="_filterZonePool(this.value)" style="width:100%;box-sizing:border-box;background:var(--glass);border:1px solid var(--glass-border2);color:var(--text);font-size:12px;padding:7px 10px;border-radius:12px;outline:none;margin-bottom:10px">`;
+  h+=`<div id="zone-pool-chips" style="display:flex;flex-wrap:wrap;gap:6px">`;
+  pool.forEach(c=>{
+    h+=`<button class="zone-pool-chip" data-name="${esc(c.name).toLowerCase()}" onclick="addClientToZone('${c.id}')" title="Добавить в зону" style="display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:16px;border:1px solid rgba(var(--accent-rgb),.25);background:rgba(var(--accent-rgb),.08);color:var(--text);font-size:12px;cursor:pointer;font-family:'Inter',sans-serif"><span style="color:var(--accent);font-weight:700">＋</span> ${esc(c.name)}</button>`;
+  });
+  h+=`</div></div>`;
+  return h;
+}
+function _filterZonePool(q){
+  q=(q||'').trim().toLowerCase();
+  document.querySelectorAll('#zone-pool-chips .zone-pool-chip').forEach(function(el){
+    el.style.display = (!q || (el.dataset.name||'').indexOf(q)>=0) ? '' : 'none';
+  });
+}
+function addClientToZone(cid){ _sfx.play('click'); _addToRoster(cid); render(); }
+function removeClientFromZone(cid){ _sfx.play('delete'); _removeFromRoster(cid); render(); }
+function addAllToZone(){
+  var m=_rosterMap(); var mk=activeMonth; if(!Array.isArray(m[mk])) m[mk]=[];
+  _poolNotInZone().forEach(function(c){ if(m[mk].indexOf(c.id)<0) m[mk].push(c.id); });
+  save('dc_zone_roster', m); _sfx.play('done'); render();
 }
 
 function renderFlowTags(cid){
@@ -211,7 +248,7 @@ function addClient(){ _sfx.play('done');
   if(schedule==='weekly')c.daysOfWeek=[...document.querySelectorAll('#schedule-extra input[type=checkbox]:checked')].map(x=>parseInt(x.value));
   const histMatch=Object.keys(historyData).find(k=>k.toLowerCase()===name.toLowerCase());
   if(histMatch&&histMatch!==name)historyData[name]=historyData[histMatch];
-  clients.push(c);saveAll();render();
+  clients.push(c);saveAll();_addToRoster(id);render();   // new client belongs to the zone it was created in
 }
 const INV_RATE = 0.50;
 

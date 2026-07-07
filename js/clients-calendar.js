@@ -18,7 +18,7 @@ function deleteClient(id){ _sfx.play('error');
 }
 function resetToInitial(){
   if(!confirm('Сбросить все данные до начального состояния из таблицы?\nВсе твои правки удалятся.'))return;
-  ['dc_clients','dc_log','dc_history','dc_plans','dc_plantasks','dc_manual_done','dc_sms_days','dc_pay_disabled','dc_sheet_url'].forEach(k=>localStorage.removeItem(k));
+  ['dc_clients','dc_log','dc_history','dc_plans','dc_plantasks','dc_manual_done','dc_sms_days','dc_pay_disabled','dc_sheet_url','dc_zone_roster'].forEach(k=>localStorage.removeItem(k));
   clients=[];log={};historyData={};
   initPreload();render();
 }

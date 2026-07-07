@@ -21,11 +21,14 @@ function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var items = data.bulk && data.bulk.length ? data.bulk : [data];
+    var isBulk = !!(data.bulk && data.bulk.length);
+    var items = isBulk ? data.bulk : [data];
     var results = [];
-    var cache = {}; // sheetName -> {values, dateRow:{iso:rowIdx}, header}
-    items.forEach(function (it) { results.push(writeOne(ss, it.client, it.iso, it.status, cache)); });
-    flushCache(ss, cache);
+    var cache = {}; // sheetName -> {sheet, values} — cached reads (row/column lookup)
+    // Single edits write ONE cell immediately (concurrent edits to different cells
+    // can't clobber each other). Bulk edits batch into one full-range write.
+    items.forEach(function (it) { results.push(writeOne(ss, it.client, it.iso, it.status, cache, !isBulk)); });
+    if (isBulk) flushCache(ss, cache);
     return ContentService.createTextOutput(JSON.stringify({ ok: true, results: results }));
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(err) }));
@@ -58,9 +61,11 @@ function getSheetData(ss, sh, cache) {
   return cache[name];
 }
 
-// queue a write; actual setValues happens in flushCache (one write per sheet)
-function writeOne(ss, client, iso, status, cache) {
+// Find the cell for (client, iso) and write `status`. Single edits (immediate=true)
+// set just that one cell; bulk edits update the cached in-memory grid (flushed later).
+function writeOne(ss, client, iso, status, cache, immediate) {
   if (!client || !iso) return 'skip';
+  if (status == null || String(status).trim() === '') return 'skip-empty';  // NEVER clear a cell
   var tz = ss.getSpreadsheetTimeZone();
   var sheets = ss.getSheets();
   for (var s = 0; s < sheets.length; s++) {
@@ -81,8 +86,12 @@ function writeOne(ss, client, iso, status, cache) {
       if (score > bestScore) { bestScore = score; bestCol = c; }
     }
     if (bestCol < 0 || bestScore < 0.6) return 'client-not-found:' + client;
-    values[rowIdx][bestCol] = status; // update in-memory; flushed later
-    d.dirty = true;
+    if (immediate) {
+      d.sheet.getRange(rowIdx + 1, bestCol + 1).setValue(status);  // write ONLY this cell
+    } else {
+      values[rowIdx][bestCol] = status; // batch in-memory; flushed once for bulk
+      d.dirty = true;
+    }
     return 'ok:' + sheets[s].getName() + '/' + iso + '/' + header[bestCol] + '=' + status;
   }
   return 'date-not-found:' + iso;

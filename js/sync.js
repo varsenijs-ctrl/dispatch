@@ -173,12 +173,24 @@ function renderSyncPanel(){
    tick in Dispatch lands in the sheet's right month tab + client column.
    ═══════════════════════════════════════════════════════ */
 function _sheetUrl(){ return gload('dc_sheet_sync_url',''); }
+// Per-cell debounce: cycling a day fires '' → yes → draft → no in quick succession.
+// Sending each one as a fire-and-forget no-cors request meant they could land out of
+// order (leaving an intermediate 'yes') and a transient '' would clear the cell.
+// We coalesce rapid changes to the SAME cell and send only the final status — and
+// never send an empty status, so a sheet cell is never cleared by the app.
+var _sheetPushTimers = {};
 function _sheetPush(client, iso, status){
   const url=_sheetUrl(); if(!url) return;
-  try{
-    fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({client:client,iso:iso,status:status})});
-  }catch(e){}
+  const key = client+'|'+iso;
+  if(_sheetPushTimers[key]) clearTimeout(_sheetPushTimers[key]);
+  _sheetPushTimers[key] = setTimeout(function(){
+    delete _sheetPushTimers[key];
+    if(status==null || String(status).trim()==='') return;   // never clear a sheet cell
+    try{
+      fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:JSON.stringify({client:client,iso:iso,status:status})});
+    }catch(e){}
+  }, 650);
 }
 // One-shot backfill: send every recorded status in one bulk request
 function sheetPushAll(){

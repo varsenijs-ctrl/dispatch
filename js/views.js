@@ -235,20 +235,21 @@ function _editTask(id){
   // reassign a task to anyone), preselecting the task's current client.
   var etCl = document.getElementById('et-client');
   if(etCl){
-    // clients from EVERY zone (deduped by name) so robot tasks pointing at another
-    // zone's client still resolve to a NAME, not a raw id.
-    var list = _clientsUnion();
-    // resolve the task's current client to a name
-    var curName = '';
-    if(t.cid){ var byId=list.find(function(c){return c.id===t.cid;}); if(byId) curName=byId.name; }
-    if(!curName && t.clientName) curName=t.clientName;
-    if(curName && !list.some(function(c){return c.name===curName;})) list.push({id:t.cid||curName, name:curName, active:true});
+    // Only THIS zone's clients (no pool duplicates / legacy phantoms), plus the task's
+    // current client if it lives outside the zone — so the current selection stays valid.
+    var list = _zoneClients().map(function(c){return {id:c.id,name:c.name,active:c.active!==false};});
+    var pool = (typeof clients!=='undefined'?clients:[]);
+    var cur = null;
+    if(t.cid) cur = pool.find(function(c){return c.id===t.cid;}) || list.find(function(c){return c.id===t.cid;});
+    if(!cur && t.clientName) cur = pool.find(function(c){return c.name===t.clientName;});
+    var curId   = cur ? cur.id   : (t.cid||'');
+    var curName = cur ? cur.name : (t.clientName||'');
+    if(curId && !list.some(function(c){return c.id===curId;})) list.push({id:curId, name:curName||curId, active:true});
     list.sort(function(a,b){return a.name.localeCompare(b.name,'ru');});
     var html = '<option value="">— без клиента —</option>' +
-      list.map(function(c){return '<option value="'+esc(c.id)+'"'+(c.name===curName?' selected':'')+'>'+esc(c.name)+(c.active===false?' (пауза)':'')+'</option>';}).join('');
+      list.map(function(c){return '<option value="'+esc(c.id)+'"'+(c.id===curId?' selected':'')+'>'+esc(c.name)+(c.active===false?' (пауза)':'')+'</option>';}).join('');
     etCl.innerHTML = html;
-    var selc = list.find(function(c){return c.name===curName;});
-    etCl.value = selc ? selc.id : '';
+    etCl.value = curId || '';
   }
   // Set tod buttons (exclude the priority buttons, which share the .tod-btn style)
   document.querySelectorAll('#edit-task-modal .tod-btn:not([data-prio])').forEach(function(b){

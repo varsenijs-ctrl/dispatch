@@ -45,10 +45,19 @@ function importFromPaste(){
     for(let c=0;c<colClients.length;c++){const clientName=colClients[c];if(!clientName)continue;const val=(row[c+1]||'').trim().toLowerCase().replace(/\u200b/g,'');if(!val||!['yes','no','draft'].includes(val))continue;if(!historyData[clientName])historyData[clientName]={};historyData[clientName][iso]=val;newClientNames.add(clientName);totalDates++;}
   }
   if(!totalDates){statusEl.className='import-status err';statusEl.textContent='Не нашёл данных (yes/no/draft)';return;}
-  let added=0;
-  newClientNames.forEach(name=>{const exists=clients.find(c=>c.active&&c.name.toLowerCase()===name.toLowerCase());if(!exists){clients.push({id:'c_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),name,active:true,smsEnabled:false,schedule:'',deadline:null});added++;}});
+  let added=0; const importedCids=[];
+  newClientNames.forEach(name=>{
+    let ex=clients.find(c=>c.active&&c.name.toLowerCase()===name.toLowerCase());
+    if(!ex){ ex={id:'c_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),name,active:true,smsEnabled:false,schedule:'',deadline:null}; clients.push(ex); added++; }
+    importedCids.push(ex.id);
+  });
   saveAll();
-  statusEl.className='import-status ok';statusEl.textContent=`✓ ${totalDates} записей, ${newClientNames.size} клиентов${added?' (+'+added+' новых)':''}.`;
+  // Import = "put these clients into THIS zone" — add every imported client to the
+  // active zone's roster so they show up right away (not just in the shared pool).
+  const _rm=_rosterMap(); if(!Array.isArray(_rm[activeMonth])) _rm[activeMonth]=[];
+  importedCids.forEach(id=>{ if(_rm[activeMonth].indexOf(id)<0) _rm[activeMonth].push(id); });
+  save('dc_zone_roster', _rm);
+  statusEl.className='import-status ok';statusEl.textContent=`✓ ${totalDates} записей, ${newClientNames.size} клиентов в зону «${_finZoneLabel()}»${added?' (+'+added+' новых)':''}.`;
   document.getElementById('paste-data').value='';render();
 }
 

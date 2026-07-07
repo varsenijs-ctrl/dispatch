@@ -238,6 +238,16 @@
     return cleanText(text);
   }
 
+  // ── one-time: re-add ALL ClickUp tasks ──────────────────────────────────
+  // You deleted every task and want them all back. Clearing dc_inject_seen once
+  // lets the RAW list above re-inject IN FULL on the next load (deleted-stays-
+  // deleted resumes afterwards). To force another full re-add later, bump this
+  // flag version (…_v9, _v10…) — that's the whole "разово добавить всё заново".
+  if(!localStorage.getItem('dc_inject_reset_v8')){
+    localStorage.removeItem('dc_inject_seen');
+    localStorage.setItem('dc_inject_reset_v8','1');
+  }
+
   // ── existing tasks (single global store): dedupe by ClickUp id + by text+client ──
   var tasks; try{ tasks = JSON.parse(localStorage.getItem('dc_plantasks')||'{}')||{}; }catch(e){ tasks={}; }
   var seenIds = {}, texts = {};

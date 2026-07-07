@@ -239,6 +239,10 @@ function renderAddForm(){
 function addClient(){ _sfx.play('done');
   const name=document.getElementById('new-name')?.value?.trim();
   if(!name){_sfx.play('error');alert('Введи имя клиента');return;}
+  // no duplicates: if a client with the same normalized name already exists in the
+  // pool, just add THAT one to this zone instead of creating a near-duplicate.
+  const dup=clients.find(x=>_normName(x.name)===_normName(name));
+  if(dup){ _addToRoster(dup.id); showToast('«'+dup.name+'» уже есть — добавлен в зону'); const _n=document.getElementById('new-name'); if(_n)_n.value=''; render(); return; }
   const schedule=document.getElementById('new-schedule')?.value||'';
   const smsEnabled=document.getElementById('new-sms')?.classList.contains('on')||false;
   const deadline=document.getElementById('new-deadline')?.value||'';

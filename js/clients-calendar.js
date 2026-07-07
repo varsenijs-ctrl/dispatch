@@ -36,18 +36,23 @@ function importFromPaste(){
   const headers=rows[headerRow];const colClients=headers.slice(1).map(h=>h.trim()).filter(h=>h);
   if(!colClients.length){statusEl.className='import-status err';statusEl.textContent='Не нашёл имена клиентов';return;}
   let totalDates=0;const newClientNames=new Set();
+  // Map each pasted column name \u2192 canonical client name: if a client with the same
+  // normalized name already exists, reuse ITS exact name so history & the client
+  // record don't split between "Macro Beauty" and "macrobeauty".
+  const canonical={};
+  colClients.forEach(nm=>{ const ex=clients.find(c=>c.active&&_normName(c.name)===_normName(nm)); canonical[nm]=ex?ex.name:nm; });
   for(let r=headerRow+1;r<rows.length;r++){
     const row=rows[r];const dateRaw=(row[0]||'').trim();if(!dateRaw)continue;
     let iso=null;
     if(/^\d{4}-\d{2}-\d{2}$/.test(dateRaw))iso=dateRaw;
     else{const m1=dateRaw.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);if(m1)iso=`${m1[3]}-${m1[2].padStart(2,'0')}-${m1[1].padStart(2,'0')}`;}
     if(!iso)continue;
-    for(let c=0;c<colClients.length;c++){const clientName=colClients[c];if(!clientName)continue;const val=(row[c+1]||'').trim().toLowerCase().replace(/\u200b/g,'');if(!val||!['yes','no','draft'].includes(val))continue;if(!historyData[clientName])historyData[clientName]={};historyData[clientName][iso]=val;newClientNames.add(clientName);totalDates++;}
+    for(let c=0;c<colClients.length;c++){const clientName=canonical[colClients[c]];if(!clientName)continue;const val=(row[c+1]||'').trim().toLowerCase().replace(/\u200b/g,'');if(!val||!['yes','no','draft'].includes(val))continue;if(!historyData[clientName])historyData[clientName]={};historyData[clientName][iso]=val;newClientNames.add(clientName);totalDates++;}
   }
   if(!totalDates){statusEl.className='import-status err';statusEl.textContent='Не нашёл данных (yes/no/draft)';return;}
   let added=0; const importedCids=[];
   newClientNames.forEach(name=>{
-    let ex=clients.find(c=>c.active&&c.name.toLowerCase()===name.toLowerCase());
+    let ex=clients.find(c=>c.active&&_normName(c.name)===_normName(name));
     if(!ex){ ex={id:'c_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),name,active:true,smsEnabled:false,schedule:'',deadline:null}; clients.push(ex); added++; }
     importedCids.push(ex.id);
   });

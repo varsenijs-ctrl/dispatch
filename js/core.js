@@ -115,6 +115,45 @@ function _zac(){ return _zoneClients().filter(function(c){return c.active&&!c.pa
 // Lower-cased names of the active zone's clients — for filtering name-keyed data
 // (history / action log) to this zone only.
 function _zoneClientNames(){ var set={}; _zac().forEach(function(c){ if(c&&c.name) set[String(c.name).toLowerCase()]=1; }); return set; }
+// Normalized client-name key (case/space/punctuation-insensitive) so "Macro Beauty"
+// and "macrobeauty" collapse to the same key — used to de-duplicate client records.
+function _normName(s){ return (s||'').toString().toLowerCase().replace(/[^a-z0-9а-яё]/gi,''); }
+
+// One-time: collapse duplicate client records that differ only by case / spacing /
+// punctuation (e.g. "Macro Beauty" ↔ "macrobeauty"). Keeps the record that HAS data
+// (history / flows / roster membership); removes ONLY the empty phantom duplicates.
+// If two same-named records BOTH have data, it leaves them untouched and logs them
+// (so nothing with your data is ever deleted). Guarded by a flag — bump to re-run.
+function _dedupeClients(){
+  if(localStorage.getItem('dc_dedupe_clients_v1')) return {removed:0,conflicts:[]};
+  var list = load('dc_clients', []);
+  if(!Array.isArray(list) || list.length<2){ localStorage.setItem('dc_dedupe_clients_v1','1'); return {removed:0,conflicts:[]}; }
+  var hist = load('dc_history', {}), flows = load('dc_flows', {}), roster = load('dc_zone_roster', {});
+  function score(c){
+    var s=0, h=hist[c.name]; if(h&&typeof h==='object') s+=Object.keys(h).length;
+    var f=flows[c.id]; if(f&&f.length) s+=f.length*1000;
+    Object.keys(roster).forEach(function(mk){ if(Array.isArray(roster[mk])&&roster[mk].indexOf(c.id)>=0) s+=100; });
+    return s;
+  }
+  var groups={};
+  list.forEach(function(c){ if(c&&c.name){ var k=_normName(c.name); (groups[k]=groups[k]||[]).push(c); } });
+  var removeSet={}, conflicts=[];
+  Object.keys(groups).forEach(function(k){
+    var g=groups[k]; if(g.length<2) return;
+    g.sort(function(a,b){ return score(b)-score(a); });        // keeper (most data) first
+    g.slice(1).forEach(function(d){ if(score(d)===0) removeSet[d.id]=1; else conflicts.push(d.name); });
+  });
+  var removed=Object.keys(removeSet).length;
+  if(removed){
+    save('dc_clients', list.filter(function(c){ return !removeSet[c.id]; }));
+    var changed=false;
+    Object.keys(roster).forEach(function(mk){ if(Array.isArray(roster[mk])){ var n=roster[mk].filter(function(id){return !removeSet[id];}); if(n.length!==roster[mk].length){ roster[mk]=n; changed=true; } } });
+    if(changed) save('dc_zone_roster', roster);
+  }
+  localStorage.setItem('dc_dedupe_clients_v1','1');
+  try{ console.log('Dedupe clients: removed '+removed+' empty duplicate(s)'+(conflicts.length?'; both-have-data (kept both): '+conflicts.join(', '):'')); }catch(e){}
+  return {removed:removed, conflicts:conflicts};
+}
 // Pool clients NOT yet added to the active zone (for the "add to zone" picker).
 function _poolNotInZone(){ var r=_zoneRoster(); return clients.filter(function(c){return c.active&&r.indexOf(c.id)<0;}); }
 

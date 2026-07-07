@@ -1,6 +1,6 @@
 // Build stamp — bump on each deploy so you can tell at a glance whether the
 // running app has the latest files (если метки нет — крутится старый JS из кэша).
-const BUILD='07.07 · планнер-по-зоне';
+const BUILD='07.07 · без-дублей';
 console.log('Dispatch build: '+BUILD+' — _overdue '+(typeof _overdue==='function'?'OK':'ОТСУТСТВУЕТ (старый код)'));
 try{ const _bt=document.getElementById('build-tag'); if(_bt) _bt.textContent=BUILD; }catch(e){}
 document.getElementById('topbar-date').textContent=fmtDate(getTODAY())+' '+DAYS_RU[getTODAY().getDay()]+' · '+MONTHS_RU[getTODAY().getMonth()];
@@ -8,6 +8,7 @@ try{ _dedupeFlowTasks(); }catch(e){}   // repair any duplicate flow tasks from o
 try{ _migrateManualDone(); }catch(e){} // persistent "done" marks (no daily reset)
 try{ _seedActLog(); }catch(e){}        // seed the История action log from existing marks (one-time)
 try{ _consolidateClientsToJune(); clients = load('dc_clients',[]); historyData = load('dc_history',{}); }catch(e){}  // one-time: move a set of clients' history into июнь 2026
+try{ _dedupeClients(); clients = load('dc_clients',[]); }catch(e){}   // one-time: remove empty duplicate client records (Macro Beauty ↔ macrobeauty)
 render();
 try{ if(typeof _syncInit==='function') _syncInit(); }catch(e){}  // cloud sync (if configured)
 setTimeout(renderMonthBar, 0);

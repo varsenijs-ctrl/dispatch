@@ -201,10 +201,13 @@ function _drop(el, e){
   var over = el.closest('[data-tid]');
   if(!over || !_dragId || over.dataset.tid===_dragId) return;
   var tasks = load('dc_plantasks',{});
-  // Rebuild sorted list
+  // Rebuild the list in the SAME order the view shows (priority → manual → date), so
+  // the reassigned sortOrder reflects what's on screen plus the move.
+  var _pr=function(t){return +t.prio||0;};
+  var _so=function(t){return t.sortOrder==null?1e9:t.sortOrder;};
+  var _due=function(t){return t.deadline||t.startIso;};
   var sorted = Object.values(tasks)
-    .filter(function(t){ return t.sortOrder!==undefined||true; })
-    .sort(function(a,b){ return (a.sortOrder||0)-(b.sortOrder||0); });
+    .sort(function(a,b){ return _pr(b)-_pr(a) || _so(a)-_so(b) || _due(a).localeCompare(_due(b)); });
   var fromIdx = sorted.findIndex(function(t){ return t.id===_dragId; });
   var toIdx   = sorted.findIndex(function(t){ return t.id===over.dataset.tid; });
   if(fromIdx<0||toIdx<0) return;
@@ -361,11 +364,14 @@ function renderDayToday(){
     else if(t.startIso===iso || t.deadline===iso) G.today.push(t);
     else G.next.push(t);                                       // everything else upcoming (with or without a deadline)
   });
-  // sort by priority DESC first, then by date / manual order
+  // sort by priority DESC, then MANUAL drag order (sortOrder), then date. Undragged
+  // tasks (no sortOrder) fall to the end of their priority band and keep date order.
   const _pr=t=>+t.prio||0;
-  G.overdue.sort((a,b)=>_pr(b)-_pr(a) || due(a).localeCompare(due(b)));
-  G.today.sort((a,b)=>_pr(b)-_pr(a) || (a.sortOrder||0)-(b.sortOrder||0));
-  G.next.sort((a,b)=>_pr(b)-_pr(a) || due(a).localeCompare(due(b)));
+  const _so=t=>(t.sortOrder==null?1e9:t.sortOrder);
+  const _taskCmp=(a,b)=>_pr(b)-_pr(a) || _so(a)-_so(b) || due(a).localeCompare(due(b));
+  G.overdue.sort(_taskCmp);
+  G.today.sort(_taskCmp);
+  G.next.sort(_taskCmp);
   withDeadline.sort((a,b)=>_pr(b)-_pr(a) || (a.deadline||'').localeCompare(b.deadline||''));
   const totalPending=G.overdue.length+G.today.length+G.next.length;
 

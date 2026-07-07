@@ -27,7 +27,7 @@ function openDayModal(iso){ _sfx.play('open');
   currentDayIso=iso;const d=new Date(iso+'T00:00:00');
   document.getElementById('day-modal-title').textContent=fmtDate(d)+' '+DAYS_RU[d.getDay()];
   const sel=document.getElementById('dm-client-sel');
-  sel.innerHTML=`<option value="">— без клиента —</option>`+clients.filter(c=>c.active).sort((a,b)=>a.name.localeCompare(b.name,'ru')).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  sel.innerHTML=`<option value="">— без клиента —</option>`+_zoneClients().filter(c=>c.active).sort((a,b)=>a.name.localeCompare(b.name,'ru')).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');   // only THIS zone's clients — no pool duplicates/phantoms
   sel.value='';
   const selTop=document.getElementById('dm-client-sel-top');
   if(selTop){ selTop.innerHTML=sel.innerHTML; selTop.value=''; }

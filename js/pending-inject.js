@@ -12,7 +12,7 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-07-06T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-07-07T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
@@ -29,13 +29,6 @@
       "list": "Drinkretros.com",
       "due": "1782954000000",
       "prio": 3
-    },
-    {
-      "id": "869dnvbm5",
-      "name": "BloomieBlankets - Jul-2026 - Campaigns",
-      "list": "BloomieBlankets",
-      "due": "1783040400000",
-      "prio": 2
     },
     {
       "id": "869dwq4jg",
@@ -59,13 +52,6 @@
       "prio": 0
     },
     {
-      "id": "869dwqctg",
-      "name": "[FaithIsMade] New Post Purchase Flow: Build",
-      "list": "FaithIsMade",
-      "due": "1783126800000",
-      "prio": 0
-    },
-    {
       "id": "869dzhr9a",
       "name": "Publish emails",
       "list": "Redline Syndicate",
@@ -73,32 +59,11 @@
       "prio": 3
     },
     {
-      "id": "869dnvbpb",
-      "name": "BareRitual - Jul-2026 - Campaigns",
-      "list": "BareRitual",
-      "due": "1783213200000",
-      "prio": 2
-    },
-    {
-      "id": "869dnvbh7",
-      "name": "Ovia - Jul-2026 - Campaigns",
-      "list": "Ovia",
-      "due": "1783213200000",
-      "prio": 2
-    },
-    {
       "id": "869dw2j9e",
       "name": "Orvia Labs - Delivery Flow - Build",
       "list": "Orvia Labs",
       "due": "1783296000000",
       "prio": 0
-    },
-    {
-      "id": "869dw8yhx",
-      "name": "Pilloway | Create flows",
-      "list": "Pilloway",
-      "due": "1783299600000",
-      "prio": 3
     },
     {
       "id": "869dzzydj",
@@ -120,13 +85,6 @@
       "list": "orvani",
       "due": "1783386000000",
       "prio": 3
-    },
-    {
-      "id": "869e0rkuz",
-      "name": "Nura Relief | Publish emails",
-      "list": "Nura Relief",
-      "due": "1783458000000",
-      "prio": 0
     },
     {
       "id": "869dzbkjq",
@@ -157,9 +115,9 @@
       "prio": 0
     },
     {
-      "id": "869dnvbhd",
-      "name": "LifeList Lab - Jul-2026 - Campaigns",
-      "list": "LifeList Lab",
+      "id": "869dnvbm5",
+      "name": "BloomieBlankets - Jul-2026 - Campaigns",
+      "list": "BloomieBlankets",
       "due": "1783472400000",
       "prio": 2
     },
@@ -171,10 +129,45 @@
       "prio": 0
     },
     {
+      "id": "869dnvbhd",
+      "name": "LifeList Lab - Jul-2026 - Campaigns",
+      "list": "LifeList Lab",
+      "due": "1783558800000",
+      "prio": 2
+    },
+    {
+      "id": "869e0rkuz",
+      "name": "Nura Relief | Publish emails",
+      "list": "Nura Relief",
+      "due": "1783630800000",
+      "prio": 0
+    },
+    {
       "id": "869dwqdpy",
       "name": "Garden's Pulse - Campaigns - July - Build",
       "list": "Imported From Trello",
       "due": "1783641600000",
+      "prio": 0
+    },
+    {
+      "id": "869dwqctg",
+      "name": "[FaithIsMade] New Post Purchase Flow: Build",
+      "list": "FaithIsMade",
+      "due": "1783641600000",
+      "prio": 0
+    },
+    {
+      "id": "869dw8yhx",
+      "name": "Pilloway | Create flows",
+      "list": "Pilloway",
+      "due": "1783645200000",
+      "prio": 3
+    },
+    {
+      "id": "869e1dzt8",
+      "name": "Nura Relief | Publish emails",
+      "list": "Nura Relief",
+      "due": "1783717200000",
       "prio": 0
     }
   ]/*RAW_END*/;

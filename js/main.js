@@ -1,6 +1,6 @@
 // Build stamp — bump on each deploy so you can tell at a glance whether the
 // running app has the latest files (если метки нет — крутится старый JS из кэша).
-const BUILD='07.08 · нав+свайпы';
+const BUILD='07.08 · свайп-над-списком';
 console.log('Dispatch build: '+BUILD+' — _overdue '+(typeof _overdue==='function'?'OK':'ОТСУТСТВУЕТ (старый код)'));
 try{ const _bt=document.getElementById('build-tag'); if(_bt) _bt.textContent=BUILD; }catch(e){}
 document.getElementById('topbar-date').textContent=fmtDate(getTODAY())+' '+DAYS_RU[getTODAY().getDay()]+' · '+MONTHS_RU[getTODAY().getMonth()];
@@ -85,32 +85,33 @@ setTimeout(renderMonthBar, 0);
   // tail. Switch once when the horizontal threshold is crossed, then stay LOCKED and
   // swallow everything until the wheel has been quiet for a beat — the whole momentum
   // tail is the SAME gesture. Result: one tab per swipe, never a multi-flip.
-  let wAccumX = 0;
+  let wAccumX = 0, wAccumY = 0;
   let wLocked = false;
   let wIdleTimer = null;
   const W_THRESHOLD = 55;
-  const W_IDLE = 260;                       // gesture ends after this much horizontal quiet
-  function _wDisarm(){ wLocked = false; wAccumX = 0; }
+  const W_IDLE = 260;                       // gesture ends after this much quiet
+  function _wDisarm(){ wLocked = false; wAccumX = 0; wAccumY = 0; }
 
+  // CAPTURE phase: run before the hovered element scrolls, so a horizontal swipe
+  // over a scrollable list can't get "latched"/eaten by that list — we intercept it
+  // and switch tabs. Vertical intent is left alone, so the list still scrolls.
   document.addEventListener('wheel', e => {
     if(modalsOpen()) return;
-    // Only bail over genuinely horizontal-scroll UI (tab strip, month bar, wide
-    // tables) and form controls. Over a VERTICAL list a sideways swipe should still
-    // switch tabs — the ax>ay test below lets vertical scrolling pass through.
+    // genuinely horizontal-scroll UI + form controls keep their own wheel behaviour
     if(e.target.closest('.navlist,.month-bar,.hist-wrap,.day-modal,.modal,.modal-overlay,input,textarea,select')) return;
     const ax = Math.abs(e.deltaX), ay = Math.abs(e.deltaY);
-    if(ax <= ay || ax < 6) return;          // not clearly horizontal → let it scroll
-    e.preventDefault();
     clearTimeout(wIdleTimer);
-    wIdleTimer = setTimeout(_wDisarm, W_IDLE);   // any horizontal wheel keeps the gesture alive
-    if(wLocked) return;                     // already switched this gesture → swallow the tail
-    wAccumX += e.deltaX;
-    if(Math.abs(wAccumX) >= W_THRESHOLD){
+    wIdleTimer = setTimeout(_wDisarm, W_IDLE);   // any wheel keeps the gesture alive
+    if(wLocked){ if(ax > ay) e.preventDefault(); return; }   // already switched → swallow the horizontal tail
+    if(ax > ay) e.preventDefault();         // this event is horizontal → it's ours, don't let the list latch it
+    wAccumX += e.deltaX; wAccumY += e.deltaY;
+    // switch once the gesture is decisively horizontal (net X dominates net Y)
+    if(Math.abs(wAccumX) >= W_THRESHOLD && Math.abs(wAccumX) > Math.abs(wAccumY)){
       const dir = wAccumX > 0 ? 1 : -1;
-      wLocked = true; wAccumX = 0;
+      wLocked = true; wAccumX = 0; wAccumY = 0;
       if(dir > 0) goNext(); else goPrev();
     }
-  }, { passive: false });
+  }, { capture: true, passive: false });
 
   // ── Touch (mobile) ──
   // Ignore swipes that begin inside something horizontally scrollable (the tab

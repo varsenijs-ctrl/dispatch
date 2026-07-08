@@ -35,7 +35,7 @@ function importFromPaste(){
   for(let i=0;i<Math.min(5,rows.length);i++){const cols=rows[i].slice(1).filter(c=>c&&c.trim());if(cols.length>0&&!rows[i][0].match(/^\d{4}-\d{2}-\d{2}$/)&&!rows[i][0].match(/^\d{1,2}\.\d{1,2}/)){headerRow=i;break;}}
   const headers=rows[headerRow];const colClients=headers.slice(1).map(h=>h.trim()).filter(h=>h);
   if(!colClients.length){statusEl.className='import-status err';statusEl.textContent='Не нашёл имена клиентов';return;}
-  let totalDates=0;const newClientNames=new Set();
+  let totalDates=0;let skipped=0;const newClientNames=new Set();
   // Map each pasted column name \u2192 canonical client name: if a client with the same
   // normalized name already exists, reuse ITS exact name so history & the client
   // record don't split between "Macro Beauty" and "macrobeauty".
@@ -47,9 +47,10 @@ function importFromPaste(){
     if(/^\d{4}-\d{2}-\d{2}$/.test(dateRaw))iso=dateRaw;
     else{const m1=dateRaw.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);if(m1)iso=`${m1[3]}-${m1[2].padStart(2,'0')}-${m1[1].padStart(2,'0')}`;}
     if(!iso)continue;
+    if(!_inZone(iso)){ skipped++; continue; }   // import only THIS zone's month \u2014 don't fill other months
     for(let c=0;c<colClients.length;c++){const clientName=canonical[colClients[c]];if(!clientName)continue;const val=(row[c+1]||'').trim().toLowerCase().replace(/\u200b/g,'');if(!val||!['yes','no','draft'].includes(val))continue;if(!historyData[clientName])historyData[clientName]={};historyData[clientName][iso]=val;newClientNames.add(clientName);totalDates++;}
   }
-  if(!totalDates){statusEl.className='import-status err';statusEl.textContent='Не нашёл данных (yes/no/draft)';return;}
+  if(!totalDates){statusEl.className='import-status err';statusEl.textContent=skipped?('Все даты из других месяцев — переключись на нужную зону ('+skipped+' строк пропущено)'):'Не нашёл данных (yes/no/draft)';return;}
   let added=0; const importedCids=[];
   newClientNames.forEach(name=>{
     let ex=clients.find(c=>c.active&&_normName(c.name)===_normName(name));
@@ -62,7 +63,9 @@ function importFromPaste(){
   const _rm=_rosterMap(); if(!Array.isArray(_rm[activeMonth])) _rm[activeMonth]=[];
   importedCids.forEach(id=>{ if(_rm[activeMonth].indexOf(id)<0) _rm[activeMonth].push(id); });
   save('dc_zone_roster', _rm);
-  statusEl.className='import-status ok';statusEl.textContent=`✓ ${totalDates} записей, ${newClientNames.size} клиентов в зону «${_finZoneLabel()}»${added?' (+'+added+' новых)':''}.`;
+  var _msg=`✓ ${totalDates} записей, ${newClientNames.size} клиентов в зону «${_finZoneLabel()}»${added?' (+'+added+' новых)':''}${skipped?' · '+skipped+' строк из других месяцев пропущено':''}.`;
+  statusEl.className='import-status ok';statusEl.textContent=_msg;
+  try{ showToast(_msg); }catch(e){}   // render() below rebuilds the panel and wipes the inline status, so surface it as a toast too
   document.getElementById('paste-data').value='';render();
 }
 

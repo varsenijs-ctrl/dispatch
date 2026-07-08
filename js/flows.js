@@ -10,7 +10,7 @@ function renderFlows(){
   ac.forEach(function(c){
     getFlows(c.id).forEach(function(f){
       var ft=Object.values(tasks).filter(function(t){return t.cid===c.id&&t.flowId===f.id;});
-      var doneInZone=ft.some(function(t){return t.done&&_inZone(t.startIso);});
+      var doneInZone=ft.some(function(t){return t.done&&_markInActiveZone(c.id, t.startIso);});
       var doneAnywhere=ft.some(function(t){return t.done;});
       var val=f.count*0.60;
       if(doneInZone){ totalDone++; totalPlanned++; totalEarned+=val; totalPotential+=val; }
@@ -129,7 +129,7 @@ function renderFlows(){
 
   } else {
     var hm=_flowsHistoryMode||'date';
-    var doneTasks=Object.values(tasks).filter(function(t){return t.flowId&&t.done&&_inZone(t.startIso)&&_inRoster(t.cid);}).sort(function(a,b){return b.startIso.localeCompare(a.startIso);});
+    var doneTasks=Object.values(tasks).filter(function(t){return t.flowId&&t.done&&_markInActiveZone(t.cid, t.startIso)&&_inRoster(t.cid);}).sort(function(a,b){return b.startIso.localeCompare(a.startIso);});
     h+='<div style="display:flex;gap:6px;margin-bottom:16px">';
     h+='<button onclick="_flowsHistoryMode=this.dataset.m;render()" data-m="date" style="padding:5px 14px;border-radius:20px;cursor:pointer;font-family:Inter,sans-serif;font-size:11px;border:1px solid '+(hm!=='client'?'rgba(var(--accent-rgb),.4)':'rgba(255,255,255,.1)')+';background:'+(hm!=='client'?'rgba(var(--accent-rgb),.12)':'rgba(255,255,255,.04)')+';color:'+(hm!=='client'?'var(--accent)':'var(--text3)')+'">По дате</button>';
     h+='<button onclick="_flowsHistoryMode=this.dataset.m;render()" data-m="client" style="padding:5px 14px;border-radius:20px;cursor:pointer;font-family:Inter,sans-serif;font-size:11px;border:1px solid '+(hm==='client'?'rgba(var(--accent-rgb),.4)':'rgba(255,255,255,.1)')+';background:'+(hm==='client'?'rgba(var(--accent-rgb),.12)':'rgba(255,255,255,.04)')+';color:'+(hm==='client'?'var(--accent)':'var(--text3)')+'">По клиентам</button>';
@@ -374,7 +374,7 @@ function getFlowEarnings(cid, scope){
   flows.forEach(f=>{
     const val=f.count*0.60;
     const ft=Object.values(tasks).filter(t=>t.cid===cid && t.flowId===f.id);
-    const doneInZone=ft.some(t=>t.done && _inZone(t.startIso));
+    const doneInZone=ft.some(t=>t.done && _markInActiveZone(cid, t.startIso));
     const doneAnywhere=ft.some(t=>t.done);
     if(scope==='month'){
       if(doneInZone){ earned+=val; potential+=val; list.push({flow:f, val, done:true, task:ft.find(t=>t.done)||null}); }

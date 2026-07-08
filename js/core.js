@@ -115,6 +115,21 @@ function _zac(){ return _zoneClients().filter(function(c){return c.active&&!c.pa
 // Lower-cased names of the active zone's clients — for filtering name-keyed data
 // (history / action log) to this zone only.
 function _zoneClientNames(){ var set={}; _zac().forEach(function(c){ if(c&&c.name) set[String(c.name).toLowerCase()]=1; }); return set; }
+
+// Does a dated mark for `cid` count toward the ACTIVE zone's earnings?
+// The zone is defined by its client roster, not strictly by the calendar month, so a
+// zone shows ALL its clients' earnings — including work you did "in July for August".
+// A mark counts here if its month IS the active month, OR no OTHER zone (matching that
+// month) rosters this client. So a recurring client's June work stays in the June zone
+// (that zone rosters them for June) and never bleeds into July.
+function _markInActiveZone(cid, iso){
+  var m=(iso||'').slice(0,7);
+  if(!m) return false;
+  if(m===activeMonth) return true;
+  var mp=_rosterMap();
+  if(Array.isArray(mp[m]) && mp[m].indexOf(cid)>=0) return false;   // belongs to the zone of month m
+  return true;
+}
 // Normalized client-name key (case/space/punctuation-insensitive) so "Macro Beauty"
 // and "macrobeauty" collapse to the same key — used to de-duplicate client records.
 function _normName(s){ return (s||'').toString().toLowerCase().replace(/[^a-z0-9а-яё]/gi,''); }

@@ -20,7 +20,7 @@ function _clientEntries(name){
   const sms=load('dc_sms_days',{}), dis=load('dc_pay_disabled',{});
   const cidSms=(cid&&sms[cid])||{}, cidDis=(cid&&dis[cid])||{};
   Object.keys(days).forEach(iso=>{
-    if(!_inZone(iso)) return;   // active zone only — dates of THIS zone's month
+    if(!_markInActiveZone(cid, iso)) return;   // all of this zone's earnings (incl. "July for August"), no cross-zone bleed
     res.push({iso, v:days[iso], sms:!!cidSms[iso], disabled:!!cidDis[iso], cid, rate:cidSms[iso]?SMS_DAY_RATE:EMAIL_RATE});
   });
   return res;
@@ -37,7 +37,7 @@ function computeFinanceTotals(scope){
   _zac().forEach(c=>{                              // only clients added to THIS zone
     const cidSms=smsDays[c.id]||{};const cidDis=dis[c.id]||{};const hist=historyData[c.name]||{};
     Object.entries(hist).forEach(([d,v])=>{
-      if(!_inZone(d)) return;                 // this zone's month only
+      if(!_markInActiveZone(c.id, d)) return;  // all of this zone's earnings, no cross-zone bleed
       if(cidDis[d])return;
       const rate=cidSms[d]?SMS_DAY_RATE:EMAIL_RATE;
       if(v==='yes'||v==='draft'){earned+=rate;potential+=rate;sentCount++;totalCount++;}

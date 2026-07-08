@@ -12,7 +12,7 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-07-07T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-07-08T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
@@ -24,20 +24,6 @@
       "prio": 3
     },
     {
-      "id": "869da21ty",
-      "name": "Retros: post purchase survey ",
-      "list": "Drinkretros.com",
-      "due": "1782954000000",
-      "prio": 3
-    },
-    {
-      "id": "869dwq4jg",
-      "name": "Wild Harvest© - Jul-2026 - Campaigns - Build",
-      "list": "Wild Harvest©",
-      "due": "1783123200000",
-      "prio": 0
-    },
-    {
       "id": "869dww9xg",
       "name": "[PokeSource]: Flows: Build",
       "list": "pokesource",
@@ -45,31 +31,10 @@
       "prio": 0
     },
     {
-      "id": "869dwqejp",
-      "name": "FaithIsMade - Jul-2026 - Campaigns - Build",
-      "list": "Imported From Trello",
-      "due": "1783126800000",
-      "prio": 0
-    },
-    {
-      "id": "869dzhr9a",
-      "name": "Publish emails",
-      "list": "Redline Syndicate",
-      "due": "1783213200000",
-      "prio": 3
-    },
-    {
       "id": "869dw2j9e",
       "name": "Orvia Labs - Delivery Flow - Build",
       "list": "Orvia Labs",
       "due": "1783296000000",
-      "prio": 0
-    },
-    {
-      "id": "869dzzydj",
-      "name": "Revive | Publish emails",
-      "list": "Revive",
-      "due": "1783371600000",
       "prio": 0
     },
     {
@@ -85,13 +50,6 @@
       "list": "orvani",
       "due": "1783386000000",
       "prio": 3
-    },
-    {
-      "id": "869dzbkjq",
-      "name": "Sabel Life flow | Built",
-      "list": "Sabel Life",
-      "due": "1783458000000",
-      "prio": 0
     },
     {
       "id": "869dyuanp",
@@ -122,10 +80,38 @@
       "prio": 2
     },
     {
-      "id": "869e0gghm",
-      "name": "Sabel Life | Build campaigns",
+      "id": "869e1kuy0",
+      "name": "Pilloway | Publish emails",
+      "list": "Pilloway",
+      "due": "1783544400000",
+      "prio": 0
+    },
+    {
+      "id": "869dzzydj",
+      "name": "Revive | Publish emails",
+      "list": "Revive",
+      "due": "1783544400000",
+      "prio": 0
+    },
+    {
+      "id": "869dzbkjq",
+      "name": "Sabel Life | Built flow ",
       "list": "Sabel Life",
       "due": "1783544400000",
+      "prio": 0
+    },
+    {
+      "id": "869e1wacg",
+      "name": "[Mizuro] Campaign: July: Build",
+      "list": "Mizuro",
+      "due": "1783555200000",
+      "prio": 4
+    },
+    {
+      "id": "869e1xrg3",
+      "name": "Publishing",
+      "list": "Drinkretros.com",
+      "due": "1783558800000",
       "prio": 0
     },
     {
@@ -139,6 +125,13 @@
       "id": "869e0rkuz",
       "name": "Nura Relief | Publish emails",
       "list": "Nura Relief",
+      "due": "1783630800000",
+      "prio": 0
+    },
+    {
+      "id": "869e0gghm",
+      "name": "Sabel Life | Build campaigns",
+      "list": "Sabel Life",
       "due": "1783630800000",
       "prio": 0
     },
@@ -157,17 +150,17 @@
       "prio": 0
     },
     {
-      "id": "869dw8yhx",
-      "name": "Pilloway | Create flows",
-      "list": "Pilloway",
-      "due": "1783645200000",
-      "prio": 3
-    },
-    {
       "id": "869e1dzt8",
       "name": "Nura Relief | Publish emails",
       "list": "Nura Relief",
       "due": "1783717200000",
+      "prio": 0
+    },
+    {
+      "id": "869e1pvtm",
+      "name": "enhancedhim | Build campaigns",
+      "list": "enhancedhim",
+      "due": "1783890000000",
       "prio": 0
     }
   ]/*RAW_END*/;

@@ -1,6 +1,6 @@
 // Build stamp — bump on each deploy so you can tell at a glance whether the
 // running app has the latest files (если метки нет — крутится старый JS из кэша).
-const BUILD='07.08 · зона-весь-заработок';
+const BUILD='07.08 · нав+свайпы';
 console.log('Dispatch build: '+BUILD+' — _overdue '+(typeof _overdue==='function'?'OK':'ОТСУТСТВУЕТ (старый код)'));
 try{ const _bt=document.getElementById('build-tag'); if(_bt) _bt.textContent=BUILD; }catch(e){}
 document.getElementById('topbar-date').textContent=fmtDate(getTODAY())+' '+DAYS_RU[getTODAY().getDay()]+' · '+MONTHS_RU[getTODAY().getMonth()];
@@ -80,52 +80,34 @@ setTimeout(renderMonthBar, 0);
     if(i > 0) navTo(VIEWS[i-1]);
   }
 
-  // ── Trackpad / mouse wheel: one switch per swipe ──
-  // macOS sends a long inertial "momentum" tail after a swipe. We switch once
-  // when the threshold is crossed, then lock and swallow that tail so it can't
-  // trigger a second switch. You can swipe again either when the wheel settles
-  // (~90ms idle) OR immediately by pushing again: momentum only DECELERATES,
-  // so a delta that rises back up past the decaying trend = a deliberate new
-  // swipe, and we release the lock for it right away.
+  // ── Trackpad / mouse wheel: exactly ONE switch per swipe ──
+  // A trackpad swipe emits a burst of wheel events plus a long inertial "momentum"
+  // tail. Switch once when the horizontal threshold is crossed, then stay LOCKED and
+  // swallow everything until the wheel has been quiet for a beat — the whole momentum
+  // tail is the SAME gesture. Result: one tab per swipe, never a multi-flip.
   let wAccumX = 0;
   let wLocked = false;
-  let wPrevAbs = 0;
-  let wDecaying = false;
   let wIdleTimer = null;
-  let wResetTimer = null;  // forget a partial swipe that never reached threshold
-  const W_THRESHOLD = 46;
-  const W_IDLE = 90;
-  function wUnlock(){ wLocked = false; wAccumX = 0; wPrevAbs = 0; wDecaying = false; clearTimeout(wIdleTimer); }
+  const W_THRESHOLD = 55;
+  const W_IDLE = 260;                       // gesture ends after this much horizontal quiet
+  function _wDisarm(){ wLocked = false; wAccumX = 0; }
 
   document.addEventListener('wheel', e => {
     if(modalsOpen()) return;
-    if(e.target.closest('.hist-wrap,.pcal-grid,.sidebar,.day-modal,.modal,.modal-overlay')) return;
-
+    // Only bail over genuinely horizontal-scroll UI (tab strip, month bar, wide
+    // tables) and form controls. Over a VERTICAL list a sideways swipe should still
+    // switch tabs — the ax>ay test below lets vertical scrolling pass through.
+    if(e.target.closest('.navlist,.month-bar,.hist-wrap,.day-modal,.modal,.modal-overlay,input,textarea,select')) return;
     const ax = Math.abs(e.deltaX), ay = Math.abs(e.deltaY);
-    if(ax < ay * 0.8 || ax < 2) return;   // vertical scroll → leave it alone
+    if(ax <= ay || ax < 6) return;          // not clearly horizontal → let it scroll
     e.preventDefault();
-
-    if(wLocked){
-      clearTimeout(wIdleTimer);
-      wIdleTimer = setTimeout(wUnlock, W_IDLE);     // momentum stopped → unlock
-      if(!wDecaying){ if(ax < wPrevAbs - 1) wDecaying = true; }   // wait for the peak
-      else if(ax > wPrevAbs + 8 && ax >= 12){ wUnlock(); }        // rising again → new swipe
-      wPrevAbs = ax;
-      if(wLocked) return;   // still cooling down → swallow the momentum tail
-    }
-
+    clearTimeout(wIdleTimer);
+    wIdleTimer = setTimeout(_wDisarm, W_IDLE);   // any horizontal wheel keeps the gesture alive
+    if(wLocked) return;                     // already switched this gesture → swallow the tail
     wAccumX += e.deltaX;
-    wPrevAbs = ax;
-    clearTimeout(wResetTimer);
-    wResetTimer = setTimeout(()=>{ wAccumX = 0; }, 130);
-
     if(Math.abs(wAccumX) >= W_THRESHOLD){
       const dir = wAccumX > 0 ? 1 : -1;
-      wAccumX = 0;
-      wLocked = true;
-      wDecaying = false;
-      wPrevAbs = ax;
-      clearTimeout(wIdleTimer); wIdleTimer = setTimeout(wUnlock, W_IDLE);
+      wLocked = true; wAccumX = 0;
       if(dir > 0) goNext(); else goPrev();
     }
   }, { passive: false });
@@ -138,7 +120,7 @@ setTimeout(renderMonthBar, 0);
   document.addEventListener('touchstart', e => {
     tx = e.touches[0].clientX;
     ty = e.touches[0].clientY;
-    tIgnore = !!(e.target.closest && e.target.closest('.navlist,.sidebar,.hist-wrap,.pcal-grid,.cal-grid,.day-modal,.modal,.modal-overlay,.month-bar,input,textarea,select'));
+    tIgnore = !!(e.target.closest && e.target.closest('.navlist,.month-bar,.hist-wrap,.day-modal,.modal,.modal-overlay,input,textarea,select'));
   }, { passive: true });
   document.addEventListener('touchend', e => {
     if(tIgnore || modalsOpen()) return;

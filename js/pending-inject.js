@@ -247,22 +247,38 @@
   Object.values(tasks).forEach(function(t){ if(!t) return; if(t.injectId) seenIds[t.injectId]=1; texts[norm(t.text)+'|'+(t.cid||'')]=1; });
   try { (JSON.parse(localStorage.getItem('dc_inject_seen')||'[]')||[]).forEach(function(id){ seenIds[id]=1; }); } catch(e){}
 
-  var added = 0, matched = 0;
+  var added = 0, matched = 0, updated = 0;
   RAW.forEach(function(r){
-    if(!r || !r.id || seenIds[r.id]) return;                  // same ClickUp task already injected
+    if(!r || !r.id) return;
+    var id = 'inject_' + r.id;
+    var newDue   = isoFromMs(r.due);                          // ClickUp DUE  → deadline
+    var newStart = isoFromMs(r.start) || newDue || TODAY_ISO; // ClickUp START → startIso (falls back to due)
+    var newPrio  = +r.prio || 0;
+    var existing = tasks[id];
+
+    if(existing){
+      // Already here → keep dates/deadline/priority in sync with ClickUp. Only apply
+      // when ClickUp's own value CHANGED (injStart/injDue = last synced), so a manual
+      // local move survives while ClickUp is unchanged. Never touches `done`.
+      if(existing.injStart !== newStart){ existing.startIso = newStart; existing.injStart = newStart; updated++; }
+      if(existing.injDue   !== newDue){   existing.deadline = newDue; existing.until = newDue || existing.until || newStart; existing.injDue = newDue; updated++; }
+      existing.prio = newPrio;
+      seenIds[r.id] = 1;
+      return;
+    }
+    if(seenIds[r.id]) return;                                  // injected before, user deleted it → stays deleted
+
     var c = matchClient(r.name, r.list);
-    var deadline = isoFromMs(r.due);
-    var startIso = deadline || TODAY_ISO;                      // real due day → sorts as overdue/today/next
     var text = c ? stripName(r.name, c.name) : r.name; if(!text) text = r.name;
     var key = norm(text)+'|'+(c?c.id:'');
     if(texts[key]) return;                                     // identical task already present
-    var id = 'inject_' + r.id;
     var hint = (r.list && r.list !== 'Imported From Trello') ? r.list : firstSeg(r.name);
     tasks[id] = {
       id: id, injectId: r.id, text: text,
       cid: c ? c.id : '', clientName: c ? c.name : '',
-      startIso: startIso, until: deadline || startIso, deadline: deadline || '',
-      prio: +r.prio || 0,                              // ClickUp priority (0-4)
+      startIso: newStart, until: newDue || newStart, deadline: newDue || '',
+      injStart: newStart, injDue: newDue,              // remember the synced ClickUp dates
+      prio: newPrio,                                   // ClickUp priority (0-4)
       done: false, note: c ? 'ClickUp' : ('ClickUp: ' + hint)
     };
     texts[key] = 1; seenIds[r.id] = 1; added++; if(c) matched++;
@@ -270,5 +286,5 @@
 
   localStorage.setItem('dc_plantasks', JSON.stringify(tasks));
   localStorage.setItem('dc_inject_seen', JSON.stringify(Object.keys(seenIds)));
-  console.log('Dispatch ← ClickUp: +'+added+' tasks ('+matched+' matched) · '+INJECT_VERSION);
+  console.log('Dispatch ← ClickUp: +'+added+' tasks ('+matched+' matched, '+updated+' date-synced) · '+INJECT_VERSION);
 })();

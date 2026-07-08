@@ -78,7 +78,8 @@ try {
       id: t.id,
       name: t.name,
       list: (t.list && t.list.name) || '',
-      due: String(t.due_date),
+      start: t.start_date ? String(t.start_date) : '',   // when to START (→ task's startIso)
+      due: String(t.due_date),                            // when it's DUE (→ deadline)
       prio: prioLevel(t.priority),
     }));
 

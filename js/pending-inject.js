@@ -12,7 +12,7 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-07-08T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-07-09T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
@@ -23,14 +23,6 @@
       "start": "1783123200000",
       "due": "1783296000000",
       "prio": 0
-    },
-    {
-      "id": "869dnvbjz",
-      "name": "orvani - Jul-2026 - Campaigns",
-      "list": "orvani",
-      "start": "",
-      "due": "1783386000000",
-      "prio": 3
     },
     {
       "id": "869dyuanp",
@@ -51,18 +43,10 @@
     {
       "id": "869dwqdjw",
       "name": "macrobeauty - Jul-2026 - Campaigns - Build",
-      "list": "Imported From Trello",
+      "list": "macrobeauty",
       "start": "1782864000000",
       "due": "1783468800000",
       "prio": 0
-    },
-    {
-      "id": "869dnvbm5",
-      "name": "BloomieBlankets - Jul-2026 - Campaigns",
-      "list": "BloomieBlankets",
-      "start": "",
-      "due": "1783472400000",
-      "prio": 2
     },
     {
       "id": "869e1kuy0",
@@ -95,6 +79,14 @@
       "start": "",
       "due": "1783558800000",
       "prio": 0
+    },
+    {
+      "id": "869dnvbm5",
+      "name": "BloomieBlankets - Jul-2026 - Campaigns",
+      "list": "BloomieBlankets",
+      "start": "",
+      "due": "1783558800000",
+      "prio": 2
     },
     {
       "id": "869dnvbhd",
@@ -131,7 +123,7 @@
     {
       "id": "869dwqdpy",
       "name": "Garden's Pulse - Campaigns - July - Build",
-      "list": "Imported From Trello",
+      "list": "Garden's Pulse",
       "start": "1783036800000",
       "due": "1783641600000",
       "prio": 0
@@ -158,6 +150,22 @@
       "list": "enhancedhim",
       "start": "",
       "due": "1783890000000",
+      "prio": 0
+    },
+    {
+      "id": "869e2kckf",
+      "name": "July campaigns - publishing",
+      "list": "Avera",
+      "start": "",
+      "due": "1783976340000",
+      "prio": 0
+    },
+    {
+      "id": "869e2a78j",
+      "name": "enhancedhim | Build flows",
+      "list": "enhancedhim",
+      "start": "",
+      "due": "1784062800000",
       "prio": 0
     }
   ]/*RAW_END*/;

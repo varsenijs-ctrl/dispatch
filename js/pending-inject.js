@@ -12,7 +12,7 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-07-09T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-07-10T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
@@ -41,33 +41,9 @@
       "prio": 0
     },
     {
-      "id": "869dwqdjw",
-      "name": "macrobeauty - Jul-2026 - Campaigns - Build",
-      "list": "macrobeauty",
-      "start": "1782864000000",
-      "due": "1783468800000",
-      "prio": 0
-    },
-    {
       "id": "869e1kuy0",
       "name": "Pilloway | Publish emails",
       "list": "Pilloway",
-      "start": "",
-      "due": "1783544400000",
-      "prio": 0
-    },
-    {
-      "id": "869dzzydj",
-      "name": "Revive | Publish emails",
-      "list": "Revive",
-      "start": "1783126800000",
-      "due": "1783544400000",
-      "prio": 0
-    },
-    {
-      "id": "869dzbkjq",
-      "name": "Sabel Life | Built flow ",
-      "list": "Sabel Life",
       "start": "",
       "due": "1783544400000",
       "prio": 0
@@ -81,28 +57,12 @@
       "prio": 0
     },
     {
-      "id": "869dnvbm5",
-      "name": "BloomieBlankets - Jul-2026 - Campaigns",
-      "list": "BloomieBlankets",
-      "start": "",
-      "due": "1783558800000",
-      "prio": 2
-    },
-    {
       "id": "869dnvbhd",
       "name": "LifeList Lab - Jul-2026 - Campaigns",
       "list": "LifeList Lab",
       "start": "",
       "due": "1783558800000",
       "prio": 2
-    },
-    {
-      "id": "869e26rwq",
-      "name": "enhancedscents | Publish emails",
-      "list": "enhancedscents",
-      "start": "",
-      "due": "1783630800000",
-      "prio": 0
     },
     {
       "id": "869e0rkuz",
@@ -145,11 +105,43 @@
       "prio": 0
     },
     {
+      "id": "869dzbkjq",
+      "name": "Sabel Life | Built flow ",
+      "list": "Sabel Life",
+      "start": "",
+      "due": "1783717200000",
+      "prio": 0
+    },
+    {
+      "id": "869e300vg",
+      "name": "BlockBlaster | Publish emails",
+      "list": "BlockBlaster",
+      "start": "1783645200000",
+      "due": "1783803600000",
+      "prio": 0
+    },
+    {
       "id": "869e1pvtm",
       "name": "enhancedhim | Build campaigns",
       "list": "enhancedhim",
       "start": "",
       "due": "1783890000000",
+      "prio": 0
+    },
+    {
+      "id": "869e2uf1k",
+      "name": "Pepticool - draft July campaigns",
+      "list": "Pepticool",
+      "start": "",
+      "due": "1783976340000",
+      "prio": 0
+    },
+    {
+      "id": "869e2uf0t",
+      "name": "Ilovehue (Still Archive) - draft July campaigns",
+      "list": "ilovehue",
+      "start": "",
+      "due": "1783976340000",
       "prio": 0
     },
     {

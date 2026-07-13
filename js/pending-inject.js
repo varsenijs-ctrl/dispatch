@@ -12,7 +12,7 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-07-12T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-07-13T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
@@ -41,22 +41,6 @@
       "prio": 0
     },
     {
-      "id": "869e1kuy0",
-      "name": "Pilloway | Publish emails",
-      "list": "Pilloway",
-      "start": "",
-      "due": "1783544400000",
-      "prio": 0
-    },
-    {
-      "id": "869e1xrg3",
-      "name": "Publishing",
-      "list": "Drinkretros.com",
-      "start": "",
-      "due": "1783558800000",
-      "prio": 0
-    },
-    {
       "id": "869dnvbhd",
       "name": "LifeList Lab - Jul-2026 - Campaigns",
       "list": "LifeList Lab",
@@ -78,7 +62,7 @@
       "list": "Sabel Life",
       "start": "",
       "due": "1783630800000",
-      "prio": 0
+      "prio": 4
     },
     {
       "id": "869dwqdpy",
@@ -166,6 +150,22 @@
       "list": "Sculptara™",
       "start": "1783731600000",
       "due": "1783976400000",
+      "prio": 0
+    },
+    {
+      "id": "869e3m5ph",
+      "name": "Publish emails",
+      "list": "Redline Syndicate",
+      "start": "1783818000000",
+      "due": "1783990800000",
+      "prio": 0
+    },
+    {
+      "id": "869e1xrg3",
+      "name": "Publishing",
+      "list": "Drinkretros.com",
+      "start": "",
+      "due": "1783994400000",
       "prio": 0
     },
     {

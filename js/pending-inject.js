@@ -12,34 +12,10 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-07-13T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-07-14T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
-    {
-      "id": "869dw2j9e",
-      "name": "Orvia Labs - Delivery Flow - Build",
-      "list": "Orvia Labs",
-      "start": "1783123200000",
-      "due": "1783296000000",
-      "prio": 0
-    },
-    {
-      "id": "869dyuanp",
-      "name": "[Poke Source]: July: New Email Request: #2: Build",
-      "list": "pokesource",
-      "start": "",
-      "due": "1783468800000",
-      "prio": 0
-    },
-    {
-      "id": "869dyu5fc",
-      "name": "[Poke Source]: July: New Email Request: Build",
-      "list": "pokesource",
-      "start": "",
-      "due": "1783468800000",
-      "prio": 0
-    },
     {
       "id": "869dnvbhd",
       "name": "LifeList Lab - Jul-2026 - Campaigns",
@@ -55,14 +31,6 @@
       "start": "1783386000000",
       "due": "1783630800000",
       "prio": 0
-    },
-    {
-      "id": "869e0gghm",
-      "name": "Sabel Life | Build campaigns",
-      "list": "Sabel Life",
-      "start": "",
-      "due": "1783630800000",
-      "prio": 4
     },
     {
       "id": "869dwqdpy",
@@ -86,30 +54,6 @@
       "list": "Nura Relief",
       "start": "1783386000000",
       "due": "1783717200000",
-      "prio": 0
-    },
-    {
-      "id": "869dzbkjq",
-      "name": "Sabel Life | Built flow ",
-      "list": "Sabel Life",
-      "start": "",
-      "due": "1783717200000",
-      "prio": 0
-    },
-    {
-      "id": "869e300vg",
-      "name": "BlockBlaster | Publish emails",
-      "list": "BlockBlaster",
-      "start": "1783645200000",
-      "due": "1783803600000",
-      "prio": 0
-    },
-    {
-      "id": "869e3e9hd",
-      "name": "BlockBlaster | Publish emails",
-      "list": "BlockBlaster",
-      "start": "",
-      "due": "1783890000000",
       "prio": 0
     },
     {
@@ -153,27 +97,43 @@
       "prio": 0
     },
     {
-      "id": "869e3m5ph",
-      "name": "Publish emails",
-      "list": "Redline Syndicate",
-      "start": "1783818000000",
-      "due": "1783990800000",
-      "prio": 0
-    },
-    {
-      "id": "869e1xrg3",
-      "name": "Publishing",
-      "list": "Drinkretros.com",
-      "start": "",
-      "due": "1783994400000",
-      "prio": 0
-    },
-    {
       "id": "869e2a78j",
       "name": "enhancedhim | Build flows",
       "list": "enhancedhim",
       "start": "",
       "due": "1784062800000",
+      "prio": 0
+    },
+    {
+      "id": "869e4d7dg",
+      "name": "Luvura | Publish campaigns",
+      "list": "Luvura",
+      "start": "",
+      "due": "1784149200000",
+      "prio": 0
+    },
+    {
+      "id": "869e484e3",
+      "name": "WildHarvest | Trust Pilot Email #2 | Build",
+      "list": "Wild Harvest©",
+      "start": "",
+      "due": "1784160000000",
+      "prio": 2
+    },
+    {
+      "id": "869e4bygf",
+      "name": "Auna Beauty | Publish emails",
+      "list": "Auna Beauty",
+      "start": "",
+      "due": "1784235600000",
+      "prio": 0
+    },
+    {
+      "id": "869e4c356",
+      "name": "Luvura | Publish flows",
+      "list": "Luvura",
+      "start": "",
+      "due": "1784494800000",
       "prio": 0
     }
   ]/*RAW_END*/;

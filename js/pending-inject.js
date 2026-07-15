@@ -12,32 +12,16 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-07-14T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-07-15T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
-    {
-      "id": "869dnvbhd",
-      "name": "LifeList Lab - Jul-2026 - Campaigns",
-      "list": "LifeList Lab",
-      "start": "",
-      "due": "1783558800000",
-      "prio": 2
-    },
     {
       "id": "869e0rkuz",
       "name": "Nura Relief | Publish emails",
       "list": "Nura Relief",
       "start": "1783386000000",
       "due": "1783630800000",
-      "prio": 0
-    },
-    {
-      "id": "869dwqdpy",
-      "name": "Garden's Pulse - Campaigns - July - Build",
-      "list": "Garden's Pulse",
-      "start": "1783036800000",
-      "due": "1783641600000",
       "prio": 0
     },
     {
@@ -57,14 +41,6 @@
       "prio": 0
     },
     {
-      "id": "869e1pvtm",
-      "name": "enhancedhim | Build campaigns",
-      "list": "enhancedhim",
-      "start": "",
-      "due": "1783890000000",
-      "prio": 0
-    },
-    {
       "id": "869e2uf1k",
       "name": "Pepticool - draft July campaigns",
       "list": "Pepticool",
@@ -76,14 +52,6 @@
       "id": "869e2uf0t",
       "name": "Ilovehue (Still Archive) - draft July campaigns",
       "list": "ilovehue",
-      "start": "",
-      "due": "1783976340000",
-      "prio": 0
-    },
-    {
-      "id": "869e2kckf",
-      "name": "July campaigns - publishing",
-      "list": "Avera",
       "start": "",
       "due": "1783976340000",
       "prio": 0
@@ -105,6 +73,22 @@
       "prio": 0
     },
     {
+      "id": "869dczf26",
+      "name": "RISE - Deaf & Hearing Aid/CI Welcome Flow",
+      "list": "RISE",
+      "start": "",
+      "due": "1784077200000",
+      "prio": 3
+    },
+    {
+      "id": "869e26rwq",
+      "name": "enhancedscents | Publish flows",
+      "list": "enhancedscents",
+      "start": "",
+      "due": "1784120400000",
+      "prio": 4
+    },
+    {
       "id": "869e4d7dg",
       "name": "Luvura | Publish campaigns",
       "list": "Luvura",
@@ -121,11 +105,43 @@
       "prio": 2
     },
     {
+      "id": "869e2tb7v",
+      "name": "[MacroBeauty] Flows: Build",
+      "list": "macrobeauty",
+      "start": "",
+      "due": "1784160000000",
+      "prio": 3
+    },
+    {
+      "id": "869e4zphd",
+      "name": "Sculptara™ | Publish emails",
+      "list": "Sculptara™",
+      "start": "",
+      "due": "1784235600000",
+      "prio": 0
+    },
+    {
       "id": "869e4bygf",
       "name": "Auna Beauty | Publish emails",
       "list": "Auna Beauty",
       "start": "",
       "due": "1784235600000",
+      "prio": 0
+    },
+    {
+      "id": "869dnf5x4",
+      "name": "Bare Rituals: Post-Purchase Flow Audit & Restructure + Replenishment & Cross-Sell Flow Build (OCU)",
+      "list": "BareRitual",
+      "start": "",
+      "due": "1784250000000",
+      "prio": 2
+    },
+    {
+      "id": "869e51qm9",
+      "name": "Publish emails",
+      "list": "Velcura",
+      "start": "1784077200000",
+      "due": "1784336400000",
       "prio": 0
     },
     {

@@ -13,6 +13,16 @@ const SYNC = {
 };
 let _sbClient=null, _syncPushTimer=null, _syncApplying=false, _syncChan=null, _syncPolling=false;
 
+// ── Shared-workspace mode ────────────────────────────────────────────────
+// 'full'  = sync EVERYTHING (your own phone ↔ computer) — the default.
+// 'shared'= sync ONLY the workspace definition (clients + tasks + zone rosters +
+//   flow definitions). Your private progress (statuses, earnings, invoices, done
+//   ticks) is NEVER pushed and NEVER overwritten. A coworker joins in this mode:
+//   they see your clients & tasks live, but keep their own marks.
+const SHARE_KEYS = ['dc_clients','dc_plantasks','dc_zone_roster','dc_flows'];
+function _syncMode(){ return gload('dc_sync_mode','full'); }
+function _syncShared(){ return _syncMode()==='shared'; }
+
 async function _sb(){
   if(_sbClient) return _sbClient;
   if(!SYNC.enabled()) return null;
@@ -31,19 +41,26 @@ function _syncCleanUrl(u){
 }
 function _syncStatus(msg,cls){ const el=document.getElementById('sync-status'); if(el){ el.textContent=msg; el.dataset.cls=cls||''; } }
 
-// All shareable dc_* keys (exclude the local-only sync config)
+// All shareable dc_* keys (exclude the local-only sync config). In shared mode only
+// the workspace keys (clients/tasks/rosters/flows) are collected.
 function _syncCollect(){
   const data={};
   for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.indexOf('dc_')===0&&k.indexOf('dc_sync_')!==0) data[k]=localStorage.getItem(k); }
+  if(_syncShared()){ const s={}; SHARE_KEYS.forEach(function(k){ if(data[k]!=null) s[k]=data[k]; }); return s; }
   return data;
 }
 function _syncApply(data){
   if(!data) return;
   _syncApplying=true;
   try{
-    const del=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.indexOf('dc_')===0&&k.indexOf('dc_sync_')!==0) del.push(k); }
-    del.forEach(function(k){ localStorage.removeItem(k); });
-    Object.keys(data).forEach(function(k){ if(k.indexOf('dc_')===0&&k.indexOf('dc_sync_')!==0) localStorage.setItem(k, data[k]); });
+    if(_syncShared()){
+      // touch ONLY the shared workspace keys — never wipe local progress
+      SHARE_KEYS.forEach(function(k){ if(data[k]!=null) localStorage.setItem(k, data[k]); else localStorage.removeItem(k); });
+    } else {
+      const del=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.indexOf('dc_')===0&&k.indexOf('dc_sync_')!==0) del.push(k); }
+      del.forEach(function(k){ localStorage.removeItem(k); });
+      Object.keys(data).forEach(function(k){ if(k.indexOf('dc_')===0&&k.indexOf('dc_sync_')!==0) localStorage.setItem(k, data[k]); });
+    }
   } finally { _syncApplying=false; }
 }
 
@@ -51,7 +68,16 @@ async function syncPushNow(){
   try{
     const sb=await _sb(); if(!sb) return;
     _syncStatus('⬆ выгрузка…','load');
-    const row={ id:SYNC.code(), data:_syncCollect(), device:SYNC.device(), updated_at:new Date().toISOString() };
+    let payload=_syncCollect();
+    if(_syncShared()){
+      // merge our workspace keys INTO the existing cloud blob so the owner's private
+      // data (statuses/earnings/…) already there is preserved, not overwritten.
+      try{
+        const {data}=await sb.from('dispatch_sync').select('data').eq('id',SYNC.code()).maybeSingle();
+        payload=Object.assign({}, (data&&data.data)||{}, payload);
+      }catch(e){}
+    }
+    const row={ id:SYNC.code(), data:payload, device:SYNC.device(), updated_at:new Date().toISOString() };
     const {error}=await sb.from('dispatch_sync').upsert(row);
     if(error){ _syncStatus('⚠ '+error.message,'err'); return; }
     gsave('dc_sync_ts', row.updated_at);
@@ -110,6 +136,8 @@ async function syncConnect(){
   let keyVal=key.trim();
   if(/^[•·∙*]+$/.test(keyVal)) keyVal=SYNC.key();   // field shows a mask → keep the saved key
   if(!url.trim()||!keyVal||!code.trim()){ showToast('Заполни URL, ключ и код'); return; }
+  const sharedMode=!!((document.getElementById('sync-shared')||{}).checked);
+  gsave('dc_sync_mode', sharedMode?'shared':'full');
   gsave('dc_sync_url',_syncCleanUrl(url)); gsave('dc_sync_key',keyVal); gsave('dc_sync_code',code.trim());
   _sbClient=null;
   _syncStatus('проверка…','load');
@@ -119,7 +147,12 @@ async function syncConnect(){
   try{ res=await sb.from('dispatch_sync').select('data,updated_at').eq('id',code.trim()).maybeSingle(); }
   catch(e){ _syncStatus('⚠ '+(e.message||'ошибка'),'err'); return; }
   if(res.error){ _syncStatus('⚠ '+res.error.message,'err'); showToast('Ошибка: '+res.error.message); return; }
-  if(res.data){
+  if(sharedMode){
+    // Joining a shared workspace: pull clients+tasks from the cloud, keep your own
+    // marks. Never offers to overwrite the cloud with your (empty) local data.
+    if(res.data){ await syncPullNow(); }
+    else { _syncStatus('⚠ в облаке пока нет данных','err'); showToast('Владелец ещё не выгрузил данные в этот код'); }
+  } else if(res.data){
     const when=new Date(res.data.updated_at).toLocaleString();
     if(confirm('В облаке уже есть данные (обновлены '+when+').\n\nОК — загрузить из облака (заменить локальные).\nОтмена — выгрузить локальные в облако (заменить облачные).')){
       await syncPullNow();
@@ -133,7 +166,7 @@ async function syncConnect(){
   render();
 }
 function syncDisconnect(){
-  ['dc_sync_url','dc_sync_key','dc_sync_code'].forEach(function(k){ localStorage.removeItem(k); });
+  ['dc_sync_url','dc_sync_key','dc_sync_code','dc_sync_mode'].forEach(function(k){ localStorage.removeItem(k); });
   _sbClient=null; if(_syncChan){ try{ _sbClient&&_sbClient.removeChannel(_syncChan); }catch(e){} _syncChan=null; }
   showToast('Синхронизация отключена'); render();
 }
@@ -156,6 +189,10 @@ function renderSyncPanel(){
       <input id="sync-url" placeholder="Project URL (https://xxxx.supabase.co)" value="${url}" style="background:rgba(255,255,255,.07);border:1px solid var(--glass-border2);color:var(--text);font-family:var(--mono);font-size:11px;padding:9px 12px;border-radius:13px;outline:none">
       <input id="sync-key" type="password" placeholder="anon public key" value="${key}" style="background:rgba(255,255,255,.07);border:1px solid var(--glass-border2);color:var(--text);font-family:var(--mono);font-size:11px;padding:9px 12px;border-radius:13px;outline:none">
       <input id="sync-code" placeholder="Код синхронизации (придумай, держи в секрете)" value="${code}" style="background:rgba(255,255,255,.07);border:1px solid var(--glass-border2);color:var(--text);font-family:var(--mono);font-size:11px;padding:9px 12px;border-radius:13px;outline:none">
+      <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text2);line-height:1.5;cursor:pointer;padding:2px 0">
+        <input type="checkbox" id="sync-shared" ${_syncShared()?'checked':''} style="margin-top:2px;accent-color:var(--accent);flex-shrink:0">
+        <span><b>Общий доступ</b> — синхронизировать только клиентов и задачи (для коллеги). Твои отметки, заработок и инвойсы останутся локальными и не уедут в это облако.</span>
+      </label>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
       <button class="btn-add" onclick="syncConnect()">${on?'↻ Переподключить':'Подключить'}</button>

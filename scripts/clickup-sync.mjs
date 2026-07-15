@@ -64,22 +64,24 @@ try {
   }
   console.log(`Fetched ${collected.length} assigned tasks.`);
 
-  // 4) keep open tasks that have a due date within the horizon (overdue included)
+  // 4) keep open tasks: everything with NO due date (shown as "no deadline"), plus
+  //    anything due within the horizon (overdue included). Nothing assigned & open
+  //    is silently dropped just because it lacks a due date.
   const raw = collected
     .filter(t => {
       const st = (t.status && (t.status.status || '')).toLowerCase();
       const type = (t.status && (t.status.type || '')).toLowerCase();
       if (DONE_STATUSES.has(st) || type === 'closed' || type === 'done') return false;
-      if (!t.due_date) return false;
-      return Number(t.due_date) <= horizon;
+      if (t.due_date && Number(t.due_date) > horizon) return false;   // only drop far-future dated tasks
+      return true;
     })
-    .sort((a, b) => Number(a.due_date) - Number(b.due_date))
+    .sort((a, b) => Number(a.due_date || a.start_date || 0) - Number(b.due_date || b.start_date || 0))
     .map(t => ({
       id: t.id,
       name: t.name,
       list: (t.list && t.list.name) || '',
       start: t.start_date ? String(t.start_date) : '',   // when to START (→ task's startIso)
-      due: String(t.due_date),                            // when it's DUE (→ deadline)
+      due: t.due_date ? String(t.due_date) : '',          // when it's DUE (→ deadline); '' = no deadline
       prio: prioLevel(t.priority),
     }));
 

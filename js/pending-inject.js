@@ -220,20 +220,23 @@
     return cleanText(text);
   }
 
-  // ── one-time: re-add ALL ClickUp tasks ──────────────────────────────────
-  // You deleted every task and want them all back. Clearing dc_inject_seen once
-  // lets the RAW list above re-inject IN FULL on the next load (deleted-stays-
-  // deleted resumes afterwards). To force another full re-add later, bump this
-  // flag version (…_v9, _v10…) — that's the whole "разово добавить всё заново".
-  if(!localStorage.getItem('dc_inject_reset_v8')){
+  // ── one-time: clean re-sync of ClickUp tasks ────────────────────────────
+  // Drops the previously-injected ClickUp tasks (keeps your MANUAL ones) and clears
+  // dc_inject_seen, so the RAW list above re-injects the CURRENT ClickUp board in full
+  // — no stale tasks from earlier syncs linger, none are missing. Bump the flag version
+  // (…_v10, _v11…) whenever you want another clean re-sync.
+  if(!localStorage.getItem('dc_inject_reset_v10')){
     localStorage.removeItem('dc_inject_seen');
-    localStorage.setItem('dc_inject_reset_v8','1');
+    try{ var _tp=JSON.parse(localStorage.getItem('dc_plantasks')||'{}')||{}; Object.keys(_tp).forEach(function(k){ if(_tp[k]&&_tp[k].injectId) delete _tp[k]; }); localStorage.setItem('dc_plantasks', JSON.stringify(_tp)); }catch(e){}
+    localStorage.setItem('dc_inject_reset_v10','1');
   }
 
-  // ── existing tasks (single global store): dedupe by ClickUp id + by text+client ──
+  // ── existing tasks (single global store): dedupe ONLY by ClickUp id (unique) ──
+  // NOT by text — two distinct ClickUp tasks can share a name (e.g. two "Nura Relief
+  // | Publish emails"); dropping by text lost the second one.
   var tasks; try{ tasks = JSON.parse(localStorage.getItem('dc_plantasks')||'{}')||{}; }catch(e){ tasks={}; }
-  var seenIds = {}, texts = {};
-  Object.values(tasks).forEach(function(t){ if(!t) return; if(t.injectId) seenIds[t.injectId]=1; texts[norm(t.text)+'|'+(t.cid||'')]=1; });
+  var seenIds = {};
+  Object.values(tasks).forEach(function(t){ if(!t) return; if(t.injectId) seenIds[t.injectId]=1; });
   try { (JSON.parse(localStorage.getItem('dc_inject_seen')||'[]')||[]).forEach(function(id){ seenIds[id]=1; }); } catch(e){}
 
   var added = 0, matched = 0, updated = 0;
@@ -259,8 +262,6 @@
 
     var c = matchClient(r.name, r.list);
     var text = c ? stripName(r.name, c.name) : r.name; if(!text) text = r.name;
-    var key = norm(text)+'|'+(c?c.id:'');
-    if(texts[key]) return;                                     // identical task already present
     var hint = (r.list && r.list !== 'Imported From Trello') ? r.list : firstSeg(r.name);
     tasks[id] = {
       id: id, injectId: r.id, text: text,
@@ -270,7 +271,7 @@
       prio: newPrio,                                   // ClickUp priority (0-4)
       done: false, note: c ? 'ClickUp' : ('ClickUp: ' + hint)
     };
-    texts[key] = 1; seenIds[r.id] = 1; added++; if(c) matched++;
+    seenIds[r.id] = 1; added++; if(c) matched++;
   });
 
   localStorage.setItem('dc_plantasks', JSON.stringify(tasks));

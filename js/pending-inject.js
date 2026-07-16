@@ -12,10 +12,18 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-07-15T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-07-16T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
+    {
+      "id": "869dtzgn9",
+      "name": "test",
+      "list": "Personal List",
+      "start": "",
+      "due": "",
+      "prio": 0
+    },
     {
       "id": "869e0rkuz",
       "name": "Nura Relief | Publish emails",
@@ -25,35 +33,11 @@
       "prio": 0
     },
     {
-      "id": "869dwqctg",
-      "name": "[FaithIsMade] New Post Purchase Flow: Build",
-      "list": "FaithIsMade",
-      "start": "1782691200000",
-      "due": "1783641600000",
-      "prio": 0
-    },
-    {
       "id": "869e1dzt8",
       "name": "Nura Relief | Publish emails",
       "list": "Nura Relief",
       "start": "1783386000000",
       "due": "1783717200000",
-      "prio": 0
-    },
-    {
-      "id": "869e2uf1k",
-      "name": "Pepticool - draft July campaigns",
-      "list": "Pepticool",
-      "start": "",
-      "due": "1783976340000",
-      "prio": 0
-    },
-    {
-      "id": "869e2uf0t",
-      "name": "Ilovehue (Still Archive) - draft July campaigns",
-      "list": "ilovehue",
-      "start": "",
-      "due": "1783976340000",
       "prio": 0
     },
     {
@@ -82,7 +66,7 @@
     },
     {
       "id": "869e26rwq",
-      "name": "enhancedscents | Publish flows",
+      "name": "enhancedscents | Publish emails",
       "list": "enhancedscents",
       "start": "",
       "due": "1784120400000",
@@ -129,12 +113,28 @@
       "prio": 0
     },
     {
+      "id": "869e51vdt",
+      "name": "Snatched | Flow Builds",
+      "list": "SNATCHED",
+      "start": "",
+      "due": "1784246400000",
+      "prio": 0
+    },
+    {
       "id": "869dnf5x4",
       "name": "Bare Rituals: Post-Purchase Flow Audit & Restructure + Replenishment & Cross-Sell Flow Build (OCU)",
       "list": "BareRitual",
       "start": "",
       "due": "1784250000000",
       "prio": 2
+    },
+    {
+      "id": "869e5gv83",
+      "name": "Ruvelo | Publish emails",
+      "list": "Ruvelo",
+      "start": "",
+      "due": "1784322000000",
+      "prio": 0
     },
     {
       "id": "869e51qm9",

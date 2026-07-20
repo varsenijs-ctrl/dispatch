@@ -12,7 +12,7 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-07-19T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-07-20T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
@@ -41,28 +41,12 @@
       "prio": 0
     },
     {
-      "id": "869e3c6gd",
-      "name": "Sculptara™ | Publish emails",
-      "list": "Sculptara™",
-      "start": "1783731600000",
-      "due": "1783976400000",
-      "prio": 0
-    },
-    {
-      "id": "869e4d7dg",
-      "name": "Luvura | Publish campaigns",
-      "list": "Luvura",
+      "id": "869e2a78j",
+      "name": "enhancedhim | Build flows",
+      "list": "enhancedhim",
       "start": "",
-      "due": "1784149200000",
+      "due": "1784062800000",
       "prio": 0
-    },
-    {
-      "id": "869e2tb7v",
-      "name": "[MacroBeauty] Flows: Build",
-      "list": "macrobeauty",
-      "start": "",
-      "due": "1784160000000",
-      "prio": 3
     },
     {
       "id": "869e4bygf",
@@ -95,14 +79,6 @@
       "start": "",
       "due": "1784250000000",
       "prio": 2
-    },
-    {
-      "id": "869dczf26",
-      "name": "RISE - Deaf & Hearing Aid/CI Welcome Flow",
-      "list": "RISE",
-      "start": "",
-      "due": "1784250000000",
-      "prio": 3
     },
     {
       "id": "869e5gv83",

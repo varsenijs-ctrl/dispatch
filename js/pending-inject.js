@@ -12,7 +12,7 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-07-20T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-07-21T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
@@ -63,22 +63,6 @@
       "start": "",
       "due": "1784246400000",
       "prio": 0
-    },
-    {
-      "id": "869e484e3",
-      "name": "WildHarvest | Trust Pilot Email #2 | Build",
-      "list": "Wild Harvest©",
-      "start": "",
-      "due": "1784246400000",
-      "prio": 2
-    },
-    {
-      "id": "869dnf5x4",
-      "name": "Bare Rituals: Post-Purchase Flow Audit & Restructure + Replenishment & Cross-Sell Flow Build (OCU)",
-      "list": "BareRitual",
-      "start": "",
-      "due": "1784250000000",
-      "prio": 2
     },
     {
       "id": "869e5gv83",

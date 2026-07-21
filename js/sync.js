@@ -43,9 +43,25 @@ function _syncStatus(msg,cls){ const el=document.getElementById('sync-status'); 
 
 // All shareable dc_* keys (exclude the local-only sync config). In shared mode only
 // the workspace keys (clients/tasks/rosters/flows) are collected.
+// ClickUp-injected tasks are re-derived locally on EVERY device (the RAW mirror), so
+// they must NOT travel through the cloud — a stale copy there would clobber the live
+// mirror (that's how tasks "went missing"). Only MANUAL (non-injected) tasks sync.
+function _plantasksShareable(json){
+  try{ var t=JSON.parse(json)||{}; var o={}; Object.keys(t).forEach(function(k){ if(t[k] && !t[k].injectId) o[k]=t[k]; }); return JSON.stringify(o); }catch(e){ return json; }
+}
+function _localInjectTasks(){
+  var out={}; try{ var t=JSON.parse(localStorage.getItem('dc_plantasks')||'{}')||{}; Object.keys(t).forEach(function(k){ if(t[k]&&t[k].injectId) out[k]=t[k]; }); }catch(e){} return out;
+}
+function _applyPlantasks(incomingJson, injectBase){
+  var out=Object.assign({}, injectBase || _localInjectTasks());   // keep this device's ClickUp tasks
+  try{ var inc=JSON.parse(incomingJson||'{}')||{}; Object.keys(inc).forEach(function(k){ if(inc[k]&&!inc[k].injectId) out[k]=inc[k]; }); }catch(e){}  // + synced manual tasks
+  localStorage.setItem('dc_plantasks', JSON.stringify(out));
+}
+
 function _syncCollect(){
   const data={};
   for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.indexOf('dc_')===0&&k.indexOf('dc_sync_')!==0) data[k]=localStorage.getItem(k); }
+  if(data.dc_plantasks!=null) data.dc_plantasks=_plantasksShareable(data.dc_plantasks);   // never ship ClickUp tasks
   if(_syncShared()){ const s={}; SHARE_KEYS.forEach(function(k){ if(data[k]!=null) s[k]=data[k]; }); return s; }
   return data;
 }
@@ -55,11 +71,16 @@ function _syncApply(data){
   try{
     if(_syncShared()){
       // touch ONLY the shared workspace keys — never wipe local progress
-      SHARE_KEYS.forEach(function(k){ if(data[k]!=null) localStorage.setItem(k, data[k]); else localStorage.removeItem(k); });
+      SHARE_KEYS.forEach(function(k){
+        if(k==='dc_plantasks'){ _applyPlantasks(data[k]); return; }   // merge: keep local ClickUp tasks
+        if(data[k]!=null) localStorage.setItem(k, data[k]); else localStorage.removeItem(k);
+      });
     } else {
+      const localInject=_localInjectTasks();
       const del=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.indexOf('dc_')===0&&k.indexOf('dc_sync_')!==0) del.push(k); }
       del.forEach(function(k){ localStorage.removeItem(k); });
-      Object.keys(data).forEach(function(k){ if(k.indexOf('dc_')===0&&k.indexOf('dc_sync_')!==0) localStorage.setItem(k, data[k]); });
+      Object.keys(data).forEach(function(k){ if(k.indexOf('dc_')!==0||k.indexOf('dc_sync_')===0) return; if(k==='dc_plantasks'){ _applyPlantasks(data[k], localInject); } else { localStorage.setItem(k, data[k]); } });
+      if(data.dc_plantasks==null){ localStorage.setItem('dc_plantasks', JSON.stringify(localInject)); }   // blob had none → keep our ClickUp tasks
     }
   } finally { _syncApplying=false; }
 }

@@ -87,7 +87,7 @@ function renderHome(){
   const deadlines=ac.filter(c=>c.deadline).map(c=>{const dl=new Date(c.deadline+'T00:00:00');const diff=Math.ceil((dl-new Date(getTODAY().toDateString()))/86400000);return{c,diff};}).filter(x=>x.diff>=0&&x.diff<=14).sort((a,b)=>a.diff-b.diff);
   const clientStats=ac.map(c=>{const hist=historyData[c.name]||{};const yes=Object.entries(hist).filter(([d,v])=>d.startsWith(mk)&&v==='yes').length;const total=Object.entries(hist).filter(([d])=>d.startsWith(mk)).length||1;return{c,yes,rate:Math.round(yes/total*100)};}).sort((a,b)=>b.yes-a.yes).slice(0,5);
   const _tasks=load('dc_plantasks',{});const _iso=isoToday();
-  const todayTasks=Object.values(_tasks).filter(t=>!_isTaskClientPaused(t)&&t.startIso===_iso);
+  const todayTasks=Object.values(_tasks).filter(t=>!t.flowId&&!_isTaskClientPaused(t)&&t.startIso===_iso);
   const todayTasksCount=todayTasks.length;const todayTasksDone=todayTasks.filter(t=>t.done).length;
   const _smsDays=load('dc_sms_days',{});const _dis=load('dc_pay_disabled',{});
   // Same source of truth as the Finance tab, so both earnings blocks agree.
@@ -97,8 +97,8 @@ function renderHome(){
   const earnedUSD=earnedAmt.toFixed(2);const potentialUSD=potentialAmt.toFixed(2);
   const earnPct=potentialAmt?Math.round(earnedAmt/potentialAmt*100):0;
   const leftAmt=(potentialAmt-earnedAmt).toFixed(2);
-  const overdueHome=Object.values(_tasks).filter(t=>!_isTaskClientPaused(t)&&_inZone(t.startIso)&&_overdue(t)).length;
-  const upcomingTasks=Object.values(_tasks).filter(t=>{if(t.done||_isTaskClientPaused(t)||!_inZone(t.startIso))return false;const d=new Date(t.startIso+'T00:00:00');const diff=Math.ceil((d-new Date(getTODAY().toDateString()))/86400000);return diff>=0&&diff<=6;}).sort((a,b)=>a.startIso.localeCompare(b.startIso)).slice(0,6);
+  const overdueHome=Object.values(_tasks).filter(t=>!t.flowId&&!_isTaskClientPaused(t)&&_inZone(t.startIso)&&_overdue(t)).length;
+  const upcomingTasks=Object.values(_tasks).filter(t=>{if(t.flowId||t.done||_isTaskClientPaused(t)||!_inZone(t.startIso))return false;const d=new Date(t.startIso+'T00:00:00');const diff=Math.ceil((d-new Date(getTODAY().toDateString()))/86400000);return diff>=0&&diff<=6;}).sort((a,b)=>a.startIso.localeCompare(b.startIso)).slice(0,6);
   const h=new Date().getHours();const greet=h<12?'Доброе утро':h<17?'Добрый день':'Добрый вечер';
 
   let deadlineRows='';
@@ -356,6 +356,7 @@ function renderDayToday(){
   const due=t=>t.deadline||t.startIso;
   const G={overdue:[],today:[],next:[]}; const done=[]; const withDeadline=[];
   Object.values(tasks).forEach(t=>{
+    if(t.flowId) return;                                       // flows live in the Флоу tab, not the task list
     if(_isTaskClientPaused(t)) return;                         // paused client → hidden everywhere but Clients tab
     if(!_inZone(t.startIso)) return;                           // active zone only — this zone's tasks
     if(t.done){ if(t.doneDate===iso||t.startIso===iso) done.push(t); return; }

@@ -68,7 +68,7 @@ function updateFlowSelect(){
 }
 
 function renderDayTasks(iso){
-  const tasks=load('dc_plantasks',{});const dayTasks=Object.values(tasks).filter(t=>!_isTaskClientPaused(t)&&(t.startIso===iso||(!t.done&&t.startIso<iso&&t.until&&t.until>=iso)))
+  const tasks=load('dc_plantasks',{});const dayTasks=Object.values(tasks).filter(t=>!t.flowId&&!_isTaskClientPaused(t)&&(t.startIso===iso||(!t.done&&t.startIso<iso&&t.until&&t.until>=iso)))   // flows live in the Флоу tab
   // split into tasks carried over from earlier days vs. tasks of this day
   const _pr=t=>+t.prio||0;   // priority DESC first
   const carried = dayTasks.filter(t=>t.startIso<iso).sort((a,b)=>_pr(b)-_pr(a) || a.startIso.localeCompare(b.startIso));

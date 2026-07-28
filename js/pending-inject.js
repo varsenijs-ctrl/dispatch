@@ -12,7 +12,7 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-07-27T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-07-28T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
@@ -49,24 +49,8 @@
       "prio": 0
     },
     {
-      "id": "869e51vdt",
-      "name": "Snatched | Flow Builds",
-      "list": "SNATCHED",
-      "start": "",
-      "due": "1784246400000",
-      "prio": 0
-    },
-    {
       "id": "869e91db7",
       "name": "Kerablend | Publish campaigns",
-      "list": "Kerablend",
-      "start": "",
-      "due": "1784854800000",
-      "prio": 0
-    },
-    {
-      "id": "869e37t90",
-      "name": "Kerablend | Create campaigns",
       "list": "Kerablend",
       "start": "",
       "due": "1784854800000",
@@ -78,6 +62,14 @@
       "list": "Onesniffaway",
       "start": "1784768400000",
       "due": "1784926800000",
+      "prio": 0
+    },
+    {
+      "id": "869ea5cjb",
+      "name": "BikerVision | Create campaigns | Build",
+      "list": "BikerVision",
+      "start": "",
+      "due": "1785196800000",
       "prio": 0
     },
     {
@@ -94,6 +86,22 @@
       "list": "Healthy Living Co",
       "start": "",
       "due": "1785272400000",
+      "prio": 0
+    },
+    {
+      "id": "869ea5czb",
+      "name": "Orvia Labs | Create campaigns | Build",
+      "list": "Orvia Labs",
+      "start": "",
+      "due": "1785283200000",
+      "prio": 0
+    },
+    {
+      "id": "869e9ugxz",
+      "name": "BareRitual | Publish campaigns",
+      "list": "BareRitual",
+      "start": "",
+      "due": "1785459600000",
       "prio": 0
     },
     {

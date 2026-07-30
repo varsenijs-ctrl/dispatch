@@ -12,7 +12,7 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-07-29T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-07-30T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
@@ -49,35 +49,11 @@
       "prio": 0
     },
     {
-      "id": "869e91db7",
-      "name": "Kerablend | Publish campaigns",
-      "list": "Kerablend",
-      "start": "",
-      "due": "1784854800000",
-      "prio": 0
-    },
-    {
-      "id": "869e8hu5e",
-      "name": "Onesniffaway | Publish emails",
-      "list": "Onesniffaway",
-      "start": "1784768400000",
-      "due": "1784926800000",
-      "prio": 0
-    },
-    {
       "id": "869ea5cjb",
       "name": "BikerVision | Create campaigns | Build",
       "list": "BikerVision",
       "start": "",
       "due": "1785196800000",
-      "prio": 0
-    },
-    {
-      "id": "869e9k0fw",
-      "name": "Auna Beauty | Build campaigns",
-      "list": "Auna Beauty",
-      "start": "",
-      "due": "1785272400000",
       "prio": 0
     },
     {
@@ -89,12 +65,12 @@
       "prio": 0
     },
     {
-      "id": "869ea5czb",
-      "name": "Orvia Labs | Create campaigns | Build",
-      "list": "Orvia Labs",
+      "id": "869eb44b2",
+      "name": "Revair | Subscription Payment Due Email Batch - Build",
+      "list": "Revair",
       "start": "",
       "due": "1785283200000",
-      "prio": 0
+      "prio": 4
     },
     {
       "id": "869e8jy0a",
@@ -102,6 +78,30 @@
       "list": "enhancedscents",
       "start": "",
       "due": "1785358800000",
+      "prio": 0
+    },
+    {
+      "id": "869eb0yje",
+      "name": "Ruvelo | Publish emails",
+      "list": "Ruvelo",
+      "start": "",
+      "due": "1785445200000",
+      "prio": 0
+    },
+    {
+      "id": "869eawe00",
+      "name": "Mirae | Build campaigns ",
+      "list": "Mirae",
+      "start": "",
+      "due": "1785445200000",
+      "prio": 0
+    },
+    {
+      "id": "869eb1wh9",
+      "name": "BloomieBlankets | Publishing",
+      "list": "BloomieBlankets",
+      "start": "",
+      "due": "1785459600000",
       "prio": 0
     },
     {
@@ -118,6 +118,14 @@
       "list": "BareRitual",
       "start": "",
       "due": "1785459600000",
+      "prio": 0
+    },
+    {
+      "id": "869eb7ud7",
+      "name": "Kerablend | Publishing",
+      "list": "Kerablend",
+      "start": "",
+      "due": "1785718800000",
       "prio": 0
     }
   ]/*RAW_END*/;

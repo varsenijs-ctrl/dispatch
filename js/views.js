@@ -14,8 +14,8 @@ function updateSidebar(){
     const hist=historyData[c.name]||{};
     const cidSms=_sdSms[c.id]||{};
     Object.entries(hist).forEach(([iso,v])=>{
-      if(iso.slice(0,7)!==activeMonth) return;   // STRICTLY this zone's month — no whole-history bleed (that's what gave 1185)
-      if(!v) return;                             // every marked day of the month counts (yes/draft/no)
+      if(!_markInActiveZone(c.id, iso)) return;  // SAME function as Finance → sidebar & Финансы always agree, strictly this zone
+      if(!v) return;                             // every marked day of the zone counts (yes/draft/no)
       em++;
       if(cidSms[iso]) sm++;
     });

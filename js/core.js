@@ -116,19 +116,15 @@ function _zac(){ return _zoneClients().filter(function(c){return c.active&&!c.pa
 // (history / action log) to this zone only.
 function _zoneClientNames(){ var set={}; _zac().forEach(function(c){ if(c&&c.name) set[String(c.name).toLowerCase()]=1; }); return set; }
 
-// Does a dated mark for `cid` count toward the ACTIVE zone's earnings?
-// The zone is defined by its client roster, not strictly by the calendar month, so a
-// zone shows ALL its clients' earnings — including work you did "in July for August".
-// A mark counts here if its month IS the active month, OR no OTHER zone (matching that
-// month) rosters this client. So a recurring client's June work stays in the June zone
-// (that zone rosters them for June) and never bleeds into July.
+// Does a dated mark for `cid` count toward the ACTIVE zone?
+// STRICT per-zone: a dated mark belongs ONLY to the zone of its own calendar month.
+// "июль 2026" shows exclusively July marks, "август 2026" exclusively August — nothing
+// from other months ever bleeds in. (The old "bleed-safe" rule pulled a client's WHOLE
+// history into the active zone whenever no other zone rostered them, which summed years
+// of marks into one number — that was the phantom 1185.) `cid` is kept for call-site
+// compatibility; the zone is decided purely by the date's month.
 function _markInActiveZone(cid, iso){
-  var m=(iso||'').slice(0,7);
-  if(!m) return false;
-  if(m===activeMonth) return true;
-  var mp=_rosterMap();
-  if(Array.isArray(mp[m]) && mp[m].indexOf(cid)>=0) return false;   // belongs to the zone of month m
-  return true;
+  return _inZone(iso);   // iso.slice(0,7) === activeMonth
 }
 // Normalized client-name key (case/space/punctuation-insensitive) so "Macro Beauty"
 // and "macrobeauty" collapse to the same key — used to de-duplicate client records.

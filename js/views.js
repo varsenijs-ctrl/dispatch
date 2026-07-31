@@ -14,10 +14,11 @@ function updateSidebar(){
     const hist=historyData[c.name]||{};
     const cidSms=_sdSms[c.id]||{};
     Object.entries(hist).forEach(([iso,v])=>{
-      if(!_markInActiveZone(c.id, iso)) return;  // SAME function as Finance → sidebar & Финансы always agree, strictly this zone
-      if(!v) return;                             // every marked day of the zone counts (yes/draft/no)
-      em++;
-      if(cidSms[iso]) sm++;
+      if(!_markInActiveZone(c.id, iso)) return;   // same zone rule as Finance — counts agree, don't jump
+      if(v==='yes'||v==='draft'){                 // ONLY sent + drafts (never 'no') — matches build "сайдбар-как-финансы" (446)
+        em++;
+        if(cidSms[iso]) sm++;
+      }
     });
   });
   const _em=document.getElementById('s-email-month'); if(_em)_em.textContent=em;

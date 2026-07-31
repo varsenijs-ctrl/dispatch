@@ -7,7 +7,6 @@ function updateSidebar(){
   const _sp=document.getElementById('s-pending'); if(_sp)_sp.textContent=pendingToday;
   const _sd=document.getElementById('s-done'); if(_sd)_sd.textContent=doneToday;
   const _sb=document.getElementById('s-blocked'); if(_sb)_sb.textContent=0;
-  const mk=monthKey(getTODAY());
   const _sdSms=load('dc_sms_days',{});
   const activeCl=_zac();
   let em=0, sm=0;
@@ -15,7 +14,7 @@ function updateSidebar(){
     const hist=historyData[c.name]||{};
     const cidSms=_sdSms[c.id]||{};
     Object.entries(hist).forEach(([iso,v])=>{
-      if(iso.slice(0,7)!==mk) return;
+      if(!_markInActiveZone(c.id, iso)) return;   // same zone rule as Finance — counts don't jump/mismatch
       if(v==='yes'||v==='draft'){
         em++;
         if(cidSms[iso]) sm++;

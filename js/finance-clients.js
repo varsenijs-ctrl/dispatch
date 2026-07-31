@@ -1,4 +1,32 @@
 let financeSelectedCid=null;let financeScope='all';   // 'all' = все месяцы вместе (default) · 'month' = активная зона. Toggle in the Finance header.
+let financeFilter='all';   // Finance breakdown filter: all | email | sms | flows | invoices
+function setFinanceFilter(f){ financeFilter=f; render(); }
+
+// Per-client earnings split into components for the active zone. An email-day pays
+// EMAIL_RATE (email part); an SMS day adds SMS_EXTRA on top (sms part). Flows are
+// separate. Returns {email:{e,p}, sms:{e,p}, flows:{e,p}, doneN, totalN}.
+function _clientFinanceParts(c){
+  const smsDays=load('dc_sms_days',{}),dis=load('dc_pay_disabled',{});
+  const cidSms=smsDays[c.id]||{},cidDis=dis[c.id]||{},hist=historyData[c.name]||{};
+  let email=0,emailPot=0,sms=0,smsPot=0,doneN=0,totalN=0;
+  Object.entries(hist).forEach(([d,v])=>{
+    if(!_markInActiveZone(c.id,d))return;
+    const isSms=!!cidSms[d], disabled=!!cidDis[d];
+    if(v==='yes'||v==='draft'){ doneN++;totalN++; if(!disabled){ email+=EMAIL_RATE;emailPot+=EMAIL_RATE; if(isSms){sms+=SMS_EXTRA;smsPot+=SMS_EXTRA;} } }
+    else if(v==='no'){ totalN++; if(!disabled){ emailPot+=EMAIL_RATE; if(isSms)smsPot+=SMS_EXTRA; } }
+  });
+  const fe=getFlowEarnings(c.id,'month');
+  return {email:{e:email,p:emailPot}, sms:{e:sms,p:smsPot}, flows:{e:fe.earned,p:fe.potential}, doneN:doneN, totalN:totalN};
+}
+// Pick a client's {earned,potential} for a given filter (invoices aren't per-client → 0).
+function _clientFinance(c, filter){
+  const p=_clientFinanceParts(c);
+  if(filter==='email') return {e:p.email.e,p:p.email.p, doneN:p.doneN,totalN:p.totalN};
+  if(filter==='sms')   return {e:p.sms.e,  p:p.sms.p,   doneN:p.doneN,totalN:p.totalN};
+  if(filter==='flows') return {e:p.flows.e,p:p.flows.p, doneN:p.doneN,totalN:p.totalN};
+  if(filter==='invoices') return {e:0,p:0, doneN:p.doneN,totalN:p.totalN};
+  return {e:p.email.e+p.sms.e+p.flows.e, p:p.email.p+p.sms.p+p.flows.p, doneN:p.doneN,totalN:p.totalN};
+}
 
 // Single source of truth for earnings totals — used by BOTH Finance and Home so
 // the two earnings blocks always agree. Counts email (yes/draft) + flows +
@@ -31,40 +59,41 @@ function _clientEntries(name){
 // calendar month matches the zone.
 // Totals for the ACTIVE zone only (this month's slice) — fully independent of other
 // zones. scope is ignored; a zone always shows only what was done in it.
-function computeFinanceTotals(scope){
-  const smsDays=load('dc_sms_days',{});const dis=load('dc_pay_disabled',{});
-  let earned=0,potential=0,sentCount=0,totalCount=0;
+function computeFinanceTotals(scope, filter){
+  filter = filter || 'all';
+  let email=0,emailPot=0,sms=0,smsPot=0,flows=0,flowsPot=0,sentCount=0,totalCount=0;
   _zac().forEach(c=>{                              // only clients added to THIS zone
-    const cidSms=smsDays[c.id]||{};const cidDis=dis[c.id]||{};const hist=historyData[c.name]||{};
-    Object.entries(hist).forEach(([d,v])=>{
-      if(!_markInActiveZone(c.id, d)) return;  // all of this zone's earnings, no cross-zone bleed
-      if(cidDis[d])return;
-      const rate=cidSms[d]?SMS_DAY_RATE:EMAIL_RATE;
-      if(v==='yes'||v==='draft'){earned+=rate;potential+=rate;sentCount++;totalCount++;}
-      else if(v==='no'){potential+=rate;totalCount++;}
-    });
-    const fe=getFlowEarnings(c.id,'month');earned+=fe.earned;potential+=fe.potential;
+    const p=_clientFinanceParts(c);
+    email+=p.email.e; emailPot+=p.email.p; sms+=p.sms.e; smsPot+=p.sms.p; flows+=p.flows.e; flowsPot+=p.flows.p;
+    sentCount+=p.doneN; totalCount+=p.totalN;
   });
   const invTotal=invoiceTotalForScope('month');
-  earned+=invTotal;potential+=invTotal;
-  return {earned:earned,potential:potential,sentCount:sentCount,totalCount:totalCount,invTotal:invTotal};
+  let earned,potential;
+  if(filter==='email'){ earned=email; potential=emailPot; }
+  else if(filter==='sms'){ earned=sms; potential=smsPot; }
+  else if(filter==='flows'){ earned=flows; potential=flowsPot; }
+  else if(filter==='invoices'){ earned=invTotal; potential=invTotal; }
+  else { earned=email+sms+flows+invTotal; potential=emailPot+smsPot+flowsPot+invTotal; }
+  return {earned:earned,potential:potential,sentCount:sentCount,totalCount:totalCount,invTotal:invTotal,
+          parts:{email:email,emailPot:emailPot,sms:sms,smsPot:smsPot,flows:flows,flowsPot:flowsPot,inv:invTotal}};
 }
 function renderFinance(){
   const mk=monthKey(getTODAY());const smsDays=load('dc_sms_days',{});const dis=load('dc_pay_disabled',{});
   const ac=_zac().sort((a,b)=>a.name.localeCompare(b.name,'ru'));   // only THIS zone's clients
-  const _T=computeFinanceTotals(financeScope);
+  const _T=computeFinanceTotals(financeScope, financeFilter);
   const invTotal=_T.invTotal;
   const totalWithInv=_T.earned;
   const totalPotentialWithInv=_T.potential;
   const earnPct=totalPotentialWithInv?Math.round(totalWithInv/totalPotentialWithInv*100):0;
+  // ── breakdown filter row (Всё / Имейлы / SMS / Флоу / Инвойсы) ──
+  const _pb=_T.parts;
+  const FILTERS=[['all','Всё',totalWithInv],['email','Имейлы',_pb.email],['sms','SMS',_pb.sms],['flows','Флоу',_pb.flows],['invoices','Инвойсы',_pb.inv]];
+  const filterRow=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">`+
+    FILTERS.map(f=>`<button onclick="setFinanceFilter('${f[0]}')" class="scope-btn ${financeFilter===f[0]?'active':''}">${f[1]} <span style="opacity:.65;font-family:var(--mono)">$${(f[2]||0).toFixed(2)}</span></button>`).join('')+`</div>`;
   let clientRows='';
   ac.forEach(c=>{
-    const entries=_clientEntries(c.name); let ce=0,cp=0,cDone=0,cTotal=0;
-    entries.forEach(e=>{ cTotal++;
-      if(e.v==='yes'||e.v==='draft'){ cDone++; if(!e.disabled) ce+=e.rate; }
-      if(!e.disabled&&(e.v==='yes'||e.v==='no'||e.v==='draft')) cp+=e.rate; });
-    const cfe=getFlowEarnings(c.id, 'month');
-    ce+=cfe.earned; cp+=cfe.potential;
+    const cf=_clientFinance(c, financeFilter);
+    const ce=cf.e, cp=cf.p, cDone=cf.doneN, cTotal=cf.totalN;
     // every client added to this zone is shown (even at $0 — you'll mark it here)
     const isSel=financeSelectedCid===c.id;
     clientRows+=`<div onclick="_sfx.play('click');financeSelectedCid='${c.id}';render()" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05);transition:background .15s;background:${isSel?'rgba(var(--accent-rgb),.1)':'none'}">
@@ -78,6 +107,9 @@ function renderFinance(){
       </div>
     </div>`;
   });
+  if(financeFilter==='invoices'){   // invoices aren't tied to clients — show a note instead of the roster
+    clientRows=`<div style="padding:18px;color:var(--text3);font-size:12px;font-family:var(--mono);line-height:1.7">Инвойсы не привязаны к клиентам.<br>Сумма за инвойсы — в карточке выше.<br>Список — во вкладке «Инвойсы».</div>`;
+  }
   const detailHtml=financeSelectedCid?renderFinanceDetail(financeSelectedCid,financeScope):'<div style="color:var(--text3);font-size:13px;padding:24px;text-align:center;font-family:var(--mono)">← выбери клиента</div>';
   // Mobile: the side-by-side grid stacks, so a selected client's report ends up
   // far below the list. Show it full-width with a back button instead.
@@ -93,11 +125,12 @@ function renderFinance(){
     </div>`;
   }
     return `<div style="max-width:860px"><div class="section-header" style="margin-bottom:12px;align-items:center;gap:10px"><h2>Финансы 💰</h2><span style="font-family:var(--mono);font-size:12px;color:var(--text3)">${_finZoneLabel()}</span></div>
+    ${filterRow}
     <div class="earn-card" style="background:linear-gradient(135deg,rgba(var(--accent-rgb),.1),rgba(48,209,88,.05));border:1px solid rgba(var(--accent-rgb),.2);border-radius:22px;padding:18px 22px;margin-bottom:16px;display:flex;gap:28px;align-items:center;flex-wrap:wrap">
       <div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Заработано</div><div style="font-size:30px;font-weight:700;color:var(--green);line-height:1">$${totalWithInv.toFixed(2)}</div></div>
       <div style="width:1px;height:40px;background:rgba(255,255,255,.1)"></div>
       <div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Максимум</div><div style="font-size:30px;font-weight:700;color:var(--text);line-height:1">$${totalPotentialWithInv.toFixed(2)}</div></div>
-      <div style="flex:1;min-width:150px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:11px;color:var(--text3);font-family:var(--mono)">выполнено</span><span style="font-size:11px;color:var(--green);font-family:var(--mono);font-weight:600">${earnPct}%</span></div><div style="height:5px;background:rgba(255,255,255,.08);border-radius:12px;overflow:hidden"><div style="width:${earnPct}%;height:100%;background:var(--green);border-radius:12px;box-shadow:0 0 6px var(--green-glow)"></div></div><div style="margin-top:5px;font-size:11px;color:var(--text3);font-family:var(--mono)">осталось: <span style="color:var(--amber)">$${(totalPotentialWithInv-totalWithInv).toFixed(2)}</span>${invTotal>0?` <span style="color:var(--text3)">+$${invTotal.toFixed(2)} инвойсы</span>`:""}</div></div>
+      <div style="flex:1;min-width:150px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:11px;color:var(--text3);font-family:var(--mono)">выполнено</span><span style="font-size:11px;color:var(--green);font-family:var(--mono);font-weight:600">${earnPct}%</span></div><div style="height:5px;background:rgba(255,255,255,.08);border-radius:12px;overflow:hidden"><div style="width:${earnPct}%;height:100%;background:var(--green);border-radius:12px;box-shadow:0 0 6px var(--green-glow)"></div></div><div style="margin-top:5px;font-size:11px;color:var(--text3);font-family:var(--mono)">осталось: <span style="color:var(--amber)">$${(totalPotentialWithInv-totalWithInv).toFixed(2)}</span>${(financeFilter==='all'&&invTotal>0)?` <span style="color:var(--text3)">+$${invTotal.toFixed(2)} инвойсы</span>`:""}</div></div>
     </div>
     <div style="display:grid;grid-template-columns:260px 1fr;gap:12px;align-items:start">
       <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:20px;overflow:hidden">${clientRows}</div>

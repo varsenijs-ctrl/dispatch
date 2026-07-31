@@ -14,8 +14,8 @@ function updateSidebar(){
     const hist=historyData[c.name]||{};
     const cidSms=_sdSms[c.id]||{};
     Object.entries(hist).forEach(([iso,v])=>{
-      if(!_markInActiveZone(c.id, iso)) return;   // same zone rule as Finance — counts don't jump/mismatch
-      if(v==='yes'||v==='draft'){
+      if(iso.slice(0,7)!==activeMonth) return;   // ONLY the active zone's month — no calendar-drift, no neighbour-month bleed
+      if(v==='yes'||v==='draft'){                // sent + drafted only (never 'no')
         em++;
         if(cidSms[iso]) sm++;
       }

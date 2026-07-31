@@ -15,10 +15,9 @@ function updateSidebar(){
     const cidSms=_sdSms[c.id]||{};
     Object.entries(hist).forEach(([iso,v])=>{
       if(iso.slice(0,7)!==activeMonth) return;   // ONLY the active zone's month — no calendar-drift, no neighbour-month bleed
-      if(v==='yes'||v==='draft'){                // sent + drafted only (never 'no')
-        em++;
-        if(cidSms[iso]) sm++;
-      }
+      if(!v) return;                             // every marked day counts (yes/draft/no) — all emails/SMS of this zone
+      em++;
+      if(cidSms[iso]) sm++;
     });
   });
   const _em=document.getElementById('s-email-month'); if(_em)_em.textContent=em;

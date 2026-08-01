@@ -12,7 +12,7 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-07-31T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-08-01T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
@@ -49,28 +49,12 @@
       "prio": 0
     },
     {
-      "id": "869e9k02z",
-      "name": "Healthy Living Co | Build campaigns",
-      "list": "Healthy Living Co",
-      "start": "",
-      "due": "1785272400000",
-      "prio": 0
-    },
-    {
       "id": "869e8jy0a",
       "name": "enhancedscents | Publish campaigns",
       "list": "enhancedscents",
       "start": "",
       "due": "1785358800000",
       "prio": 0
-    },
-    {
-      "id": "869eb44b2",
-      "name": "Revair | Subscription Payment Due Email Batch - Build",
-      "list": "Revair",
-      "start": "",
-      "due": "1785369600000",
-      "prio": 4
     },
     {
       "id": "869eb0yje",
@@ -110,6 +94,14 @@
       "list": "BareRitual",
       "start": "",
       "due": "1785459600000",
+      "prio": 0
+    },
+    {
+      "id": "869eca52n",
+      "name": "Ozzy | Publish emails",
+      "list": "Ozzy",
+      "start": "1785459600000",
+      "due": "1785618000000",
       "prio": 0
     },
     {

@@ -12,7 +12,7 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-08-03T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-08-04T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
@@ -65,22 +65,6 @@
       "prio": 0
     },
     {
-      "id": "869eb1wh9",
-      "name": "BloomieBlankets | Publishing",
-      "list": "BloomieBlankets",
-      "start": "",
-      "due": "1785459600000",
-      "prio": 0
-    },
-    {
-      "id": "869e9ugxz",
-      "name": "BareRitual | Publish campaigns",
-      "list": "BareRitual",
-      "start": "",
-      "due": "1785459600000",
-      "prio": 0
-    },
-    {
       "id": "869eca52n",
       "name": "Ozzy | Publish emails",
       "list": "Ozzy",
@@ -102,6 +86,38 @@
       "list": "Kerablend",
       "start": "",
       "due": "1785718800000",
+      "prio": 0
+    },
+    {
+      "id": "869ed2cfz",
+      "name": "Pokesource | Edit Campaign Emails 13, 15, 19 in Figma",
+      "list": "pokesource",
+      "start": "1785726000000",
+      "due": "1785812400000",
+      "prio": 3
+    },
+    {
+      "id": "869ed30qb",
+      "name": "Revair | Review Collection Step - Addition to Post Purchase Flow - Publish",
+      "list": "Revair",
+      "start": "",
+      "due": "1785974400000",
+      "prio": 0
+    },
+    {
+      "id": "869ed2yk5",
+      "name": "Revair | Subscription Flow - Publish",
+      "list": "Revair",
+      "start": "",
+      "due": "1786060800000",
+      "prio": 0
+    },
+    {
+      "id": "869ed3cjf",
+      "name": "Lunavo | Publish campaigns",
+      "list": "Lunavo",
+      "start": "",
+      "due": "1786064400000",
       "prio": 0
     }
   ]/*RAW_END*/;

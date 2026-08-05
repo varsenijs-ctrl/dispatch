@@ -440,6 +440,68 @@ function renderDayToday(){
 
   let html=`<div style="max-width:1040px">`;
 
+  // ── marking list ──────────────────────────────────────────
+  const MF=[['all','Все',ac.length],['left','Осталось',leftCl.length],['done','Готово',doneCl.length],['overdue','Просрочки',overdueCl.length]];
+  if(!MF.some(f=>f[0]===dayMarkFilter)) dayMarkFilter='all';
+  html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">`+
+    MF.map(f=>`<button class="dpill ${dayMarkFilter===f[0]?'active':''}" onclick="dayMarkFilter='${f[0]}';render()">${f[1]}<span class="n">${f[2]}</span></button>`).join('')+
+    `<div style="flex:1"></div><button class="dbtn dbtn-sm" onclick="setView('today')" title="Сетка-календарь всех клиентов">▦ сетка</button></div>`;
+
+  if(overdueCl.length){
+    const names=overdueCl.slice(0,4).map(c=>esc(c.name)+' ('+fmtDate(new Date(c.deadline+'T00:00:00')).slice(0,5)+')').join(', ');
+    html+=`<div style="display:flex;align-items:center;gap:11px;padding:12px 16px;border-radius:16px;background:linear-gradient(180deg,rgba(255,69,58,.18),rgba(255,69,58,.08));border:1px solid rgba(255,69,58,.22);margin-bottom:14px;box-shadow:0 1px 0 rgba(255,255,255,.08) inset">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff453a" stroke-width="2" stroke-linecap="round" style="flex:none"><path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+      <div style="font-size:13px;color:#ff8078;font-weight:540">${overdueCl.length} просрочк${overdueCl.length===1?'а':overdueCl.length<5?'и':''}: ${names}${overdueCl.length>4?' …':''}</div>
+    </div>`;
+  }
+
+  const shown = dayMarkFilter==='left'?leftCl : dayMarkFilter==='done'?doneCl : dayMarkFilter==='overdue'?overdueCl : ac;
+  if(!ac.length){
+    html+=`<div class="dcard dcard-p" style="text-align:center;padding:30px 20px;color:var(--text3);font-family:var(--mono);font-size:13px;line-height:1.7">В зоне «${_finZoneLabel()}» нет клиентов.<br>Добавь их на вкладке «Клиенты».<br><button class="dbtn dbtn-primary" style="margin-top:14px" onclick="setView('clients')">→ Клиенты</button></div>`;
+  } else if(!shown.length){
+    html+=`<div class="dcard dcard-p" style="text-align:center;padding:28px;color:var(--text3);font-family:var(--mono);font-size:13px">Здесь пусто.</div>`;
+  } else {
+    html+=`<div class="dcard" style="overflow:hidden;margin-bottom:22px">`;
+    shown.forEach(c=>{
+      const mk=markOf(c);
+      const dot=mk==='yes'?'var(--green)':mk==='draft'?'#bf5af2':mk==='no'?'var(--red)':'rgba(255,255,255,.22)';
+      const halo=mk==='yes'?'rgba(48,209,88,.18)':mk==='draft'?'rgba(191,90,242,.18)':mk==='no'?'rgba(255,69,58,.18)':'rgba(255,255,255,.06)';
+      const exp=dayExpandedCid===c.id;
+      const nFlows=getFlows(c.id).length;
+      const meta=[];
+      if(c.deadline){ const dl=new Date(c.deadline+'T00:00:00'); meta.push((c.deadline<iso?'просрочен ':'дедлайн ')+dl.getDate()+' '+_MSHORT[dl.getMonth()]); }
+      // отметки ЭТОЙ зоны (отправлено + черновики) — та же логика, что в сайдбаре и Финансах,
+      // иначе у клиента с одними черновиками показывалось «0 отправлено»
+      const zHist=historyData[c.name]||{};
+      let zSent=0, zDraft=0;
+      Object.keys(zHist).forEach(k=>{ if(!_markInActiveZone(c.id,k))return; if(zHist[k]==='yes')zSent++; else if(zHist[k]==='draft')zDraft++; });
+      meta.push(zSent+' отправлено'+(zDraft?' · '+zDraft+' черновик'+(zDraft>=2&&zDraft<=4?'а':zDraft>=5?'ов':''):''));
+      if(nFlows) meta.push(nFlows+' флоу');
+      if(c.paused) meta.push('на паузе');
+      const pay=(mk==='yes'||mk==='draft')?('$'+rateOf(c).toFixed(2)):'—';
+      const payCol=(mk==='yes'||mk==='draft')?'var(--green)':'var(--text3)';
+      const smsChip=c.smsEnabled?`<div class="dchip dchip-sms">SMS</div>`:'';
+      const seg=[['yes','Да','on-yes'],['draft','Черновик','on-draft'],['no','Нет','on-no']].map(o=>
+        `<button class="${mk===o[0]?'on '+o[2]:''}" onclick="event.stopPropagation();_setDayMark('${c.id}','${iso}','${o[0]}')" title="${mk===o[0]?'Нажми ещё раз, чтобы снять':''}">${o[1]}</button>`).join('');
+      html+=`<div style="border-bottom:1px solid rgba(255,255,255,.05)">
+        <div class="dclient-row" onclick="_dayToggleExpand('${c.id}')" style="display:flex;align-items:center;gap:13px;padding:13px 17px;cursor:pointer;${c.paused?'opacity:.5;':''}">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.32)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="flex:none;transition:transform .2s ease;transform:rotate(${exp?90:0}deg)"><path d="M9 6l6 6-6 6"/></svg>
+          <div style="width:8px;height:8px;border-radius:980px;flex:none;background:${dot};box-shadow:0 0 0 3px ${halo}"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13.5px;font-weight:540;letter-spacing:-.15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</div>
+            <div class="dmeta" style="margin-top:3px">${meta.join(' · ')}</div>
+          </div>
+          ${smsChip}
+          <div class="dseg">${seg}</div>
+          <div style="font-family:var(--mono);font-size:12.5px;font-weight:600;width:48px;flex:none;text-align:right;color:${payCol}">${pay}</div>
+        </div>
+        ${exp?_dayInlineCalendar(c):''}
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
+
   // ── tasks (kept from the old tab, restyled) ───────────────
   const tasks=load('dc_plantasks',{});
   const todEmoji={morning:'🌅',day:'☀️',evening:'🌇',night:'🌙'};
@@ -523,67 +585,6 @@ function renderDayToday(){
         <div onclick="toggleDayTask('${t.id}');render()" style="width:16px;height:16px;border-radius:6px;background:var(--green);display:flex;align-items:center;justify-content:center;flex:none;cursor:pointer"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#06371a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
         <div style="flex:1;display:flex;align-items:center;flex-wrap:wrap;gap:6px"><span style="font-size:13px;text-decoration:line-through;color:var(--text3)">${esc(t.text)}</span>${cb}</div>
         <button class="dicon" onclick="event.stopPropagation();removeDayTask('${t.id}');render()" title="Удалить">✕</button>
-      </div>`;
-    });
-    html+=`</div>`;
-  }
-
-  // ── marking list ──────────────────────────────────────────
-  const MF=[['all','Все',ac.length],['left','Осталось',leftCl.length],['done','Готово',doneCl.length],['overdue','Просрочки',overdueCl.length]];
-  if(!MF.some(f=>f[0]===dayMarkFilter)) dayMarkFilter='all';
-  html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">`+
-    MF.map(f=>`<button class="dpill ${dayMarkFilter===f[0]?'active':''}" onclick="dayMarkFilter='${f[0]}';render()">${f[1]}<span class="n">${f[2]}</span></button>`).join('')+
-    `<div style="flex:1"></div><button class="dbtn dbtn-sm" onclick="setView('today')" title="Сетка-календарь всех клиентов">▦ сетка</button></div>`;
-
-  if(overdueCl.length){
-    const names=overdueCl.slice(0,4).map(c=>esc(c.name)+' ('+fmtDate(new Date(c.deadline+'T00:00:00')).slice(0,5)+')').join(', ');
-    html+=`<div style="display:flex;align-items:center;gap:11px;padding:12px 16px;border-radius:16px;background:linear-gradient(180deg,rgba(255,69,58,.18),rgba(255,69,58,.08));border:1px solid rgba(255,69,58,.22);margin-bottom:14px;box-shadow:0 1px 0 rgba(255,255,255,.08) inset">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff453a" stroke-width="2" stroke-linecap="round" style="flex:none"><path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
-      <div style="font-size:13px;color:#ff8078;font-weight:540">${overdueCl.length} просрочк${overdueCl.length===1?'а':overdueCl.length<5?'и':''}: ${names}${overdueCl.length>4?' …':''}</div>
-    </div>`;
-  }
-
-  const shown = dayMarkFilter==='left'?leftCl : dayMarkFilter==='done'?doneCl : dayMarkFilter==='overdue'?overdueCl : ac;
-  if(!ac.length){
-    html+=`<div class="dcard dcard-p" style="text-align:center;padding:30px 20px;color:var(--text3);font-family:var(--mono);font-size:13px;line-height:1.7">В зоне «${_finZoneLabel()}» нет клиентов.<br>Добавь их на вкладке «Клиенты».<br><button class="dbtn dbtn-primary" style="margin-top:14px" onclick="setView('clients')">→ Клиенты</button></div>`;
-  } else if(!shown.length){
-    html+=`<div class="dcard dcard-p" style="text-align:center;padding:28px;color:var(--text3);font-family:var(--mono);font-size:13px">Здесь пусто.</div>`;
-  } else {
-    html+=`<div class="dcard" style="overflow:hidden;margin-bottom:22px">`;
-    shown.forEach(c=>{
-      const mk=markOf(c);
-      const dot=mk==='yes'?'var(--green)':mk==='draft'?'#bf5af2':mk==='no'?'var(--red)':'rgba(255,255,255,.22)';
-      const halo=mk==='yes'?'rgba(48,209,88,.18)':mk==='draft'?'rgba(191,90,242,.18)':mk==='no'?'rgba(255,69,58,.18)':'rgba(255,255,255,.06)';
-      const exp=dayExpandedCid===c.id;
-      const nFlows=getFlows(c.id).length;
-      const meta=[];
-      if(c.deadline){ const dl=new Date(c.deadline+'T00:00:00'); meta.push((c.deadline<iso?'просрочен ':'дедлайн ')+dl.getDate()+' '+_MSHORT[dl.getMonth()]); }
-      // отметки ЭТОЙ зоны (отправлено + черновики) — та же логика, что в сайдбаре и Финансах,
-      // иначе у клиента с одними черновиками показывалось «0 отправлено»
-      const zHist=historyData[c.name]||{};
-      let zSent=0, zDraft=0;
-      Object.keys(zHist).forEach(k=>{ if(!_markInActiveZone(c.id,k))return; if(zHist[k]==='yes')zSent++; else if(zHist[k]==='draft')zDraft++; });
-      meta.push(zSent+' отправлено'+(zDraft?' · '+zDraft+' черновик'+(zDraft>=2&&zDraft<=4?'а':zDraft>=5?'ов':''):''));
-      if(nFlows) meta.push(nFlows+' флоу');
-      if(c.paused) meta.push('на паузе');
-      const pay=(mk==='yes'||mk==='draft')?('$'+rateOf(c).toFixed(2)):'—';
-      const payCol=(mk==='yes'||mk==='draft')?'var(--green)':'var(--text3)';
-      const smsChip=c.smsEnabled?`<div class="dchip dchip-sms">SMS</div>`:'';
-      const seg=[['yes','Да','on-yes'],['draft','Черновик','on-draft'],['no','Нет','on-no']].map(o=>
-        `<button class="${mk===o[0]?'on '+o[2]:''}" onclick="event.stopPropagation();_setDayMark('${c.id}','${iso}','${o[0]}')" title="${mk===o[0]?'Нажми ещё раз, чтобы снять':''}">${o[1]}</button>`).join('');
-      html+=`<div style="border-bottom:1px solid rgba(255,255,255,.05)">
-        <div class="dclient-row" onclick="_dayToggleExpand('${c.id}')" style="display:flex;align-items:center;gap:13px;padding:13px 17px;cursor:pointer;${c.paused?'opacity:.5;':''}">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.32)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="flex:none;transition:transform .2s ease;transform:rotate(${exp?90:0}deg)"><path d="M9 6l6 6-6 6"/></svg>
-          <div style="width:8px;height:8px;border-radius:980px;flex:none;background:${dot};box-shadow:0 0 0 3px ${halo}"></div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:13.5px;font-weight:540;letter-spacing:-.15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</div>
-            <div class="dmeta" style="margin-top:3px">${meta.join(' · ')}</div>
-          </div>
-          ${smsChip}
-          <div class="dseg">${seg}</div>
-          <div style="font-family:var(--mono);font-size:12.5px;font-weight:600;width:48px;flex:none;text-align:right;color:${payCol}">${pay}</div>
-        </div>
-        ${exp?_dayInlineCalendar(c):''}
       </div>`;
     });
     html+=`</div>`;

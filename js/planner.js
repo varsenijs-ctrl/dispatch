@@ -1,22 +1,100 @@
+// ── Планировщик — 3 колонки дней (по макету) + месяц ─────────
+// Колонки: сегодня / завтра / послезавтра. Карточку можно перетащить в другую
+// колонку — задача переедет на этот день. Ниже — месячный календарь (как был).
+function _dropToDay(el,e,iso){
+  e.preventDefault(); el.style.background='';
+  if(_dragId){ const id=_dragId; _dragId=null; moveTask(id,iso); }
+}
+function _dayOverCol(el,e){ e.preventDefault(); el.style.background='rgba(64,203,224,.06)'; }
+function _dayLeaveCol(el){ el.style.background=''; }
 function renderPlanner(){
   if(typeof plannerMonth==='undefined')window.plannerMonth=new Date(getTODAY().getFullYear(),getTODAY().getMonth(),1);
-  const y=plannerMonth.getFullYear(),m=plannerMonth.getMonth();
-  const daysInMonth=new Date(y,m+1,0).getDate();
-  const firstDow=new Date(y,m,1).getDay();const offset=(firstDow+6)%7;
-  const tasks=load('dc_plantasks',{});const byDate={};
-  Object.values(tasks).forEach(t=>{if(_isTaskClientPaused(t))return;if(!byDate[t.startIso])byDate[t.startIso]=[];byDate[t.startIso].push(t);});
-  const mn=MONTHS_RU[m]+' '+y;
-  let html=`<div class="section-header"><h2>Планировщик</h2></div><div class="pcal-nav"><button class="pcal-nav-btn" onclick="shiftPlannerMonth(-1)">‹</button><div class="pcal-month-label">${mn}</div><button class="pcal-nav-btn" onclick="shiftPlannerMonth(1)">›</button><button class="pcal-nav-btn" onclick="shiftPlannerMonth(0)" style="width:auto;padding:0 8px;font-size:11px;font-family:var(--mono)">сегодня</button></div><div class="pcal-grid">${['пн','вт','ср','чт','пт','сб','вс'].map(d=>`<div class="pcal-dow">${d}</div>`).join('')}`;
-  for(let i=0;i<offset;i++)html+=`<div></div>`;
-  for(let d=1;d<=daysInMonth;d++){
-    const iso=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const isToday=iso===isoToday();const dayTasks=byDate[iso]||[];
-    const show=dayTasks.slice(0,3);const more=dayTasks.length-3;
-    const overdueCount = dayTasks.filter(_overdue).length;
-    html+=`<div class="pcal-cell${isToday?' today':''}${overdueCount?' overdue':''}${dayTasks.length?' has-tasks':''}" onclick="openDayModal('${iso}')" style="${overdueCount?'border-color:rgba(255,69,58,.3);background:rgba(255,69,58,.04)':''}"><div class="pcal-cell-num" style="${overdueCount?'color:var(--red)':''}">${d}${overdueCount?` <span style="font-size:9px">⚠</span>`:''}</div>${show.map(t=>`<div class="pcal-pill ${_overdue(t)?'type-overdue':'type-plan'}" title="${esc(t.text||t.name)}">${esc((t.text||t.name).slice(0,12))}</div>`).join('')}${more>0?`<div class="pcal-pill type-more">+${more}</div>`:''}</div>`;
+  const iso=isoToday();
+  const tasks=load('dc_plantasks',{});
+  const PRIO={4:['СРОЧНО','var(--red)','rgba(255,69,58,.16)'],3:['ВЫСОКИЙ','#ffe066','rgba(255,214,10,.16)'],2:['СРЕДНИЙ','#5eb0ff','rgba(10,132,255,.16)'],1:['НИЗКИЙ','var(--text3)','rgba(255,255,255,.08)']};
+
+  // ── three day columns ──
+  let cols='';
+  for(let i=0;i<3;i++){
+    const dt=new Date(getTODAY()); dt.setDate(dt.getDate()+i);
+    const dIso=toISO(dt);
+    const title=i===0?'Сегодня':i===1?'Завтра':(_DFULL[dt.getDay()].charAt(0).toUpperCase()+_DFULL[dt.getDay()].slice(1));
+    // tasks of that day + anything carried over (unfinished, still within its «до»)
+    const list=Object.values(tasks).filter(t=>{
+      if(t.flowId||_isTaskClientPaused(t)) return false;
+      if(t.startIso===dIso) return true;
+      return !t.done&&t.startIso<dIso&&t.until&&t.until>=dIso;
+    }).sort((a,b)=>(+b.prio||0)-(+a.prio||0)||((a.sortOrder==null?1e9:a.sortOrder)-(b.sortOrder==null?1e9:b.sortOrder)));
+    let items='';
+    list.forEach(t=>{
+      const over=_overdue(t);
+      const pr=PRIO[+t.prio||0];
+      const carried=t.startIso<dIso;
+      const chip=pr?`<span style="font-size:9.5px;font-weight:660;letter-spacing:.4px;padding:2px 7px;border-radius:980px;background:${pr[2]};color:${pr[1]}">${pr[0]}</span>`:'';
+      const cl=t.clientName?`<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${esc(t.clientName)}</span>`:'';
+      const carr=carried?`<span style="font-family:var(--mono);font-size:10px;color:${over?'var(--red)':'#ffe066'}">⤷ с ${fmtDate(new Date(t.startIso+'T00:00:00')).slice(0,5)}</span>`:'';
+      const dl=t.deadline?`<span style="font-family:var(--mono);font-size:10px;color:${over?'var(--red)':'#ffe066'}">⏳ ${fmtDate(new Date(t.deadline+'T00:00:00')).slice(0,5)}</span>`:'';
+      items+=`<div data-tid="${t.id}" draggable="true" ondragstart="_startDrag(this,event)" ondragend="_endDrag(this)" ondragover="_dragOver(this,event)" ondragleave="_dragLeave(this)" ondrop="_drop(this,event)"
+        style="display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border-radius:14px;background:${over?'linear-gradient(180deg,rgba(255,69,58,.14),rgba(255,69,58,.05))':'rgba(255,255,255,.05)'};border:1px solid ${over?'rgba(255,69,58,.24)':'rgba(255,255,255,.06)'};cursor:grab;transition:background .15s ease,transform .15s ease;${t.done?'opacity:.45;':''}">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.26)" stroke-width="2.4" stroke-linecap="round" style="margin-top:3px;flex:none"><path d="M4 8h16M4 16h16"/></svg>
+        <div onclick="event.stopPropagation();toggleDayTask('${t.id}');render()" style="width:15px;height:15px;margin-top:2px;border-radius:5px;flex:none;cursor:pointer;${t.done?'background:var(--green);display:flex;align-items:center;justify-content:center':'border:1.5px solid rgba(255,255,255,.22)'}">${t.done?'<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#06371a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>':''}</div>
+        <div style="flex:1;min-width:0">
+          <div ondblclick="event.stopPropagation();_editTask('${t.id}')" style="font-size:12.5px;line-height:1.4;letter-spacing:-.1px;cursor:pointer;${t.done?'text-decoration:line-through;color:var(--text3)':over?'color:#ff8078':''}" title="Двойной клик — редактировать">${esc(t.text||t.name||'')}</div>
+          <div style="display:flex;align-items:center;gap:7px;margin-top:7px;flex-wrap:wrap">${chip}${cl}${carr}${dl}</div>
+        </div>
+        <button class="dicon neutral" onclick="event.stopPropagation();_editTask('${t.id}')" title="Редактировать" style="width:22px;height:22px;font-size:12px">✎</button>
+        <button class="dicon" onclick="event.stopPropagation();removeDayTask('${t.id}');render()" title="Удалить" style="width:22px;height:22px;font-size:12px">✕</button>
+      </div>`;
+    });
+    cols+=`<div class="dcard dcard-p" ondragover="_dayOverCol(this,event)" ondragleave="_dayLeaveCol(this)" ondrop="_dropToDay(this,event,'${dIso}')">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:13px;gap:8px">
+        <div class="dcard-t">${title}</div>
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <div class="dmeta">${fmtDate(dt).slice(0,5)}</div>
+          <button class="dicon neutral" onclick="openDayModal('${dIso}')" title="Добавить задачу на этот день" style="font-size:15px">＋</button>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">${items||'<div class="dmeta" style="padding:6px 0">Нет задач</div>'}</div>
+    </div>`;
   }
-  html+=`</div>`;return html;
+
+  // ── month calendar (kept: navigation + day modal + overdue marks) ──
+  const y=plannerMonth.getFullYear(), m=plannerMonth.getMonth();
+  const daysInMonth=new Date(y,m+1,0).getDate();
+  const offset=(new Date(y,m,1).getDay()+6)%7;
+  const byDate={};
+  Object.values(tasks).forEach(t=>{ if(_isTaskClientPaused(t))return; (byDate[t.startIso]=byDate[t.startIso]||[]).push(t); });
+  let cal=`<div class="dcal" style="margin-bottom:6px">${['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС'].map(w=>`<div class="dcal-dow">${w}</div>`).join('')}</div><div class="dcal">`;
+  for(let i=0;i<offset;i++) cal+='<div></div>';
+  for(let d=1;d<=daysInMonth;d++){
+    const dIso=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dayTasks=byDate[dIso]||[];
+    const overdueN=dayTasks.filter(_overdue).length;
+    const isT=dIso===iso;
+    const pills=dayTasks.slice(0,3).map(t=>`<span style="display:block;font-size:9px;line-height:1.35;padding:1px 5px;border-radius:6px;margin-bottom:2px;background:${_overdue(t)?'rgba(255,69,58,.18)':'rgba(64,203,224,.14)'};color:${_overdue(t)?'#ff8078':'var(--accent)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(t.text||t.name||'')}">${esc((t.text||t.name||'').slice(0,14))}</span>`).join('');
+    const more=dayTasks.length>3?`<span style="font-size:9px;color:var(--text3);font-family:var(--mono)">+${dayTasks.length-3}</span>`:'';
+    cal+=`<div onclick="openDayModal('${dIso}')" style="min-height:74px;border-radius:14px;padding:7px 7px 6px;cursor:pointer;text-align:left;
+      background:${overdueN?'rgba(255,69,58,.07)':'rgba(255,255,255,.035)'};border:1.5px solid ${isT?'var(--accent)':overdueN?'rgba(255,69,58,.28)':'rgba(255,255,255,.05)'};transition:background .15s"
+      onmouseover="this.style.background='rgba(255,255,255,.07)'" onmouseout="this.style.background='${overdueN?'rgba(255,69,58,.07)':'rgba(255,255,255,.035)'}'">
+      <div style="font-family:var(--mono);font-size:11px;font-weight:600;margin-bottom:4px;color:${isT?'var(--accent)':overdueN?'#ff8078':'var(--text3)'}">${d}${overdueN?' ⚠':''}</div>
+      ${pills}${more}</div>`;
+  }
+  cal+='</div>';
+
+  return `<div style="max-width:1040px">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:22px">${cols}</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+      <div class="dcard-t" style="font-size:16px">${MONTHS_RU[m]} ${y}</div>
+      <div style="flex:1"></div>
+      <button class="dbtn dbtn-sm" onclick="shiftPlannerMonth(-1)">‹ назад</button>
+      <button class="dbtn dbtn-sm" onclick="shiftPlannerMonth(0)">сегодня</button>
+      <button class="dbtn dbtn-sm" onclick="shiftPlannerMonth(1)">вперёд ›</button>
+      <button class="dbtn dbtn-primary dbtn-sm" onclick="openDayModal('${iso}')">+ задача</button>
+    </div>
+    <div class="dcard" style="padding:16px">${cal}</div>
+  </div>`;
 }
+
 function shiftPlannerMonth(delta){
   if(delta===0)window.plannerMonth=new Date(getTODAY().getFullYear(),getTODAY().getMonth(),1);
   else window.plannerMonth=new Date(plannerMonth.getFullYear(),plannerMonth.getMonth()+delta,1);

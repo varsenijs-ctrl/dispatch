@@ -1,189 +1,181 @@
+// ── Флоу — карточки клиентов сеткой (по макету) ───────────────
+// Сохранено: статистика, вкладки Сегодня/История, баннер просрочек, отметка
+// «выставлен», «все флоу», добавление/удаление флоу, дедлайн, чипы задач.
 function renderFlows(){
-  var iso=isoToday();
-  var tasks=load('dc_plantasks',{});
-  var ac=_zac().sort(function(a,b){return a.name.localeCompare(b.name,'ru');});   // only THIS zone's clients
+  const iso=isoToday();
+  const tasks=load('dc_plantasks',{});
+  const ac=_zac().sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+  const ICON='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#d08bf5" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M6 3v12M18 9a3 3 0 100-6 3 3 0 000 6zM6 21a3 3 0 100-6 3 3 0 000 6zM15 6H9a3 3 0 00-3 3v3"/></svg>';
 
-  // Per-zone flow accounting: a flow issued in THIS zone counts here; a flow never
-  // issued anywhere is still "to do"; a flow issued in ANOTHER zone belongs there and
-  // is ignored (so June-issued flows don't inflate July's potential).
-  var totalDone=0,totalPlanned=0,totalEarned=0,totalPotential=0;
-  ac.forEach(function(c){
-    getFlows(c.id).forEach(function(f){
-      var ft=Object.values(tasks).filter(function(t){return t.cid===c.id&&t.flowId===f.id;});
-      var doneInZone=ft.some(function(t){return t.done&&_markInActiveZone(c.id, t.startIso);});
-      var doneAnywhere=ft.some(function(t){return t.done;});
-      var val=f.count*0.60;
+  let totalDone=0,totalPlanned=0,totalEarned=0,totalPotential=0;
+  ac.forEach(c=>{
+    getFlows(c.id).forEach(f=>{
+      const ft=Object.values(tasks).filter(t=>t.cid===c.id&&t.flowId===f.id);
+      const doneInZone=ft.some(t=>t.done&&_markInActiveZone(c.id,t.startIso));
+      const doneAnywhere=ft.some(t=>t.done);
+      const val=f.count*0.60;
       if(doneInZone){ totalDone++; totalPlanned++; totalEarned+=val; totalPotential+=val; }
-      else if(!doneAnywhere){ totalPlanned++; totalPotential+=val; }   // pending → still to issue
+      else if(!doneAnywhere){ totalPlanned++; totalPotential+=val; }
     });
   });
 
-  var h='<div style="max-width:860px">';
-
-  h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">';
-  [['Выставлено',totalDone+' / '+totalPlanned,'var(--amber)'],
-   ['Заработано','$'+totalEarned.toFixed(2),'var(--green)'],
-   ['Максимум','$'+totalPotential.toFixed(2),'var(--text)']].forEach(function(r){
-    h+='<div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);border-radius:20px;padding:16px 18px">';
-    h+='<div style="font-size:11px;color:var(--text3);'+MONO+';text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">'+r[0]+'</div>';
-    h+='<div style="font-size:28px;font-weight:700;color:'+r[2]+'">'+r[1]+'</div></div>';
-  });
-  h+='</div>';
-
-  h+='<div style="display:flex;gap:8px;margin-bottom:20px">';
-  ['today','history'].forEach(function(t){
-    var label=t==='today'?'Сегодня':'История';
-    var active=_flowsTab===t;
-    h+='<button onclick="_flowsTab=\''+t+'\';render()" style="padding:7px 18px;border-radius:24px;border:1px solid '+(active?'rgba(var(--accent-rgb),.5)':'rgba(255,255,255,.12)')+';background:'+(active?'rgba(var(--accent-rgb),.15)':'rgba(255,255,255,.04)')+';color:'+(active?'var(--accent)':'var(--text3)')+';font-family:Inter,sans-serif;font-size:12px;font-weight:'+(active?'600':'400')+';cursor:pointer">'+label+'</button>';
-  });
-  h+='</div>';
+  let h=`<div style="max-width:1040px">
+    <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      ${[['Выставлено',totalDone+' / '+totalPlanned,'#d08bf5'],['Заработано','$'+totalEarned.toFixed(2),'var(--green)'],['Максимум','$'+totalPotential.toFixed(2),'var(--text)']].map(r=>
+        `<div class="dcard" style="flex:1;min-width:150px;padding:15px 18px"><div class="dcaps">${r[0]}</div><div class="dnum" style="font-size:28px;letter-spacing:-1.1px;margin-top:7px;color:${r[2]}">${r[1]}</div></div>`).join('')}
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <button class="dpill ${_flowsTab==='today'?'active':''}" onclick="_flowsTab='today';render()">Сегодня</button>
+      <button class="dpill ${_flowsTab==='history'?'active':''}" onclick="_flowsTab='history';render()">История</button>
+      <div style="flex:1"></div>
+      <button class="dbtn dbtn-sm" onclick="setView('clients')" title="Флоу добавляются у клиента">+ флоу у клиента</button>
+    </div>`;
 
   if(_flowsTab==='today'){
-    // ── СЕГОДНЯ: checkboxes ────────────────────────────────
-    var overdueItems=[];
-    ac.forEach(function(c){
-      getFlows(c.id).forEach(function(f){
-        if(!f.deadline||f.deadline>=iso) return;
-        var issued=Object.values(tasks).some(function(t){return t.cid===c.id&&t.flowId===f.id&&t.done;});
-        if(!issued) overdueItems.push({c:c,f:f});
-      });
-    });
+    // overdue banner
+    const overdueItems=[];
+    ac.forEach(c=>getFlows(c.id).forEach(f=>{
+      if(!f.deadline||f.deadline>=iso) return;
+      const issued=Object.values(tasks).some(t=>t.cid===c.id&&t.flowId===f.id&&t.done);
+      if(!issued) overdueItems.push({c:c,f:f});
+    }));
     if(overdueItems.length){
-      h+='<div style="background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.2);border-radius:20px;margin-bottom:16px;overflow:hidden">';
-      h+='<div style="padding:12px 18px;border-bottom:1px solid rgba(248,113,113,.15);font-size:12px;font-weight:600;color:var(--red)">⚠ Просрочено — '+overdueItems.length+' флоу</div>';
-      overdueItems.forEach(function(item){
-        var MONO2="font-family:var(--mono)";
-        h+='<div style="display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid rgba(248,113,113,.08)">';
-        h+='<div onclick="event.stopPropagation();_markFlowDone(this)" data-cid="'+item.c.id+'" data-fid="'+item.f.id+'" ';
-        h+='style="width:26px;height:26px;border-radius:18px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;border:2px solid rgba(248,113,113,.4);background:none">';
-        h+='</div>';
-        h+='<div style="flex:1">';
-        h+='<div style="font-size:13px;font-weight:500">⚡ '+esc(item.f.name)+'</div>';
-        h+='<div style="font-size:11px;color:var(--red);margin-top:2px">'+esc(item.c.name)+' · '+flowDeadlineBadge(item.f.deadline)+'</div>';
-        h+='</div>';
-        h+='<span style="'+MONO+';font-size:12px;color:var(--green);font-weight:600">+$'+(item.f.count*0.60).toFixed(2)+'</span>';
-        h+='</div>';
+      h+=`<div class="dcard" style="background:linear-gradient(180deg,rgba(255,69,58,.18),rgba(255,69,58,.07));border-color:rgba(255,69,58,.22);margin-bottom:14px;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 17px;border-bottom:1px solid rgba(255,69,58,.15)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff453a" stroke-width="2" stroke-linecap="round" style="flex:none"><path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+          <div style="font-size:13px;color:#ff8078;font-weight:540">Просрочено — ${overdueItems.length} флоу</div>
+        </div>`;
+      overdueItems.forEach(it=>{
+        h+=`<div style="display:flex;align-items:center;gap:12px;padding:11px 17px;border-bottom:1px solid rgba(255,69,58,.08)">
+          <div onclick="event.stopPropagation();_markFlowDone(this)" data-cid="${it.c.id}" data-fid="${it.f.id}" title="Отметить выставленным" style="width:22px;height:22px;border-radius:7px;flex:none;cursor:pointer;border:1.5px solid rgba(255,69,58,.45);background:rgba(0,0,0,.2)"></div>
+          <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:540">${esc(it.f.name)}</div><div class="dmeta" style="color:#ff8078;margin-top:2px">${esc(it.c.name)} · ${flowDeadlineBadge(it.f.deadline)}</div></div>
+          <span style="font-family:var(--mono);font-size:12px;color:var(--green);font-weight:600">+$${(it.f.count*0.60).toFixed(2)}</span>
+        </div>`;
       });
-      h+='</div>';
+      h+=`</div>`;
     }
-    var hasAny=false;
-    ac.forEach(function(c){
-      var flows=getFlows(c.id).filter(function(f){
-        // one-time: hide flows already issued (they move to История)
-        var issued=Object.values(tasks).some(function(t){return t.cid===c.id&&t.flowId===f.id&&t.done;});
+
+    // client cards (3-col grid)
+    let cards='', hasAny=false;
+    ac.forEach(c=>{
+      const flows=getFlows(c.id).filter(f=>{
+        const issued=Object.values(tasks).some(t=>t.cid===c.id&&t.flowId===f.id&&t.done);
         if(issued) return false;
-        if(f.deadline&&f.deadline<iso) return false; // overdue shown above
+        if(f.deadline&&f.deadline<iso) return false;   // shown in the banner above
         return true;
       });
       if(!flows.length) return;
       hasAny=true;
-      h+='<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:20px;margin-bottom:12px;overflow:hidden">';
-      h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.06)">';
-      h+='<div style="font-size:14px;font-weight:600">'+esc(c.name)+'</div>';
-      var allDone=flows.every(function(f){
-        return Object.values(tasks).some(function(t){return t.cid===c.id&&t.flowId===f.id&&t.startIso===iso&&t.done;});
+      const sum=flows.reduce((s,f)=>s+f.count*0.60,0);
+      const allDone=flows.every(f=>Object.values(tasks).some(t=>t.cid===c.id&&t.flowId===f.id&&t.startIso===iso&&t.done));
+      let rows='';
+      flows.forEach(f=>{
+        const doneToday=Object.values(tasks).find(t=>t.cid===c.id&&t.flowId===f.id&&t.startIso===iso&&t.done);
+        const pend=Object.values(tasks).filter(t=>t.cid===c.id&&t.flowId===f.id&&!t.done);
+        let chips='';
+        pend.forEach(t=>{ const d=new Date(t.startIso+'T00:00:00');
+          chips+=`<span class="dchip dchip-dim" style="display:inline-flex;align-items:center;gap:3px;font-weight:400">${d.getDate()}.${String(d.getMonth()+1).padStart(2,'0')}<span onclick="event.stopPropagation();_rmTask(this)" data-tid="${t.id}" style="cursor:pointer;color:rgba(255,100,100,.6)">✕</span></span>`;
+        });
+        rows+=`<div style="padding:10px 12px;border-radius:14px;background:linear-gradient(180deg,rgba(191,90,242,.16),rgba(191,90,242,.07));border:1px solid rgba(191,90,242,.18);box-shadow:0 1px 0 rgba(255,255,255,.07) inset">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div onclick="event.stopPropagation();_markFlowDone(this)" data-cid="${c.id}" data-fid="${f.id}" title="${doneToday?'Выставлен сегодня — снять':'Отметить выставленным'}"
+              style="width:20px;height:20px;border-radius:6px;flex:none;cursor:pointer;display:flex;align-items:center;justify-content:center;${doneToday?'background:var(--green)':'border:1.5px solid rgba(255,255,255,.24);background:rgba(0,0,0,.2)'}">
+              ${doneToday?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#06371a" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>':''}
+            </div>
+            ${ICON}
+            <div style="flex:1;min-width:0;font-size:12.5px;letter-spacing:-.1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${doneToday?'color:var(--green)':''}">${esc(f.name)}</div>
+            <div style="font-family:var(--mono);font-size:11.5px;color:var(--text2)">${f.count}✉ · $${(f.count*0.60).toFixed(2)}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap">
+            <input type="date" class="dinput dinput-sm ddate" value="${f.deadline||''}" onchange="event.stopPropagation();_setFlowDl(this)" data-cid="${c.id}" data-fid="${f.id}" title="Дедлайн" style="font-size:10px;padding:3px 6px">
+            ${f.deadline?flowDeadlineBadge(f.deadline):''}
+            ${chips}
+            <div style="flex:1"></div>
+            <button class="dicon" onclick="event.stopPropagation();_dfFlow(this)" data-cid="${c.id}" data-fid="${f.id}" title="Удалить флоу" style="width:22px;height:22px;font-size:12px">✕</button>
+          </div>
+        </div>`;
       });
-      h+='<div style="display:flex;align-items:center;gap:8px">';
-      h+='<button onclick="event.stopPropagation();_markAllFlowsDone(this)" data-cid="'+c.id+'" style="font-size:11px;padding:3px 12px;border-radius:24px;border:1px solid '+(allDone?'rgba(48,209,88,.4)':'rgba(255,255,255,.15)')+';background:'+(allDone?'rgba(48,209,88,.12)':'rgba(255,255,255,.06)')+';color:'+(allDone?'var(--green)':'var(--text2)')+';cursor:pointer;font-family:Inter,sans-serif">'+(allDone?'✓ все':'✓ все флоу')+'</button>';
-      h+='<button onclick="event.stopPropagation();_addFlow(this)" data-cid="'+c.id+'" class="toggle-btn" style="font-size:11px;padding:3px 10px">+ флоу</button>';
-      h+='</div></div>';
-      flows.forEach(function(f){
-        var doneToday=Object.values(tasks).find(function(t){return t.cid===c.id&&t.flowId===f.id&&t.startIso===iso&&t.done;});
-        var fp=Object.values(tasks).filter(function(t){return t.cid===c.id&&t.flowId===f.id&&!t.done;});
-        h+='<div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.04)">';
-        h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">';
-        h+='<div style="font-size:13px;font-weight:500;flex:1">⚡ '+esc(f.name)+(f.deadline?' '+flowDeadlineBadge(f.deadline):'')+'</div>';
-        h+='<div style="'+MONO+';font-size:11px;color:var(--text3)">'+f.count+'✉ · $'+(f.count*0.60).toFixed(2)+'/раз</div>';
-        h+='<input type="date" value="'+(f.deadline||'')+'" onchange="event.stopPropagation();_setFlowDl(this)" data-cid="'+c.id+'" data-fid="'+f.id+'" style="color-scheme:dark;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:14px;color:var(--text3);font-size:10px;padding:3px 6px;cursor:pointer;outline:none" title="Дедлайн">';
-        h+='<button onclick="event.stopPropagation();_dfFlow(this)" data-cid="'+c.id+'" data-fid="'+f.id+'" style="background:none;border:none;color:rgba(255,100,100,.7);cursor:pointer;font-size:16px;padding:0 6px">✕</button>';
-        h+='</div>';
-        h+='<div style="display:flex;align-items:center;gap:12px">';
-        h+='<div onclick="event.stopPropagation();_markFlowDone(this)" data-cid="'+c.id+'" data-fid="'+f.id+'" style="width:26px;height:26px;border-radius:18px;flex-shrink:0;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;border:2px solid '+(doneToday?'rgba(48,209,88,.6)':'rgba(255,255,255,.2)')+';background:'+(doneToday?'rgba(48,209,88,.15)':'none')+'">';
-        if(doneToday) h+='<span style="color:var(--green);font-size:14px;font-weight:700;line-height:1">✓</span>';
-        h+='</div>';
-        h+='<div style="flex:1"><div style="font-size:13px;font-weight:500;color:'+(doneToday?'var(--green)':'var(--text2)')+'">'+( doneToday?'Выставлен сегодня':'Отметить выставленным')+'</div></div>';
-        h+='<span style="'+MONO+';font-size:13px;color:var(--green);font-weight:600">+$'+(f.count*0.60).toFixed(2)+'</span>';
-        h+='</div>';
-        if(fp.length){
-          h+='<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:5px">';
-          fp.forEach(function(t){
-            var d=new Date(t.startIso+'T00:00:00');
-            var ds=d.getDate()+'.'+String(d.getMonth()+1).padStart(2,'0');
-            h+='<div style="display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:14px;background:rgba(var(--accent-rgb),.08);border:1px solid rgba(var(--accent-rgb),.15)">';
-            h+='<span style="'+MONO+';font-size:10px;color:var(--accent)">'+ds+'</span>';
-            h+='<button onclick="event.stopPropagation();_rmTask(this)" data-tid="'+t.id+'" style="background:none;border:none;color:rgba(255,100,100,.5);cursor:pointer;font-size:11px;padding:0 2px">✕</button>';
-            h+='</div>';
-          });
-          h+='</div>';
-        }
-        h+='</div>';
-      });
-      h+='</div>';
+      cards+=`<div class="dcard" style="padding:17px 18px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:13px;gap:8px">
+          <div class="dcard-t" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</div>
+          <div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--green)">$${sum.toFixed(2)}</div>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:11px;flex-wrap:wrap">
+          <button class="dbtn dbtn-sm${allDone?' on':''}" onclick="event.stopPropagation();_markAllFlowsDone(this)" data-cid="${c.id}">${allDone?'✓ все':'✓ все флоу'}</button>
+          <button class="dbtn dbtn-sm" onclick="event.stopPropagation();_addFlow(this)" data-cid="${c.id}">+ флоу</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">${rows}</div>
+      </div>`;
     });
-    if(!hasAny){
-      var emptyMsg = totalPlanned>0
-        ? '<div style="font-size:32px;margin-bottom:12px">🎉</div><div style="font-size:14px">Все флоу выставлены — см. вкладку «История»</div>'
-        : '<div style="font-size:32px;margin-bottom:12px">⚡</div><div style="font-size:14px">Нет флоу — зайди в Клиенты</div>';
-      h+='<div style="text-align:center;padding:60px 20px;color:var(--text3)">'+emptyMsg+'</div>';
-    }
+    if(hasAny) h+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">${cards}</div>`;
+    else h+=`<div class="dcard dcard-p" style="text-align:center;padding:44px 20px;color:var(--text3)">
+      <div style="font-size:30px;margin-bottom:10px">${totalPlanned>0?'🎉':'⚡'}</div>
+      <div style="font-size:14px">${totalPlanned>0?'Все флоу выставлены — смотри «Историю»':'Нет флоу — добавь их у клиента'}</div>
+      <button class="dbtn dbtn-primary" style="margin-top:14px" onclick="setView('clients')">→ Клиенты</button></div>`;
 
   } else {
-    var hm=_flowsHistoryMode||'date';
-    var doneTasks=Object.values(tasks).filter(function(t){return t.flowId&&t.done&&_markInActiveZone(t.cid, t.startIso)&&_inRoster(t.cid);}).sort(function(a,b){return b.startIso.localeCompare(a.startIso);});
-    h+='<div style="display:flex;gap:6px;margin-bottom:16px">';
-    h+='<button onclick="_flowsHistoryMode=this.dataset.m;render()" data-m="date" style="padding:5px 14px;border-radius:20px;cursor:pointer;font-family:Inter,sans-serif;font-size:11px;border:1px solid '+(hm!=='client'?'rgba(var(--accent-rgb),.4)':'rgba(255,255,255,.1)')+';background:'+(hm!=='client'?'rgba(var(--accent-rgb),.12)':'rgba(255,255,255,.04)')+';color:'+(hm!=='client'?'var(--accent)':'var(--text3)')+'">По дате</button>';
-    h+='<button onclick="_flowsHistoryMode=this.dataset.m;render()" data-m="client" style="padding:5px 14px;border-radius:20px;cursor:pointer;font-family:Inter,sans-serif;font-size:11px;border:1px solid '+(hm==='client'?'rgba(var(--accent-rgb),.4)':'rgba(255,255,255,.1)')+';background:'+(hm==='client'?'rgba(var(--accent-rgb),.12)':'rgba(255,255,255,.04)')+';color:'+(hm==='client'?'var(--accent)':'var(--text3)')+'">По клиентам</button>';
-    h+='</div>';
+    // ── История ──
+    const hm=(typeof _flowsHistoryMode!=='undefined'&&_flowsHistoryMode)||'date';
+    const doneTasks=Object.values(tasks).filter(t=>t.flowId&&t.done&&_markInActiveZone(t.cid,t.startIso)&&_inRoster(t.cid)).sort((a,b)=>b.startIso.localeCompare(a.startIso));
+    h+=`<div style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="dpill ${hm!=='client'?'active':''}" onclick="_flowsHistoryMode='date';render()">По дате</button>
+      <button class="dpill ${hm==='client'?'active':''}" onclick="_flowsHistoryMode='client';render()">По клиентам</button>
+    </div>`;
     if(!doneTasks.length){
-      h+='<div style="text-align:center;padding:60px 20px;color:var(--text3)"><div style="font-size:32px;margin-bottom:12px">📋</div><div style="font-size:14px">История пуста</div></div>';
+      h+=`<div class="dcard dcard-p" style="text-align:center;padding:44px 20px;color:var(--text3)"><div style="font-size:30px;margin-bottom:10px">📋</div><div style="font-size:14px">История пуста</div></div>`;
     } else if(hm!=='client'){
-      var byDate={};
-      doneTasks.forEach(function(t){if(!byDate[t.startIso])byDate[t.startIso]=[];byDate[t.startIso].push(t);});
-      Object.keys(byDate).sort(function(a,b){return b.localeCompare(a);}).forEach(function(dateStr){
-        var d=new Date(dateStr+'T00:00:00');
-        var label=dateStr===iso?'Сегодня':d.getDate()+' '+MONTHS_RU[d.getMonth()]+' '+d.getFullYear();
-        h+='<div style="margin-bottom:16px"><div style="font-size:11px;'+MONO+';color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">'+label+'</div>';
-        byDate[dateStr].forEach(function(t){
-          var c=clients.find(function(x){return x.id===t.cid;});
-          var flow=(t.cid?getFlows(t.cid):[]).find(function(f){return f.id===t.flowId;});
-          var val=flow?flow.count*0.60:0;
-          h+='<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:18px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.07);margin-bottom:5px">';
-          h+='<span style="color:var(--green)">✓</span><div style="flex:1"><div style="font-size:13px;font-weight:500">⚡ '+esc(t.text)+'</div>';
-          if(c) h+='<div style="font-size:11px;color:var(--text3)">'+esc(c.name)+'</div>';
-          h+='</div>';
-          if(val) h+='<span style="'+MONO+';font-size:12px;color:var(--green);font-weight:600">+$'+val.toFixed(2)+'</span>';
-          h+='<button onclick="event.stopPropagation();_rmTask(this)" data-tid="'+t.id+'" style="background:none;border:none;color:rgba(255,100,100,.5);cursor:pointer;font-size:14px;padding:0 4px;margin-left:4px">✕</button>';
-          h+='</div>';
+      const byDate={};
+      doneTasks.forEach(t=>{ (byDate[t.startIso]=byDate[t.startIso]||[]).push(t); });
+      h+=`<div style="display:flex;flex-direction:column;gap:10px">`;
+      Object.keys(byDate).sort((a,b)=>b.localeCompare(a)).forEach(ds=>{
+        const d=new Date(ds+'T00:00:00');
+        const label=ds===iso?'Сегодня':d.getDate()+' '+_MSHORT[d.getMonth()]+' '+d.getFullYear();
+        let sum=0, rows='';
+        byDate[ds].forEach(t=>{
+          const c=clients.find(x=>x.id===t.cid);
+          const fl=(t.cid?getFlows(t.cid):[]).find(f=>f.id===t.flowId);
+          const val=fl?fl.count*0.60:0; sum+=val;
+          rows+=`<div class="drow">
+            <div style="width:6px;height:6px;border-radius:980px;flex:none;background:#bf5af2"></div>
+            <div style="flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.text)}${c?` <span class="dmeta">· ${esc(c.name)}</span>`:''}</div>
+            <div style="font-family:var(--mono);font-size:12px;font-weight:600;color:var(--green);width:56px;text-align:right">+$${val.toFixed(2)}</div>
+            <button class="dicon" onclick="event.stopPropagation();_rmTask(this)" data-tid="${t.id}" title="Удалить">✕</button>
+          </div>`;
         });
-        h+='</div>';
+        h+=`<div class="dcard" style="padding:16px 19px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px"><div class="dcard-t">${label}</div><div class="dnum" style="font-size:15px;letter-spacing:-.4px;color:var(--green)">$${sum.toFixed(2)}</div></div>
+          <div style="display:flex;flex-direction:column;gap:2px">${rows}</div></div>`;
       });
+      h+=`</div>`;
     } else {
-      var byClient={};
-      doneTasks.forEach(function(t){var key=t.cid||'x';if(!byClient[key])byClient[key]=[];byClient[key].push(t);});
-      Object.keys(byClient).forEach(function(cid){
-        var c=clients.find(function(x){return x.id===cid;});
-        var ctasks=byClient[cid];
-        var ctotal=ctasks.reduce(function(s,t){var fl=(c?getFlows(cid):[]).find(function(f){return f.id===t.flowId;});return s+(fl?fl.count*0.60:0);},0);
-        h+='<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:20px;margin-bottom:12px;overflow:hidden">';
-        h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06)"><div style="font-size:13px;font-weight:600">'+(c?esc(c.name):'Без клиента')+'</div><div style="'+MONO+';font-size:12px;color:var(--green)">$'+ctotal.toFixed(2)+'</div></div>';
-        ctasks.forEach(function(t){
-          var d=new Date(t.startIso+'T00:00:00');
-          var ds=d.getDate()+' '+MONTHS_RU[d.getMonth()];
-          var fl=(c?getFlows(cid):[]).find(function(f){return f.id===t.flowId;});
-          var val=fl?fl.count*0.60:0;
-          h+='<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.04)">';
-          h+='<span style="color:var(--green)">✓</span><div style="flex:1;font-size:13px;font-weight:500">⚡ '+esc(t.text)+'</div>';
-          h+='<span style="'+MONO+';font-size:11px;color:var(--text3)">'+ds+'</span>';
-          if(val) h+='<span style="'+MONO+';font-size:12px;color:var(--green);font-weight:600;margin-left:8px">+$'+val.toFixed(2)+'</span>';
-          h+='<button onclick="event.stopPropagation();_rmTask(this)" data-tid="'+t.id+'" style="background:none;border:none;color:rgba(255,100,100,.5);cursor:pointer;font-size:14px;padding:0 4px;margin-left:6px">✕</button>';
-          h+='</div>';
+      const byClient={};
+      doneTasks.forEach(t=>{ (byClient[t.cid||'x']=byClient[t.cid||'x']||[]).push(t); });
+      h+=`<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px">`;
+      Object.keys(byClient).forEach(cid=>{
+        const c=clients.find(x=>x.id===cid);
+        const list=byClient[cid];
+        const total=list.reduce((s,t)=>{ const fl=(c?getFlows(cid):[]).find(f=>f.id===t.flowId); return s+(fl?fl.count*0.60:0); },0);
+        let rows='';
+        list.forEach(t=>{
+          const d=new Date(t.startIso+'T00:00:00');
+          const fl=(c?getFlows(cid):[]).find(f=>f.id===t.flowId);
+          const val=fl?fl.count*0.60:0;
+          rows+=`<div class="drow">
+            <div style="width:6px;height:6px;border-radius:980px;flex:none;background:#bf5af2"></div>
+            <div style="flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.text)}</div>
+            <div class="dmeta">${d.getDate()} ${_MSHORT[d.getMonth()]}</div>
+            <div style="font-family:var(--mono);font-size:12px;font-weight:600;color:var(--green);width:56px;text-align:right">+$${val.toFixed(2)}</div>
+            <button class="dicon" onclick="event.stopPropagation();_rmTask(this)" data-tid="${t.id}" title="Удалить">✕</button>
+          </div>`;
         });
-        h+='</div>';
+        h+=`<div class="dcard" style="padding:16px 19px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px"><div class="dcard-t">${c?esc(c.name):'Без клиента'}</div><div class="dnum" style="font-size:14px;letter-spacing:-.4px;color:var(--green)">$${total.toFixed(2)}</div></div>
+          <div style="display:flex;flex-direction:column;gap:2px">${rows}</div></div>`;
       });
+      h+=`</div>`;
     }
   }
-
-  h+='</div>';
+  h+=`</div>`;
   return h;
 }
 

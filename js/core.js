@@ -63,6 +63,9 @@ function getTODAY(){ return new Date(); }
 const DAYS_RU = ['вс','пн','вт','ср','чт','пт','сб'];
 const MONTHS_RU = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
 const MONTHS_SHORT = MONTHS_RU;
+// Compact labels used by the redesigned views ("5 авг", "среда")
+const _MSHORT = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+const _DFULL  = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
 
 function fmtDate(d){ return d.getDate().toString().padStart(2,'0')+'.'+( d.getMonth()+1).toString().padStart(2,'0')+'.'+d.getFullYear(); }
 function todayKey(){ return fmtDate(getTODAY()); }

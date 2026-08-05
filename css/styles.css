@@ -9,16 +9,17 @@
 
   /* ── Backgrounds — iOS system dark (near-black, not pure: keeps the many
         translucent-white inline surfaces visible) ── */
-  --bg:#0a0a0c;
+  --bg:#08080a;
   --bg2:#1c1c1e;          /* iOS grouped card */
   --bg3:#2c2c2e;          /* iOS secondary grouped */
 
-  /* ── Accent (user-changeable) ── */
-  --accent:#6366f1;
-  --accent-rgb:99,102,241;
-  --accent-dim:rgba(99,102,241,.18);
+  /* ── Accent — iOS teal (fixed, no picker) ── */
+  --accent:#40cbe0;
+  --accent-rgb:64,203,224;
+  --accent-dim:rgba(64,203,224,.16);
   --accent-glow:transparent;            /* iOS is flat — no glow */
-  --accent-border:rgba(99,102,241,.4);
+  --accent-border:rgba(64,203,224,.4);
+  --acc-ink:#062227;                    /* text on accent-filled controls */
 
   /* ── Fills — iOS system gray (118,118,128) translucency on dark ── */
   --glass-0:rgba(118,118,128,.10);
@@ -933,4 +934,137 @@ body::before{
   .main{padding:12px 10px 96px!important;}
   .section-header h2{font-size:19px;}
   .pcal-cell{min-height:50px!important;padding:4px!important;}
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   REDESIGN v2 — "Dark iOS dashboard" (teal). Phase 1: shell + Обзор.
+   Keeps the class structure & all JS hooks; only reskins the chrome.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Ambient aurora behind everything (overrides the old single wash) */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(900px 520px at 12% 0%, rgba(64,203,224,.10), transparent 62%),
+    radial-gradient(760px 480px at 88% 8%, rgba(191,90,242,.07), transparent 60%),
+    radial-gradient(1000px 600px at 50% 110%, rgba(48,209,88,.05), transparent 60%)!important;
+  transition:none!important;
+}
+
+/* Accent-color picker is gone (fixed teal) */
+.topbar button[onclick*="toggleColorPicker"],#color-picker-popup{display:none!important;}
+
+/* Sidebar brand */
+.sidebar-brand{display:flex;align-items:center;gap:11px;padding:4px 8px 16px;flex:none;}
+.brand-tile{width:30px;height:30px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(160deg,var(--accent),rgba(64,203,224,.55));
+  box-shadow:0 1px 0 rgba(255,255,255,.4) inset,0 6px 18px rgba(64,203,224,.22);}
+.brand-name{font-size:16px;font-weight:660;letter-spacing:-.4px;line-height:1.1;color:var(--text);}
+.brand-sub{font-family:var(--mono);font-size:9.5px;letter-spacing:.6px;color:var(--text3);margin-top:2px;}
+
+/* Build stamp chip in the topbar */
+.build-chip{font-family:var(--mono);font-size:9px;font-weight:600;color:var(--green);
+  background:rgba(48,209,88,.12);border:1px solid rgba(48,209,88,.3);border-radius:7px;padding:1px 6px;letter-spacing:.04em;}
+
+/* Nav hotkey numbers (no markup needed) */
+.navlist .tab::after{font-family:var(--mono);font-size:10.5px;opacity:.4;margin-left:auto;}
+.navlist .tab:nth-child(1)::after{content:"1";}
+.navlist .tab:nth-child(2)::after{content:"2";}
+.navlist .tab:nth-child(3)::after{content:"3";}
+.navlist .tab:nth-child(4)::after{content:"4";}
+.navlist .tab:nth-child(5)::after{content:"5";}
+.navlist .tab:nth-child(6)::after{content:"6";}
+.navlist .tab:nth-child(7)::after{content:"7";}
+.navlist .tab:nth-child(8)::after{content:"8";}
+.navlist .tab:nth-child(9)::after{content:"9";}
+
+/* СЕГОДНЯ panel internals */
+.today-split{display:flex;gap:10px;}
+.today-cell{flex:1;}
+.today-num{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-.7px;line-height:1;}
+.today-cap{font-size:11px;color:var(--text2);margin-top:2px;}
+.today-div{width:1px;background:rgba(255,255,255,.08);}
+.today-bar{height:5px;border-radius:980px;background:rgba(255,255,255,.07);margin-top:11px;overflow:hidden;}
+.today-bar-fill{height:100%;border-radius:980px;background:var(--green);transition:width .45s cubic-bezier(.2,.8,.2,1);}
+
+/* ЭТОТ МЕСЯЦ panel internals */
+.month-stats{display:flex;flex-direction:column;gap:8px;}
+.month-stats .mrow{display:flex;align-items:baseline;justify-content:space-between;}
+.month-stats .mrow>span:first-child{font-size:12px;color:var(--text2);}
+.month-stats .mval{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text);}
+.month-stats .mrow-div{height:1px;background:rgba(255,255,255,.08);margin:1px 0;}
+.month-stats .dim{color:var(--text3)!important;font-weight:400!important;}
+
+/* Topbar controls */
+.topbar-tabtitle{font-size:18px;font-weight:660;letter-spacing:-.45px;color:var(--text);}
+.topbar-zone{font-family:var(--mono);font-size:12px;color:var(--text3);padding-top:2px;}
+.topbar-search{display:flex;align-items:center;gap:8px;padding:7px 13px;border-radius:980px;
+  background:rgba(118,118,128,.16);border:1px solid rgba(255,255,255,.07);width:210px;
+  font-size:12.5px;color:rgba(255,255,255,.28);user-select:none;}
+.btn-topadd{display:flex;align-items:center;gap:7px;padding:8px 15px;border-radius:980px;
+  border:1px solid rgba(255,255,255,.16);cursor:pointer;font:inherit;font-size:12.5px;font-weight:580;
+  background:linear-gradient(180deg,var(--accent),rgba(64,203,224,.72));color:var(--acc-ink);
+  box-shadow:0 1px 0 rgba(255,255,255,.45) inset,0 6px 20px rgba(64,203,224,.20);transition:filter .15s;}
+.btn-topadd:hover{filter:brightness(1.06);}
+
+/* ── Desktop shell geometry (sidebar full-height, topbar over content) ── */
+@media (min-width:721px){
+  .app{display:grid;grid-template-columns:272px 1fr;grid-template-rows:62px 1fr;
+    height:100vh;overflow:hidden;position:relative;z-index:1;}
+  .topbar{grid-column:2;grid-row:1;position:static;height:62px;padding:0 26px;gap:14px;
+    background:rgba(8,8,10,.6);
+    backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%);
+    box-shadow:inset 0 -1px 0 rgba(255,255,255,.07);}
+
+  .sidebar{grid-column:1;grid-row:1 / span 2;
+    margin:0;border-radius:0;padding:18px 14px 16px;gap:0;overflow:hidden;
+    display:flex;flex-direction:column;
+    background:linear-gradient(180deg,rgba(118,118,128,.14),rgba(118,118,128,.06));
+    border:none;border-right:1px solid rgba(255,255,255,.07);
+    backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);
+    box-shadow:none;}
+  .sidebar-scroll{flex:1;min-height:0;overflow-y:auto;margin:0 -4px;padding:0 4px 6px;
+    display:flex;flex-direction:column;}
+  .navlist{gap:2px;margin-bottom:18px;}
+  .sidebar-cards{display:flex;flex-direction:column;gap:9px;}
+  .sidebar .sidebar-section{margin:0;padding:13px 14px;border-radius:16px;
+    background:linear-gradient(180deg,rgba(118,118,128,.20),rgba(118,118,128,.09));
+    border:1px solid rgba(255,255,255,.08);box-shadow:0 1px 0 rgba(255,255,255,.07) inset;}
+  .sidebar-label{font-family:var(--font);font-size:10px;font-weight:640;letter-spacing:.7px;
+    color:var(--text3);text-transform:uppercase;margin:0 0 10px;}
+  .tab{border-radius:12px;}
+  .navlist .tab.active{
+    background:linear-gradient(180deg,var(--accent),rgba(64,203,224,.82));color:var(--acc-ink);
+    border-color:transparent;box-shadow:0 1px 0 rgba(255,255,255,.35) inset,0 4px 14px rgba(0,0,0,.35);}
+  .navlist .tab.active svg{stroke:var(--acc-ink);opacity:1;}
+  .navlist .tab.active::after{opacity:.55;}
+
+  /* Zone bar → pinned liquid-glass footer of the sidebar */
+  .month-bar{position:static;transform:none;left:auto;bottom:auto;
+    margin:14px auto 0;width:max-content;max-width:100%;flex:none;
+    padding:5px;gap:3px;border-radius:980px;
+    background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(118,118,128,.24));
+    border:1px solid rgba(255,255,255,.14);
+    -webkit-backdrop-filter:blur(26px) saturate(200%);
+    backdrop-filter:blur(26px) saturate(200%) url(#liquid);
+    box-shadow:0 10px 34px rgba(0,0,0,.55),0 1px 0 rgba(255,255,255,.30) inset,0 -1px 0 rgba(255,255,255,.08) inset;}
+  .month-bar::after{opacity:.35;}
+  .month-tab{padding:7px 12px;font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:-.2px;}
+
+  .main{padding:26px 26px 44px;max-width:none;}
+}
+
+/* Keep the new shell elements out of the mobile horizontal-nav layout */
+@media (max-width:720px){
+  .sidebar-brand{display:none;}
+  .sidebar-scroll{display:contents;}
+  .sidebar-cards{display:contents;}
+  /* Topbar: only the view title + a compact Add button fit on a phone */
+  .topbar-zone,.build-chip,.topbar-search{display:none;}
+  .topbar-tabtitle{font-size:16px;}
+  .btn-topadd{padding:7px 12px;font-size:12px;flex:none;}
+  /* Zone bar → a centered pill row inside the sticky header, just below the nav
+     (fixed positioning gets trapped by the sidebar's backdrop-filter containing block) */
+  .month-bar{position:static!important;transform:none!important;left:auto!important;right:auto!important;
+    top:auto!important;bottom:auto!important;margin:8px auto 2px!important;width:max-content;max-width:calc(100vw - 24px);}
 }

@@ -6,6 +6,7 @@ function updateSidebar(){
   const pendingToday=activeCl2.length-doneToday;
   const _sp=document.getElementById('s-pending'); if(_sp)_sp.textContent=pendingToday;
   const _sd=document.getElementById('s-done'); if(_sd)_sd.textContent=doneToday;
+  const _tb=document.getElementById('s-today-bar'); if(_tb){const _tt=doneToday+pendingToday; _tb.style.width=(_tt?Math.round(doneToday/_tt*100):0)+'%';}
   const _sb=document.getElementById('s-blocked'); if(_sb)_sb.textContent=0;
   const _sdSms=load('dc_sms_days',{});
   const activeCl=_zac();
@@ -34,10 +35,23 @@ function updateSidebar(){
   const _wm=document.getElementById('s-sms-missing'); if(_wm)_wm.textContent=withoutSmsClients;
   const _tot=document.getElementById('s-total'); if(_tot)_tot.textContent=activeCl.length;
 }
+const VIEW_TITLES={home:'Обзор',day_today:'Сегодня',today:'Рассылки',planner:'Планировщик',history:'История',clients:'Клиенты',finance:'Финансы',flows:'Флоу',invoices:'Инвойсы'};
+function updateTopbar(){
+  const t=document.getElementById('topbar-tabtitle'); if(t)t.textContent=VIEW_TITLES[view]||'';
+  const z=document.getElementById('topbar-zone'); if(z)z.textContent=(typeof _finZoneLabel==='function'?_finZoneLabel():activeMonth);
+}
+// Context-aware "Добавить" button in the topbar.
+function topbarAdd(){
+  if(typeof _sfx!=='undefined'&&_sfx.play)_sfx.play('click');
+  if(view==='clients'){ const i=document.getElementById('new-client-name'); if(i){i.focus();return;} }
+  if(view==='flows'){ return; }              // flows are added per-client on that tab
+  if(typeof openDayModal==='function'){ openDayModal(isoToday()); return; }  // default: add a task for today
+}
 function render(){
   const _now=getTODAY();
   const dateEl=document.getElementById('topbar-date');
   if(dateEl) dateEl.textContent=fmtDate(_now)+' '+DAYS_RU[_now.getDay()]+' · '+MONTHS_RU[_now.getMonth()];
+  updateTopbar();
   updateSidebar();
   const el=document.getElementById('main-content');
   try{
@@ -69,94 +83,87 @@ function toggleDaySms(cid,iso){
   renderCalModal(cid);updateSidebar();
 }
 
-// ── Home ─────────────────────────────────────────────────────
+// ── Home (Обзор) — redesign v2 ───────────────────────────────
+function _homeToggleTask(id){const t=load('dc_plantasks',{});if(t[id]){t[id].done=!t[id].done;save('dc_plantasks',t);render();}}
 function renderHome(){
   const iso=isoToday();const mk=activeMonth;   // Home reflects the ACTIVE zone
   const ac=_zac();                              // only THIS zone's clients
   const manual=load('dc_manual_done',{});
   const doneTodayCount=ac.filter(c=>manual[c.id]).length;
   const totalToday=ac.length;const pendingToday=totalToday-doneTodayCount;
-  const pct=totalToday?Math.round(doneTodayCount/totalToday*100):0;
-  let monthYes=0,monthNo=0,monthDraft=0;
-  ac.forEach(c=>{const hist=historyData[c.name]||{};Object.entries(hist).forEach(([d,v])=>{if(!d.startsWith(mk))return;if(v==='yes')monthYes++;else if(v==='no')monthNo++;else if(v==='draft')monthDraft++;});});
-  const monthTotal=monthYes+monthNo+monthDraft||1;
-  const monthRate=Math.round(monthYes/monthTotal*100);
   let streak=0;
   for(let i=0;i<60;i++){const d=new Date(getTODAY());d.setDate(d.getDate()-i);const diso=toISO(d);const dman=load('dc_manual_done',{})[diso];const hasManual=dman&&Object.keys(dman).length>0;const hasHist=ac.some(c=>historyData[c.name]&&historyData[c.name][diso]==='yes');if(hasManual||hasHist)streak++;else if(i>0)break;}
-  const deadlines=ac.filter(c=>c.deadline).map(c=>{const dl=new Date(c.deadline+'T00:00:00');const diff=Math.ceil((dl-new Date(getTODAY().toDateString()))/86400000);return{c,diff};}).filter(x=>x.diff>=0&&x.diff<=14).sort((a,b)=>a.diff-b.diff);
-  const clientStats=ac.map(c=>{const hist=historyData[c.name]||{};const yes=Object.entries(hist).filter(([d,v])=>d.startsWith(mk)&&v==='yes').length;const total=Object.entries(hist).filter(([d])=>d.startsWith(mk)).length||1;return{c,yes,rate:Math.round(yes/total*100)};}).sort((a,b)=>b.yes-a.yes).slice(0,5);
-  const _tasks=load('dc_plantasks',{});const _iso=isoToday();
-  const todayTasks=Object.values(_tasks).filter(t=>!t.flowId&&!_isTaskClientPaused(t)&&t.startIso===_iso);
-  const todayTasksCount=todayTasks.length;const todayTasksDone=todayTasks.filter(t=>t.done).length;
-  const _smsDays=load('dc_sms_days',{});const _dis=load('dc_pay_disabled',{});
-  // Same source of truth as the Finance tab, so both earnings blocks agree.
-  const _T=computeFinanceTotals(financeScope);   // active work-zone (month), consistent with Finance
-  const earnedAmt=_T.earned, potentialAmt=_T.potential, earnedCount=_T.sentCount, potentialCount=_T.totalCount;
-  const flowEarnedAmt=0; // flows are already folded into earnedAmt
-  const earnedUSD=earnedAmt.toFixed(2);const potentialUSD=potentialAmt.toFixed(2);
-  const earnPct=potentialAmt?Math.round(earnedAmt/potentialAmt*100):0;
-  const leftAmt=(potentialAmt-earnedAmt).toFixed(2);
-  const overdueHome=Object.values(_tasks).filter(t=>!t.flowId&&!_isTaskClientPaused(t)&&_overdue(t)).length;   // tasks are a global to-do, not per-zone
-  const upcomingTasks=Object.values(_tasks).filter(t=>{if(t.flowId||t.done||_isTaskClientPaused(t))return false;const d=new Date(t.startIso+'T00:00:00');const diff=Math.ceil((d-new Date(getTODAY().toDateString()))/86400000);return diff>=0&&diff<=6;}).sort((a,b)=>a.startIso.localeCompare(b.startIso)).slice(0,6);
-  const h=new Date().getHours();const greet=h<12?'Доброе утро':h<17?'Добрый день':'Добрый вечер';
+  const deadlines=ac.filter(c=>c.deadline).map(c=>{const dl=new Date(c.deadline+'T00:00:00');const diff=Math.ceil((dl-new Date(getTODAY().toDateString()))/86400000);return{c,diff,dl};}).filter(x=>x.diff>=0&&x.diff<=14).sort((a,b)=>a.diff-b.diff);
+  const _tasks=load('dc_plantasks',{});
+  const todayTasks=Object.values(_tasks).filter(t=>!t.flowId&&!_isTaskClientPaused(t)&&t.startIso===iso).sort((a,b)=>(+b.prio||0)-(+a.prio||0));
+  const todayTasksDone=todayTasks.filter(t=>t.done).length;
+  const overdueHome=Object.values(_tasks).filter(t=>!t.flowId&&!_isTaskClientPaused(t)&&_overdue(t)).length;   // tasks are a global to-do
+  const _T=computeFinanceTotals(financeScope);   // same source of truth as Finance
+  const earnedUSD=_T.earned.toFixed(2), potentialUSD=_T.potential.toFixed(2);
+  const earnPct=_T.potential?Math.round(_T.earned/_T.potential*100):0;
+  const monthSends=_T.sentCount;
+  const hh=new Date().getHours();const greet=hh<12?'Доброе утро':hh<17?'Добрый день':'Добрый вечер';
+  const topMoney=ac.map(c=>{const p=_clientFinanceParts(c);return{c,m:p.email.e+p.sms.e+p.flows.e};}).filter(x=>x.m>0).sort((a,b)=>b.m-a.m).slice(0,6);
+  const maxM=topMoney.length?topMoney[0].m:1;
+  const P=_T.parts||{email:0,sms:0,flows:0,inv:0};
+  const emailCnt=Math.round(P.email/0.5), smsCnt=Math.round(P.sms/0.1), flowCnt=Math.round(P.flows/0.6), invCnt=Math.round(P.inv/0.5);
+
+  const CARD='background:linear-gradient(180deg,rgba(118,118,128,.20),rgba(118,118,128,.08));border:1px solid rgba(255,255,255,.08);border-radius:22px;backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);box-shadow:0 1px 0 rgba(255,255,255,.07) inset';
+  const stat=(icon,color,label,value,sub,onclick)=>`<div style="${CARD};border-radius:20px;padding:17px 18px;box-shadow:0 1px 0 rgba(255,255,255,.07) inset,0 10px 30px rgba(0,0,0,.28)${onclick?';cursor:pointer':''}"${onclick?` onclick="${onclick}"`:''}><div style="display:flex;align-items:center;gap:7px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon}</svg><div style="font-size:11px;font-weight:580;letter-spacing:.2px;color:var(--text2)">${label}</div></div><div style="font-family:var(--mono);font-size:34px;font-weight:600;letter-spacing:-1.4px;margin-top:9px;color:${color}">${value}</div><div style="font-size:11.5px;color:var(--text3);margin-top:3px">${sub}</div></div>`;
+  const icPlane='<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/>';
+  const icMoney='<path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>';
+  const icFlame='<path d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 002.5 2.5z"/>';
+  const icCheck='<path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/>';
+  const statCards=[
+    stat(icPlane,'var(--text)','Рассылки',monthSends,'за '+MONTHS_SHORT[getTODAY().getMonth()],"setView('today')"),
+    stat(icMoney,'var(--green)','Этот месяц','$'+earnedUSD,'заработано',"setView('finance')"),
+    stat(icFlame,'var(--amber)','Стрик',streak,'дней подряд',''),
+    stat(icCheck,'var(--accent)','Задачи сегодня',todayTasks.length,(overdueHome?overdueHome+' просрочено':todayTasksDone+' выполнено'),"setView('day_today')")
+  ].join('');
 
   let deadlineRows='';
-  deadlines.forEach(({c,diff})=>{deadlineRows+=`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer" onclick="openCal('${c.id}')"><div style="flex:1;font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</div><div style="font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:16px;white-space:nowrap;background:${diff===0?'rgba(255,69,58,.2)':diff<=3?'rgba(255,214,10,.15)':'rgba(255,255,255,.07)'};color:${diff===0?'var(--red)':diff<=3?'var(--amber)':'var(--text3)'}">${diff===0?'сегодня':diff===1?'завтра':diff+'д'}</div></div>`;});
-  let taskRows='';
-  upcomingTasks.forEach(t=>{const d=new Date(t.startIso+'T00:00:00');const diff=Math.ceil((d-new Date(getTODAY().toDateString()))/86400000);const label=diff===0?'сегодня':diff===1?'завтра':DAYS_RU[d.getDay()]+' '+d.getDate();taskRows+=`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)"><div style="width:6px;height:6px;border-radius:10px;background:var(--blue);flex-shrink:0"></div><div style="flex:1;font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.text)}${t.clientName?`<span style="color:var(--blue);font-size:10px;margin-left:6px">${esc(t.clientName)}</span>`:''}</div><div style="font-family:var(--mono);font-size:10px;color:var(--text3);white-space:nowrap">${label}</div></div>`;});
-  let topClientRows='';
-  clientStats.forEach((s,i)=>{topClientRows+=`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer" onclick="openCal('${s.c.id}')"><div style="font-family:var(--mono);font-size:11px;color:var(--text3);width:16px;text-align:right">${i+1}</div><div style="flex:1;font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.c.name)}</div><div style="display:flex;align-items:center;gap:6px"><div style="width:50px;height:3px;background:rgba(255,255,255,.08);border-radius:10px;overflow:hidden"><div style="width:${s.rate}%;height:100%;background:var(--green);border-radius:10px"></div></div><div style="font-family:var(--mono);font-size:10px;color:var(--green);min-width:24px;text-align:right">${s.yes}</div></div></div>`;});
+  deadlines.forEach(({c,diff,dl})=>{
+    const col=diff===0?'var(--red)':diff<=3?'var(--amber)':'var(--text2)';
+    const halo=diff===0?'rgba(255,69,58,.18)':diff<=3?'rgba(255,214,10,.18)':'rgba(255,255,255,.08)';
+    const when=diff===0?'сегодня':diff===1?'завтра':dl.getDate()+' '+MONTHS_SHORT[dl.getMonth()];
+    deadlineRows+=`<div onclick="openCal('${c.id}')" style="display:flex;align-items:center;gap:11px;padding:7px 9px;margin:0 -9px;border-radius:11px;cursor:pointer"><div style="width:7px;height:7px;border-radius:980px;flex:none;background:${col};box-shadow:0 0 0 3px ${halo}"></div><div style="flex:1;font-size:13px;letter-spacing:-.1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</div><div style="font-family:var(--mono);font-size:11.5px;font-weight:560;color:${col}">${when}</div></div>`;
+  });
 
-  return `<div style="max-width:820px">
-    <div style="margin-bottom:32px"><div style="font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:6px">${greet} 👋</div><div style="color:var(--text3);font-size:14px;font-family:var(--mono)">${fmtDate(getTODAY())} · ${DAYS_RU[getTODAY().getDay()]} · ${MONTHS_RU[getTODAY().getMonth()]}</div></div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px">
-      <div style="background:${pct===100?'rgba(var(--accent-rgb),.12)':'rgba(255,255,255,.05)'};border:1px solid ${pct===100?'rgba(var(--accent-rgb),.3)':'rgba(255,255,255,.1)'};border-radius:22px;padding:18px 16px;backdrop-filter:blur(12px);cursor:pointer" onclick="setView('today')">
-        <div style="font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">Рассылки</div>
-        <div style="font-size:36px;font-weight:700;letter-spacing:-.02em;color:${pct===100?'var(--green)':'var(--text)'};line-height:1">${doneTodayCount}<span style="font-size:16px;color:var(--text3);font-weight:400">/${totalToday}</span></div>
-        <div style="margin-top:10px;height:3px;background:rgba(255,255,255,.08);border-radius:10px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${pct===100?'var(--green)':'var(--blue)'};border-radius:10px;transition:width .6s"></div></div>
-        <div style="margin-top:6px;font-size:11px;color:var(--text3);font-family:var(--mono)">${pendingToday} осталось</div>
+  const PRIO={4:['ВЫСОКИЙ','var(--red)','rgba(255,69,58,.16)'],3:['ВЫСОКИЙ','var(--amber)','rgba(255,214,10,.16)'],2:['СРЕДНИЙ','var(--blue)','rgba(10,132,255,.16)'],1:['НИЗКИЙ','var(--text3)','rgba(255,255,255,.08)']};
+  let taskRows='';
+  todayTasks.slice(0,6).forEach(t=>{
+    const pr=PRIO[+t.prio||0];
+    const chip=pr?`<div style="font-size:10px;font-weight:640;letter-spacing:.3px;padding:3px 8px;border-radius:980px;background:${pr[2]};color:${pr[1]}">${pr[0]}</div>`:'';
+    const box=t.done?`<div style="width:16px;height:16px;border-radius:6px;flex:none;background:var(--green);display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#06371a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>`:`<div style="width:16px;height:16px;border-radius:6px;flex:none;border:1.5px solid rgba(255,255,255,.22)"></div>`;
+    taskRows+=`<div style="display:flex;align-items:center;gap:11px;padding:7px 9px;margin:0 -9px;border-radius:11px"><div onclick="_homeToggleTask('${t.id}')" style="cursor:pointer">${box}</div><div style="flex:1;font-size:13px;letter-spacing:-.1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${t.done?'opacity:.5;text-decoration:line-through':''}">${esc(t.text)}${t.clientName?`<span style="color:var(--accent);font-size:10px;margin-left:6px">${esc(t.clientName)}</span>`:''}</div>${chip}</div>`;
+  });
+
+  let topRows='';
+  topMoney.forEach(({c,m})=>{topRows+=`<div onclick="openCal('${c.id}')" style="cursor:pointer"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px"><span style="font-size:13px;letter-spacing:-.1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</span><span style="font-family:var(--mono);font-size:12.5px;font-weight:600">$${m.toFixed(2)}</span></div><div style="height:5px;border-radius:980px;background:rgba(255,255,255,.06);overflow:hidden"><div style="height:100%;border-radius:980px;background:var(--accent);box-shadow:0 1px 0 rgba(255,255,255,.3) inset;width:${Math.round(m/maxM*100)}%"></div></div></div>`;});
+
+  const brk=[['Имейлы','var(--accent)',emailCnt,P.email],['SMS-надбавка','var(--blue)',smsCnt,P.sms],['Флоу','var(--purple)',flowCnt,P.flows],['Инвойсы','var(--green)',invCnt,P.inv]];
+  let brkRows='';
+  brk.forEach(([label,color,cnt,money])=>{brkRows+=`<div style="display:flex;align-items:center;gap:10px;padding:7px 0"><div style="width:9px;height:9px;border-radius:3px;flex:none;background:${color}"></div><div style="flex:1;font-size:13px">${label}</div><div style="font-family:var(--mono);font-size:11.5px;color:var(--text3);min-width:28px;text-align:right">${cnt}</div><div style="font-family:var(--mono);font-size:12.5px;min-width:56px;text-align:right">$${money.toFixed(2)}</div></div>`;});
+
+  return `<div style="max-width:1220px">
+    <div style="margin-bottom:22px"><div style="font-size:30px;font-weight:680;letter-spacing:-1px">${greet} 👋</div><div style="font-family:var(--mono);font-size:12.5px;color:var(--text3);margin-top:6px">${fmtDate(getTODAY())} · ${DAYS_RU[getTODAY().getDay()]} · ${pendingToday} клиентов ждут отметки</div></div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px">${statCards}</div>
+    <div style="${CARD};border-radius:24px;padding:22px 24px;margin-bottom:12px;box-shadow:0 1px 0 rgba(255,255,255,.07) inset,0 14px 40px rgba(0,0,0,.3)">
+      <div style="display:flex;align-items:flex-end;gap:44px;flex-wrap:wrap">
+        <div><div style="font-size:11px;font-weight:580;letter-spacing:.3px;color:var(--text2)">ЗАРАБОТАНО</div><div style="font-family:var(--mono);font-size:46px;font-weight:600;letter-spacing:-2px;color:var(--green);margin-top:5px;line-height:1">$${earnedUSD}</div></div>
+        <div style="padding-bottom:8px"><div style="font-size:11px;font-weight:580;letter-spacing:.3px;color:var(--text2)">МАКСИМУМ</div><div style="font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-.7px;color:var(--text2);margin-top:4px">$${potentialUSD}</div></div>
+        <div style="flex:1"></div>
+        <div style="padding-bottom:8px;text-align:right"><div style="font-size:11px;font-weight:580;letter-spacing:.3px;color:var(--text2)">% ВЫПОЛНЕНО</div><div style="font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-.7px;margin-top:4px">${earnPct}%</div></div>
       </div>
-      <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:22px;padding:18px 16px;backdrop-filter:blur(12px)">
-        <div style="font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">Этот месяц</div>
-        <div style="font-size:36px;font-weight:700;letter-spacing:-.02em;line-height:1;color:var(--green)">${monthYes}<span style="font-size:16px;color:var(--text3);font-weight:400"> отпр.</span></div>
-        <div style="margin-top:10px;height:3px;background:rgba(255,255,255,.08);border-radius:10px;overflow:hidden"><div style="width:${monthRate}%;height:100%;background:var(--green);border-radius:10px;box-shadow:0 0 6px var(--green-glow)"></div></div>
-        <div style="margin-top:6px;font-size:11px;color:var(--text3);font-family:var(--mono)">${monthRate}% успешных</div>
-      </div>
-      <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:22px;padding:18px 16px;backdrop-filter:blur(12px)">
-        <div style="font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">Стрик 🔥</div>
-        <div style="font-size:36px;font-weight:700;letter-spacing:-.02em;line-height:1;color:var(--amber)">${streak}<span style="font-size:16px;color:var(--text3);font-weight:400"> дн</span></div>
-        <div style="margin-top:16px;font-size:11px;color:var(--text3);font-family:var(--mono)">подряд активных дней</div>
-      </div>
-      <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:22px;padding:18px 16px;backdrop-filter:blur(12px);cursor:pointer" onclick="setView('day_today')">
-        <div style="font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">Задачи сегодня</div>
-        <div style="font-size:36px;font-weight:700;letter-spacing:-.02em;line-height:1;color:${todayTasksCount?'var(--blue)':'var(--text)'}">${todayTasksCount}</div>
-        <div style="margin-top:16px;font-size:11px;color:var(--text3);font-family:var(--mono)">${todayTasksDone} выполнено</div>
-      </div>
+      <div style="height:10px;border-radius:980px;background:rgba(255,255,255,.06);margin-top:18px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.4) inset"><div style="height:100%;border-radius:980px;background:linear-gradient(90deg,rgba(48,209,88,.75),#30d158);box-shadow:0 1px 0 rgba(255,255,255,.35) inset;transition:width .6s cubic-bezier(.2,.8,.2,1);width:${earnPct}%"></div></div>
     </div>
-    <div class="earn-card" style="background:linear-gradient(135deg,rgba(var(--accent-rgb),.12),rgba(var(--accent-rgb),.06));border:1px solid rgba(var(--accent-rgb),.2);border-radius:22px;padding:18px 22px;backdrop-filter:blur(12px);margin-bottom:12px;display:flex;align-items:center;gap:24px;flex-wrap:wrap">
-      <div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Заработано</div><div style="font-size:32px;font-weight:700;letter-spacing:-.02em;color:var(--green);line-height:1">$${earnedUSD}</div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:4px">${earnedCount} рассылок · ${financeScope==='all'?'всё время':_finZoneLabel()}</div></div>
-      <div style="width:1px;height:48px;background:rgba(255,255,255,.1);flex-shrink:0"></div>
-      <div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Максимум</div><div style="font-size:32px;font-weight:700;letter-spacing:-.02em;color:var(--text);line-height:1">$${potentialUSD}</div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:4px">${potentialCount} записей</div></div>
-      <div style="flex:1;min-width:160px"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:11px;color:var(--text3);font-family:var(--mono)">выполнено</span><span style="font-size:11px;color:var(--green);font-family:var(--mono);font-weight:600">${earnPct}%</span></div><div style="height:6px;background:rgba(255,255,255,.08);border-radius:13px;overflow:hidden"><div style="width:${earnPct}%;height:100%;background:linear-gradient(90deg,var(--green),rgba(48,209,88,.6));border-radius:13px;box-shadow:0 0 8px var(--green-glow);transition:width .6s"></div></div><div style="margin-top:6px;font-size:11px;color:var(--text3);font-family:var(--mono)">осталось: <span style="color:var(--amber)">$${leftAmt}</span></div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div style="${CARD};padding:18px 20px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><div style="font-size:14px;font-weight:640;letter-spacing:-.25px">Дедлайны</div><div style="font-family:var(--mono);font-size:11px;color:var(--text3)">${deadlines.length}</div></div><div style="display:flex;flex-direction:column;gap:2px">${deadlineRows||'<div style="color:var(--text3);font-size:12px;font-family:var(--mono);padding:4px 0">Нет дедлайнов</div>'}</div></div>
+      <div style="${CARD};padding:18px 20px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;cursor:pointer" onclick="setView('planner')"><div style="font-size:14px;font-weight:640;letter-spacing:-.25px">Задачи сегодня</div><div style="font-family:var(--mono);font-size:11px;color:${overdueHome?'var(--red)':'var(--text3)'}">${overdueHome?'⚠ '+overdueHome:todayTasks.length}</div></div><div style="display:flex;flex-direction:column;gap:2px">${taskRows||'<div style="color:var(--text3);font-size:12px;font-family:var(--mono);padding:4px 0">Нет задач на сегодня</div>'}</div></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);border-radius:22px;padding:18px 16px;backdrop-filter:blur(12px)">
-        <div style="font-size:12px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px"><span>Дедлайны</span><span style="font-size:10px;color:var(--text3);font-family:var(--mono)">след. 14 дней</span></div>
-        ${deadlineRows||'<div style="color:var(--text3);font-size:12px;font-family:var(--mono);padding:8px 0">Нет дедлайнов</div>'}
-      </div>
-      <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);border-radius:22px;padding:18px 16px;backdrop-filter:blur(12px)">
-        <div style="font-size:12px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px;cursor:pointer" onclick="setView('planner')"><span>Задачи</span>${overdueHome?'<span style="font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:14px;background:rgba(255,69,58,.15);color:var(--red)">⚠ '+overdueHome+' просроч.</span>':''}<span style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-left:auto">след. 7 дней →</span></div>
-        ${taskRows||'<div style="color:var(--text3);font-size:12px;font-family:var(--mono);padding:8px 0">Нет задач</div>'}
-      </div>
-      <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);border-radius:22px;padding:18px 16px;backdrop-filter:blur(12px)">
-        <div style="font-size:12px;font-weight:600;margin-bottom:14px">Топ клиентов — ${MONTHS_SHORT[getTODAY().getMonth()]}</div>
-        ${topClientRows||'<div style="color:var(--text3);font-size:12px">Нет данных</div>'}
-      </div>
-      <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);border-radius:22px;padding:18px 16px;backdrop-filter:blur(12px)">
-        <div style="font-size:12px;font-weight:600;margin-bottom:14px">Месяц — разбивка</div>
-        ${[{label:'Отправлено',val:monthYes,color:'var(--accent)',pct:Math.round(monthYes/monthTotal*100)},{label:'Не отправлено',val:monthNo,color:'var(--red)',pct:Math.round(monthNo/monthTotal*100)},{label:'Черновики',val:monthDraft,color:'var(--purple)',pct:Math.round(monthDraft/monthTotal*100)}].map(row=>`<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:12px;color:var(--text2)">${row.label}</span><span style="font-family:var(--mono);font-size:11px;color:${row.color}">${row.val} · ${row.pct}%</span></div><div style="height:4px;background:rgba(255,255,255,.07);border-radius:11px;overflow:hidden"><div style="width:${row.pct}%;height:100%;background:${row.color};border-radius:11px;transition:width .6s"></div></div></div>`).join('')}
-        <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06);display:flex;justify-content:space-between"><span style="font-size:12px;color:var(--text3)">Всего записей</span><span style="font-family:var(--mono);font-size:12px;font-weight:600">${monthYes+monthNo+monthDraft}</span></div>
-      </div>
+    <div style="display:grid;grid-template-columns:1.35fr 1fr;gap:12px">
+      <div style="${CARD};padding:18px 20px"><div style="font-size:14px;font-weight:640;letter-spacing:-.25px;margin-bottom:15px">Топ-клиенты</div><div style="display:flex;flex-direction:column;gap:12px">${topRows||'<div style="color:var(--text3);font-size:12px;font-family:var(--mono)">Нет данных</div>'}</div></div>
+      <div style="${CARD};padding:18px 20px"><div style="font-size:14px;font-weight:640;letter-spacing:-.25px;margin-bottom:8px">Разбивка месяца</div>${brkRows}</div>
     </div>
   </div>`;
 }

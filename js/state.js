@@ -68,7 +68,7 @@ function renderMonthBar(){
 
   months.forEach((mk, idx)=>{
     const [y,m] = mk.split('-');
-    const label = `${monthNames[parseInt(m)-1]} ${y}`;
+    const label = `${monthNames[parseInt(m)-1]} ${y.slice(2)}`;   // compact: "июль 26"
     const isActive = mk === activeMonth || (!activeMonth && mk === months[0]);
 
     const wrap = document.createElement('div');

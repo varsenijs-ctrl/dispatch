@@ -51,10 +51,37 @@ function addNewMonth(){
   }
   if(!/^\d{4}-\d{2}$/.test(mk)){ alert('Неверный формат. Введи например: 2026-07'); return; }
   const months = getMonths();
-  if(!months.includes(mk)) months.push(mk);
+  const isNew = !months.includes(mk);
+  if(isNew) months.push(mk);
   months.sort();
   saveMonths(months);
+  // Новая зона рождалась пустой — приходилось заново набирать клиентов, и казалось,
+  // что «работает только в одной зоне». Переносим список клиентов из ближайшей
+  // предыдущей зоны (только состав; отметки, деньги и флоу у каждой зоны свои).
+  if(isNew) _inheritRoster(mk);
   switchMonth(mk);
+}
+
+// Копирует состав клиентов из ближайшей зоны ПЕРЕД mk (или из ближайшей вообще).
+// Возвращает {from, n} или null, если копировать неоткуда / зона уже заполнена.
+function _inheritRoster(mk){
+  const map = _rosterMap();
+  if(Array.isArray(map[mk]) && map[mk].length) return null;      // уже есть клиенты — не трогаем
+  const filled = Object.keys(map).filter(k=>Array.isArray(map[k])&&map[k].length).sort();
+  if(!filled.length) return null;
+  const before = filled.filter(k=>k<mk);
+  const src = before.length ? before[before.length-1] : filled[0];
+  map[mk] = map[src].slice();
+  save('dc_zone_roster', map);
+  return {from:src, n:map[mk].length};
+}
+// Кнопка на вкладке «Клиенты» для уже существующей пустой зоны.
+function copyRosterFromPrevZone(){
+  const r = _inheritRoster(activeMonth);
+  if(!r){ showToast('Копировать неоткуда'); return; }
+  const p = r.from.split('-');
+  showToast(`✓ ${r.n} ${_plural(r.n,'клиент','клиента','клиентов')} из «${MONTHS_RU[+p[1]-1]} ${p[0]}»`);
+  render();
 }
 
 function renderMonthBar(){

@@ -67,6 +67,14 @@ const MONTHS_SHORT = MONTHS_RU;
 const _MSHORT = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
 const _DFULL  = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
 const _MGEN   = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+// Русское склонение по числу: _plural(1,'клиент','клиента','клиентов') → "клиент"
+function _plural(n, one, few, many){
+  const a=Math.abs(n)%100, b=a%10;
+  if(a>10&&a<20) return many;
+  if(b>1&&b<5)   return few;
+  if(b===1)      return one;
+  return many;
+}
 
 function fmtDate(d){ return d.getDate().toString().padStart(2,'0')+'.'+( d.getMonth()+1).toString().padStart(2,'0')+'.'+d.getFullYear(); }
 function todayKey(){ return fmtDate(getTODAY()); }

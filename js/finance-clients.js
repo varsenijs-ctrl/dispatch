@@ -285,7 +285,15 @@ function renderClients(){
 
   // ── table ──
   if(!sorted.length){
-    html+=`<div class="dcard dcard-p" style="text-align:center;padding:28px 18px;color:var(--text3);font-family:var(--mono);font-size:13px;line-height:1.7">В зоне «${_finZoneLabel()}» пока нет клиентов.<br>Добавь нового выше или возьми из базы ниже —<br>старые данные никуда не делись.</div>`;
+    // Пустая зона: сразу предлагаем перенести состав клиентов из прошлой зоны,
+    // иначе приходится набирать список заново («работает только в одной зоне»).
+    const _rm=_rosterMap();
+    const _prevZ=Object.keys(_rm).filter(k=>k<activeMonth&&Array.isArray(_rm[k])&&_rm[k].length).sort().pop()
+              || Object.keys(_rm).filter(k=>Array.isArray(_rm[k])&&_rm[k].length).sort()[0];
+    const _prevLabel=_prevZ?(()=>{const p=_prevZ.split('-');return `${MONTHS_RU[+p[1]-1]} ${p[0]}`;})():'';
+    html+=`<div class="dcard dcard-p" style="text-align:center;padding:28px 18px;color:var(--text3);font-family:var(--mono);font-size:13px;line-height:1.7">В зоне «${_finZoneLabel()}» пока нет клиентов.<br>Добавь нового выше или возьми из базы ниже —<br>старые данные никуда не делись.
+      ${_prevZ?`<div style="margin-top:14px"><button class="dbtn dbtn-primary" style="font-family:var(--font)" onclick="copyRosterFromPrevZone()">↩ Перенести ${_rm[_prevZ].length} ${_plural(_rm[_prevZ].length,'клиента','клиентов','клиентов')} из «${_prevLabel}»</button></div>`:''}
+    </div>`;
   } else {
     html+=`<div class="dcard" style="overflow:hidden">
       <div class="dth">

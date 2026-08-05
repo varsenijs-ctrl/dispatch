@@ -12,7 +12,7 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-08-04T001';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-08-05T001';   // bumped daily by the Action
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[

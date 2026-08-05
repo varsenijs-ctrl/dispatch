@@ -19,14 +19,8 @@ function switchMonth(mk){
   historyData = load('dc_history',{});
   try{ _dedupeFlowTasks(); }catch(e){}   // repair duplicate flow tasks for this month
   try{ _migrateManualDone(); }catch(e){}
-  // Пустая зона = пустой экран во всех вкладках. Переносим СОСТАВ клиентов из
-  // прошлой зоны автоматически (только список; отметки, деньги и флоу не копируются),
-  // иначе каждый новый месяц приходится набирать вручную.
-  try{
-    const _inh=_inheritRoster(mk);
-    if(_inh){ const p=_inh.from.split('-');
-      showToast(`↩ Перенесено ${_inh.n} ${_plural(_inh.n,'клиент','клиента','клиентов')} из «${MONTHS_RU[+p[1]-1]} ${p[0]}» · лишних убери кнопкой 🧹 на «Клиентах»`); }
-  }catch(e){}
+  // Состав клиентов между зонами НЕ переносится сам — только по кнопке
+  // («↩ Перенести N клиентов…» в пустой зоне) или при создании новой зоны через «+».
   renderMonthBar();
   render();
 }

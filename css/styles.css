@@ -1142,10 +1142,17 @@ body::before{
 .dday.today{border-color:var(--accent)!important;}
 .dday-num{font-family:var(--mono);font-size:14px;font-weight:600;color:rgba(255,255,255,.42);}
 .dday-dot{width:5px;height:5px;border-radius:980px;background:transparent;}
+/* Мини-тумблер в ячейке дня. Как в макете: цвет = цвет статуса, ползунок вправо для
+   «да/черновик» и влево для «нет». Клик по нему переключает SMS этого дня — когда SMS
+   включён, тумблер получает синюю обводку (единственное отличие от макета, чтобы
+   не потерять управление SMS). */
 .dday-sms{position:absolute;right:7px;bottom:7px;width:26px;height:15px;border-radius:980px;padding:2px;display:flex;
   justify-content:flex-start;background:rgba(255,255,255,.16);transition:all .2s cubic-bezier(.2,.8,.2,1);}
-.dday-sms.on{background:var(--blue);justify-content:flex-end;}
 .dday-sms i{width:11px;height:11px;border-radius:980px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.45);display:block;}
+.st-yes   .dday-sms{background:var(--green);justify-content:flex-end;}
+.st-draft .dday-sms{background:#bf5af2;justify-content:flex-end;}
+.st-no    .dday-sms{background:var(--red);justify-content:flex-start;}
+.dday-sms.on{box-shadow:0 0 0 1.5px var(--blue),0 0 6px rgba(10,132,255,.5);}
 
 /* status colours for calendar/grid cells */
 .st-yes{background:linear-gradient(180deg,rgba(48,209,88,.20),rgba(48,209,88,.08));border-color:rgba(48,209,88,.42);}

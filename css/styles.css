@@ -1167,6 +1167,12 @@ body::before{
 .dgdone:hover{border-color:rgba(255,255,255,.3);color:rgba(255,255,255,.3);}
 .dgdone.on{background:var(--green);border-color:transparent;color:#08080a;}
 
+/* Extra controls that the mockup doesn't show: hidden until hover, so the default
+   look matches the design while nothing from the app is lost. */
+.dact{opacity:0;transition:opacity .15s ease;display:flex;gap:2px;align-items:center;flex:none;}
+.dhover:hover .dact,.dhover:focus-within .dact{opacity:1;}
+@media (hover:none){.dact{opacity:.8;}}   /* touch devices: always reachable */
+
 /* inputs in the new panels */
 .dinput{background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 14px;
   color:var(--text);font-size:13.5px;letter-spacing:-.15px;outline:none;font-family:var(--font);}

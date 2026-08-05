@@ -55,7 +55,10 @@ function render(){
   updateSidebar();
   const el=document.getElementById('main-content');
   try{
-  const _noC=['today','day_today','planner','finance','history','flows','invoices'];
+  // Views with UI-only state (open panels, filters, expanded rows) must never come from
+  // the data-version cache — toggling a flag doesn't bump _rv, so cached HTML would win
+  // and the panel would never open (this is what broke «Импорт вставкой»).
+  const _noC=['today','day_today','planner','finance','history','flows','invoices','clients'];
   const _rmap={home:renderHome,day_today:renderDayToday,today:renderToday,
     planner:renderPlanner,history:renderHistory,clients:renderClients,
     finance:renderFinance,flows:renderFlows,invoices:renderInvoices};
@@ -705,67 +708,82 @@ function _setLogCell(el){
 // ── История — карточка на каждый рабочий день (по макету) ─────
 // Источник тот же: журнал действий (dc_actlog), только клиенты активной зоны.
 // В строке: статус · клиент · целевая дата (если отличается) · время · деньги.
+// ── История — карточка на каждый день, ровно как в макете ─────
+// Строка: точка · «Клиент — имейл + SMS» · время · деньги.
+// Собирается из трёх источников активной зоны: отметки (журнал действий),
+// выставленные флоу и инвойсы — как в макете, где есть и флоу, и инвойс.
 function renderHistory(){
   const mk=activeMonth;
   const parts=mk.split('-'); const yy=+parts[0], mm=+parts[1];
-  const monthName=(MONTHS_RU[mm-1]||mk)+' '+yy;
+  const monthName=((MONTHS_RU[mm-1]||mk).charAt(0).toUpperCase()+(MONTHS_RU[mm-1]||'').slice(1))+' '+yy;
   const smsAll=load('dc_sms_days',{}), disAll=load('dc_pay_disabled',{});
-  const valFor=(nm,tIso,st)=>{ if(st!=='yes'&&st!=='draft')return 0; const c=clients.find(x=>x.name===nm); if(!c)return EMAIL_RATE; if((disAll[c.id]||{})[tIso])return 0; return (smsAll[c.id]||{})[tIso]?SMS_DAY_RATE:EMAIL_RATE; };
-  const smsFor=(nm,tIso)=>{ const c=clients.find(x=>x.name===nm); return c?!!((smsAll[c.id]||{})[tIso]):false; };
+  const G='#30d158', P='#bf5af2', R='#ff453a', B='#0a84ff';
+  const hhmm=t=>{ if(!t) return ''; const d=new Date(t); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
+  const dayMap={};                       // iso → {rows:[], earned:number}
+  const push=(iso,row)=>{ if(!iso||iso.slice(0,7)!==mk) return; (dayMap[iso]=dayMap[iso]||{rows:[],earned:0}); dayMap[iso].rows.push(row); dayMap[iso].earned+=row.val||0; };
 
-  const actLog=gload('dc_actlog',[]);
+  // 1) отметки рассылок — по дню, когда я их поставил
   const _zNames=_zoneClientNames();
   const rawByDay={};
-  actLog.forEach(e=>{ if(!e.w||e.w.slice(0,7)!==mk)return; if(!e.c||!_zNames[String(e.c).toLowerCase()])return; (rawByDay[e.w]=rawByDay[e.w]||[]).push(e); });
-  const dayMap={};
+  gload('dc_actlog',[]).forEach(e=>{ if(!e.w||e.w.slice(0,7)!==mk)return; if(!e.c||!_zNames[String(e.c).toLowerCase()])return; (rawByDay[e.w]=rawByDay[e.w]||[]).push(e); });
   Object.keys(rawByDay).forEach(w=>{
     const ents=rawByDay[w].slice().sort((a,b)=>(a.t||0)-(b.t||0));
-    const finalMap={}; ents.forEach(e=>{ finalMap[e.c+'|'+e.d]=e; });
-    const rows=Object.values(finalMap).filter(e=>e.s==='yes'||e.s==='draft'||e.s==='no');
-    if(!rows.length) return;
-    let earned=0; rows.forEach(e=>earned+=valFor(e.c,e.d,e.s));
-    dayMap[w]={rows:rows,earned:earned};
+    const finalMap={}; ents.forEach(e=>{ finalMap[e.c+'|'+e.d]=e; });      // последний статус за клиент|дату
+    Object.values(finalMap).forEach(e=>{
+      if(e.s!=='yes'&&e.s!=='draft'&&e.s!=='no') return;
+      const c=clients.find(x=>x.name===e.c);
+      const sms=c?!!((smsAll[c.id]||{})[e.d]):false;
+      const off=c?!!((disAll[c.id]||{})[e.d]):false;
+      const val=(e.s==='yes'||e.s==='draft')&&!off?(sms?SMS_DAY_RATE:EMAIL_RATE):0;
+      const what=e.s==='yes'?(sms?'имейл + SMS':'имейл'):e.s==='draft'?'черновик':'не сделано';
+      const other=e.d!==w?' · за '+new Date(e.d+'T00:00:00').getDate()+' '+_MSHORT[new Date(e.d+'T00:00:00').getMonth()]:'';
+      push(w,{text:esc(e.c)+' — '+what+other, time:hhmm(e.t), val:(e.s==='draft'||e.s==='no')?0:val,
+              money:(e.s==='draft'||e.s==='no')?'—':'$'+val.toFixed(2),
+              color:e.s==='yes'?G:e.s==='draft'?P:R, cname:e.c});
+    });
   });
+
+  // 2) выставленные флоу
+  Object.values(load('dc_plantasks',{})).forEach(t=>{
+    if(!t.flowId||!t.done) return;
+    if(!_inRoster(t.cid)) return;
+    const c=clients.find(x=>x.id===t.cid);
+    const fl=(t.cid?getFlows(t.cid):[]).find(f=>f.id===t.flowId);
+    const val=fl?fl.count*0.60:0;
+    push(t.startIso,{text:(c?esc(c.name):'Без клиента')+' — флоу «'+esc(fl?fl.name:t.text)+'»', time:'', val:val, money:'$'+val.toFixed(2), color:P, cname:c?c.name:''});
+  });
+
+  // 3) инвойсы
+  loadInvoices().forEach(i=>{
+    const val=i.count*INV_RATE;
+    push(i.date,{text:'Инвойсы — '+i.count+' шт'+(i.note?' · '+esc(i.note):''), time:'', val:val, money:'$'+val.toFixed(2), color:B, cname:''});
+  });
+
   const days=Object.keys(dayMap).sort((a,b)=>b.localeCompare(a));
 
-  let html=`<div style="max-width:940px">`;
+  let html=`<div style="max-width:880px">`;
   if(!days.length){
-    return html+`<div class="dcard dcard-p" style="text-align:center;padding:34px 22px;color:var(--text3);font-family:var(--mono);font-size:13px;line-height:1.8">В «${monthName}» ты пока ничего не отмечал.<br>Отмечай статусы на вкладке «Сегодня» или «Рассылки» —<br>здесь появится история по дням.<br><button class="dbtn dbtn-primary" style="margin-top:14px;font-family:var(--font)" onclick="setView('day_today')">→ Сегодня</button></div></div>`;
+    return html+`<div class="dcard dcard-p" style="text-align:center;padding:34px 22px;color:var(--text3);font-family:var(--mono);font-size:13px;line-height:1.8">В «${monthName}» пока ничего не было.<br>Отмечай статусы на «Сегодня» или «Рассылках» —<br>здесь появятся дни с отметками, флоу и инвойсами.<br><button class="dbtn dbtn-primary" style="margin-top:14px;font-family:var(--font)" onclick="setView('day_today')">→ Сегодня</button></div></div>`;
   }
-  let totalMarks=0, totalEarned=0;
-  days.forEach(w=>{ totalMarks+=dayMap[w].rows.length; totalEarned+=dayMap[w].earned; });
-
-  html+=`<div class="dcard dcard-lg" style="padding:20px 24px;margin-bottom:14px;display:flex;align-items:flex-end;gap:40px;flex-wrap:wrap">
-    <div><div class="dcaps">${monthName}</div><div class="dnum" style="font-size:40px;color:var(--green);margin-top:5px;line-height:1;letter-spacing:-1.8px">$${totalEarned.toFixed(2)}</div></div>
-    <div style="padding-bottom:8px"><div class="dcaps">Отмечено</div><div class="dnum" style="font-size:22px;letter-spacing:-.7px;margin-top:4px;color:var(--text)">${totalMarks}</div></div>
-    <div style="padding-bottom:8px"><div class="dcaps">Активных дней</div><div class="dnum" style="font-size:22px;letter-spacing:-.7px;margin-top:4px;color:var(--text2)">${days.length}</div></div>
-    <div style="flex:1"></div>
-    <div style="padding-bottom:8px" class="dmeta">листай месяцы в баре зон ↙</div>
-  </div>`;
-
-  const ST={yes:['отправлено','#30d158'],draft:['черновик','#bf5af2'],no:['не сделано','#ff453a']};
   html+=`<div style="display:flex;flex-direction:column;gap:10px">`;
   days.forEach(w=>{
-    const D=dayMap[w]; const dt=new Date(w+'T00:00:00'); const isT=w===isoToday();
-    const rows=D.rows.slice().sort((a,b)=>(b.t||0)-(a.t||0));
+    const D=dayMap[w];
+    const dt=new Date(w+'T00:00:00');
+    const title=dt.getDate()+' '+_MGEN[dt.getMonth()]+', '+_DFULL[dt.getDay()]+(w===isoToday()?' · сегодня':'');
+    const rows=D.rows.slice().sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
     let rowsHtml='';
-    rows.forEach(e=>{
-      const st=ST[e.s]||[e.s,'#9aa0aa'];
-      const money=valFor(e.c,e.d,e.s);
-      const tgt=e.d!==w?` <span style="color:var(--text3)">→ ${new Date(e.d+'T00:00:00').getDate()} ${_MSHORT[new Date(e.d+'T00:00:00').getMonth()]}</span>`:'';
-      let time='';
-      if(e.t){ const td=new Date(e.t); time=String(td.getHours()).padStart(2,'0')+':'+String(td.getMinutes()).padStart(2,'0'); }
-      rowsHtml+=`<div class="drow" onclick="openCalByName('${jsq(e.c)}')" style="cursor:pointer">
-        <div style="width:6px;height:6px;border-radius:980px;flex:none;background:${st[1]}"></div>
-        <div style="flex:1;min-width:0;font-size:12.5px;color:rgba(255,255,255,.86);letter-spacing:-.1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.c)} <span style="color:${st[1]}">· ${st[0]}</span>${tgt}${smsFor(e.c,e.d)?' <span class="dchip dchip-sms" style="padding:1px 6px">SMS</span>':''}</div>
-        <div class="dmeta">${time}</div>
-        <div style="font-family:var(--mono);font-size:12px;font-weight:600;width:48px;text-align:right;color:${money>0?'var(--green)':'var(--text3)'}">${money>0?'$'+money.toFixed(2):'—'}</div>
+    rows.forEach(r=>{
+      rowsHtml+=`<div class="drow"${r.cname?` onclick="openCalByName('${jsq(r.cname)}')" style="cursor:pointer"`:''}>
+        <div style="width:6px;height:6px;border-radius:980px;flex:none;background:${r.color}"></div>
+        <div style="flex:1;min-width:0;font-size:12.5px;color:rgba(255,255,255,.86);letter-spacing:-.1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.text}</div>
+        <div style="font-family:var(--mono);font-size:11.5px;color:var(--text3)">${r.time}</div>
+        <div style="font-family:var(--mono);font-size:12px;font-weight:600;width:48px;text-align:right">${r.money}</div>
       </div>`;
     });
-    html+=`<div class="dcard" style="padding:16px 19px">
+    html+=`<div class="dcard" style="padding:16px 19px;border-radius:20px">
       <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px;gap:10px">
-        <div class="dcard-t">${dt.getDate()} ${_MSHORT[dt.getMonth()]} · ${DAYS_RU[dt.getDay()]}${isT?' · сегодня':''}</div>
-        <div style="display:flex;align-items:baseline;gap:10px"><span class="dmeta">${D.rows.length} отм.</span><span class="dnum" style="font-size:15px;letter-spacing:-.4px;color:var(--green)">$${D.earned.toFixed(2)}</span></div>
+        <div class="dcard-t">${title}</div>
+        <div style="font-family:var(--mono);font-size:15px;font-weight:600;color:${G}">$${D.earned.toFixed(2)}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:2px">${rowsHtml}</div>
     </div>`;

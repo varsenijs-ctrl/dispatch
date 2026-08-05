@@ -1,11 +1,15 @@
 // ── Флоу — карточки клиентов сеткой (по макету) ───────────────
 // Сохранено: статистика, вкладки Сегодня/История, баннер просрочек, отметка
 // «выставлен», «все флоу», добавление/удаление флоу, дедлайн, чипы задач.
+// ── Флоу — карточки клиентов сеткой, строки ровно как в макете ──
+// Строка флоу: иконка ветвления, название, ставка. Кнопки (отметить выставленным,
+// дедлайн, удалить) появляются по наведению — вид совпадает с макетом.
 function renderFlows(){
   const iso=isoToday();
   const tasks=load('dc_plantasks',{});
   const ac=_zac().sort((a,b)=>a.name.localeCompare(b.name,'ru'));
   const ICON='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#d08bf5" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M6 3v12M18 9a3 3 0 100-6 3 3 0 000 6zM6 21a3 3 0 100-6 3 3 0 000 6zM15 6H9a3 3 0 00-3 3v3"/></svg>';
+  const ROW='padding:10px 12px;border-radius:14px;background:linear-gradient(180deg,rgba(191,90,242,.16),rgba(191,90,242,.07));border:1px solid rgba(191,90,242,.18);box-shadow:0 1px 0 rgba(255,255,255,.07) inset';
 
   let totalDone=0,totalPlanned=0,totalEarned=0,totalPotential=0;
   ac.forEach(c=>{
@@ -25,14 +29,13 @@ function renderFlows(){
         `<div class="dcard" style="flex:1;min-width:150px;padding:15px 18px"><div class="dcaps">${r[0]}</div><div class="dnum" style="font-size:28px;letter-spacing:-1.1px;margin-top:7px;color:${r[2]}">${r[1]}</div></div>`).join('')}
     </div>
     <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
-      <button class="dpill ${_flowsTab==='today'?'active':''}" onclick="_flowsTab='today';render()">Сегодня</button>
+      <button class="dpill ${_flowsTab==='today'?'active':''}" onclick="_flowsTab='today';render()">Активные</button>
       <button class="dpill ${_flowsTab==='history'?'active':''}" onclick="_flowsTab='history';render()">История</button>
       <div style="flex:1"></div>
       <button class="dbtn dbtn-sm" onclick="setView('clients')" title="Флоу добавляются у клиента">+ флоу у клиента</button>
     </div>`;
 
   if(_flowsTab==='today'){
-    // overdue banner
     const overdueItems=[];
     ac.forEach(c=>getFlows(c.id).forEach(f=>{
       if(!f.deadline||f.deadline>=iso) return;
@@ -40,30 +43,15 @@ function renderFlows(){
       if(!issued) overdueItems.push({c:c,f:f});
     }));
     if(overdueItems.length){
-      h+=`<div class="dcard" style="background:linear-gradient(180deg,rgba(255,69,58,.18),rgba(255,69,58,.07));border-color:rgba(255,69,58,.22);margin-bottom:14px;overflow:hidden">
-        <div style="display:flex;align-items:center;gap:10px;padding:12px 17px;border-bottom:1px solid rgba(255,69,58,.15)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff453a" stroke-width="2" stroke-linecap="round" style="flex:none"><path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
-          <div style="font-size:13px;color:#ff8078;font-weight:540">Просрочено — ${overdueItems.length} флоу</div>
-        </div>`;
-      overdueItems.forEach(it=>{
-        h+=`<div style="display:flex;align-items:center;gap:12px;padding:11px 17px;border-bottom:1px solid rgba(255,69,58,.08)">
-          <div onclick="event.stopPropagation();_markFlowDone(this)" data-cid="${it.c.id}" data-fid="${it.f.id}" title="Отметить выставленным" style="width:22px;height:22px;border-radius:7px;flex:none;cursor:pointer;border:1.5px solid rgba(255,69,58,.45);background:rgba(0,0,0,.2)"></div>
-          <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:540">${esc(it.f.name)}</div><div class="dmeta" style="color:#ff8078;margin-top:2px">${esc(it.c.name)} · ${flowDeadlineBadge(it.f.deadline)}</div></div>
-          <span style="font-family:var(--mono);font-size:12px;color:var(--green);font-weight:600">+$${(it.f.count*0.60).toFixed(2)}</span>
-        </div>`;
-      });
-      h+=`</div>`;
+      h+=`<div class="dcard" style="background:linear-gradient(180deg,rgba(255,69,58,.18),rgba(255,69,58,.07));border-color:rgba(255,69,58,.22);margin-bottom:14px;padding:12px 16px;display:flex;align-items:center;gap:11px;flex-wrap:wrap">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff453a" stroke-width="2" stroke-linecap="round" style="flex:none"><path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+        <div style="font-size:13px;color:#ff8078;font-weight:540">${overdueItems.length} просрочен${overdueItems.length===1?'о флоу':'о флоу'}: ${overdueItems.slice(0,3).map(i=>esc(i.f.name)+' ('+esc(i.c.name)+')').join(', ')}${overdueItems.length>3?' …':''}</div>
+      </div>`;
     }
 
-    // client cards (3-col grid)
     let cards='', hasAny=false;
     ac.forEach(c=>{
-      const flows=getFlows(c.id).filter(f=>{
-        const issued=Object.values(tasks).some(t=>t.cid===c.id&&t.flowId===f.id&&t.done);
-        if(issued) return false;
-        if(f.deadline&&f.deadline<iso) return false;   // shown in the banner above
-        return true;
-      });
+      const flows=getFlows(c.id).filter(f=>!Object.values(tasks).some(t=>t.cid===c.id&&t.flowId===f.id&&t.done));
       if(!flows.length) return;
       hasAny=true;
       const sum=flows.reduce((s,f)=>s+f.count*0.60,0);
@@ -71,38 +59,35 @@ function renderFlows(){
       let rows='';
       flows.forEach(f=>{
         const doneToday=Object.values(tasks).find(t=>t.cid===c.id&&t.flowId===f.id&&t.startIso===iso&&t.done);
-        const pend=Object.values(tasks).filter(t=>t.cid===c.id&&t.flowId===f.id&&!t.done);
-        let chips='';
-        pend.forEach(t=>{ const d=new Date(t.startIso+'T00:00:00');
-          chips+=`<span class="dchip dchip-dim" style="display:inline-flex;align-items:center;gap:3px;font-weight:400">${d.getDate()}.${String(d.getMonth()+1).padStart(2,'0')}<span onclick="event.stopPropagation();_rmTask(this)" data-tid="${t.id}" style="cursor:pointer;color:rgba(255,100,100,.6)">✕</span></span>`;
-        });
-        rows+=`<div style="padding:10px 12px;border-radius:14px;background:linear-gradient(180deg,rgba(191,90,242,.16),rgba(191,90,242,.07));border:1px solid rgba(191,90,242,.18);box-shadow:0 1px 0 rgba(255,255,255,.07) inset">
+        const late=f.deadline&&f.deadline<iso;
+        rows+=`<div class="dhover" style="${ROW}${late?';border-color:rgba(255,69,58,.3)':''}">
           <div style="display:flex;align-items:center;gap:10px">
-            <div onclick="event.stopPropagation();_markFlowDone(this)" data-cid="${c.id}" data-fid="${f.id}" title="${doneToday?'Выставлен сегодня — снять':'Отметить выставленным'}"
-              style="width:20px;height:20px;border-radius:6px;flex:none;cursor:pointer;display:flex;align-items:center;justify-content:center;${doneToday?'background:var(--green)':'border:1.5px solid rgba(255,255,255,.24);background:rgba(0,0,0,.2)'}">
-              ${doneToday?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#06371a" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>':''}
-            </div>
             ${ICON}
             <div style="flex:1;min-width:0;font-size:12.5px;letter-spacing:-.1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${doneToday?'color:var(--green)':''}">${esc(f.name)}</div>
-            <div style="font-family:var(--mono);font-size:11.5px;color:var(--text2)">${f.count}✉ · $${(f.count*0.60).toFixed(2)}</div>
+            <div style="font-family:var(--mono);font-size:11.5px;color:var(--text2);flex:none">$${(f.count*0.60).toFixed(2)}</div>
+            <div class="dact">
+              <input type="date" class="dinput dinput-sm ddate" value="${f.deadline||''}" onchange="event.stopPropagation();_setFlowDl(this)" data-cid="${c.id}" data-fid="${f.id}" title="Дедлайн" style="font-size:10px;padding:2px 4px;width:104px">
+              <button class="dicon neutral" onclick="event.stopPropagation();_markFlowDone(this)" data-cid="${c.id}" data-fid="${f.id}" title="${doneToday?'Выставлен сегодня — снять':'Отметить выставленным'}" style="width:22px;height:22px;font-size:12px;${doneToday?'background:rgba(48,209,88,.18);color:var(--green)':''}">✓</button>
+              <button class="dicon" onclick="event.stopPropagation();_dfFlow(this)" data-cid="${c.id}" data-fid="${f.id}" title="Удалить флоу" style="width:22px;height:22px;font-size:12px">✕</button>
+            </div>
           </div>
-          <div style="display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap">
-            <input type="date" class="dinput dinput-sm ddate" value="${f.deadline||''}" onchange="event.stopPropagation();_setFlowDl(this)" data-cid="${c.id}" data-fid="${f.id}" title="Дедлайн" style="font-size:10px;padding:3px 6px">
+          ${(f.deadline||f.count!==1)?`<div style="display:flex;align-items:center;gap:7px;margin-top:6px">
+            <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${f.count}✉</span>
             ${f.deadline?flowDeadlineBadge(f.deadline):''}
-            ${chips}
-            <div style="flex:1"></div>
-            <button class="dicon" onclick="event.stopPropagation();_dfFlow(this)" data-cid="${c.id}" data-fid="${f.id}" title="Удалить флоу" style="width:22px;height:22px;font-size:12px">✕</button>
-          </div>
+            ${doneToday?'<span class="dchip dchip-ok">выставлен</span>':''}
+          </div>`:''}
         </div>`;
       });
-      cards+=`<div class="dcard" style="padding:17px 18px">
+      cards+=`<div class="dcard dhover" style="padding:17px 18px">
         <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:13px;gap:8px">
           <div class="dcard-t" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</div>
-          <div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--green)">$${sum.toFixed(2)}</div>
-        </div>
-        <div style="display:flex;gap:6px;margin-bottom:11px;flex-wrap:wrap">
-          <button class="dbtn dbtn-sm${allDone?' on':''}" onclick="event.stopPropagation();_markAllFlowsDone(this)" data-cid="${c.id}">${allDone?'✓ все':'✓ все флоу'}</button>
-          <button class="dbtn dbtn-sm" onclick="event.stopPropagation();_addFlow(this)" data-cid="${c.id}">+ флоу</button>
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--green)">$${sum.toFixed(2)}</div>
+            <span class="dact">
+              <button class="dicon neutral" onclick="event.stopPropagation();_markAllFlowsDone(this)" data-cid="${c.id}" title="${allDone?'Все выставлены':'Отметить все флоу выставленными'}" style="width:22px;height:22px;font-size:12px;${allDone?'background:rgba(48,209,88,.18);color:var(--green)':''}">✓✓</button>
+              <button class="dicon neutral" onclick="event.stopPropagation();_addFlow(this)" data-cid="${c.id}" title="Добавить флоу" style="width:22px;height:22px;font-size:14px">＋</button>
+            </span>
+          </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px">${rows}</div>
       </div>`;
@@ -114,7 +99,6 @@ function renderFlows(){
       <button class="dbtn dbtn-primary" style="margin-top:14px" onclick="setView('clients')">→ Клиенты</button></div>`;
 
   } else {
-    // ── История ──
     const hm=(typeof _flowsHistoryMode!=='undefined'&&_flowsHistoryMode)||'date';
     const doneTasks=Object.values(tasks).filter(t=>t.flowId&&t.done&&_markInActiveZone(t.cid,t.startIso)&&_inRoster(t.cid)).sort((a,b)=>b.startIso.localeCompare(a.startIso));
     h+=`<div style="display:flex;gap:8px;margin-bottom:14px">
@@ -129,21 +113,21 @@ function renderFlows(){
       h+=`<div style="display:flex;flex-direction:column;gap:10px">`;
       Object.keys(byDate).sort((a,b)=>b.localeCompare(a)).forEach(ds=>{
         const d=new Date(ds+'T00:00:00');
-        const label=ds===iso?'Сегодня':d.getDate()+' '+_MSHORT[d.getMonth()]+' '+d.getFullYear();
+        const label=ds===iso?'Сегодня':d.getDate()+' '+_MGEN[d.getMonth()]+', '+_DFULL[d.getDay()];
         let sum=0, rows='';
         byDate[ds].forEach(t=>{
           const c=clients.find(x=>x.id===t.cid);
           const fl=(t.cid?getFlows(t.cid):[]).find(f=>f.id===t.flowId);
           const val=fl?fl.count*0.60:0; sum+=val;
-          rows+=`<div class="drow">
+          rows+=`<div class="drow dhover">
             <div style="width:6px;height:6px;border-radius:980px;flex:none;background:#bf5af2"></div>
-            <div style="flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.text)}${c?` <span class="dmeta">· ${esc(c.name)}</span>`:''}</div>
-            <div style="font-family:var(--mono);font-size:12px;font-weight:600;color:var(--green);width:56px;text-align:right">+$${val.toFixed(2)}</div>
-            <button class="dicon" onclick="event.stopPropagation();_rmTask(this)" data-tid="${t.id}" title="Удалить">✕</button>
+            <div style="flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c?esc(c.name)+' — ':''}флоу «${esc(fl?fl.name:t.text)}»</div>
+            <div style="font-family:var(--mono);font-size:12px;font-weight:600;color:var(--green);width:56px;text-align:right">$${val.toFixed(2)}</div>
+            <span class="dact"><button class="dicon" onclick="event.stopPropagation();_rmTask(this)" data-tid="${t.id}" title="Удалить">✕</button></span>
           </div>`;
         });
-        h+=`<div class="dcard" style="padding:16px 19px">
-          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px"><div class="dcard-t">${label}</div><div class="dnum" style="font-size:15px;letter-spacing:-.4px;color:var(--green)">$${sum.toFixed(2)}</div></div>
+        h+=`<div class="dcard" style="padding:16px 19px;border-radius:20px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px"><div class="dcard-t">${label}</div><div style="font-family:var(--mono);font-size:15px;font-weight:600;color:var(--green)">$${sum.toFixed(2)}</div></div>
           <div style="display:flex;flex-direction:column;gap:2px">${rows}</div></div>`;
       });
       h+=`</div>`;
@@ -160,16 +144,16 @@ function renderFlows(){
           const d=new Date(t.startIso+'T00:00:00');
           const fl=(c?getFlows(cid):[]).find(f=>f.id===t.flowId);
           const val=fl?fl.count*0.60:0;
-          rows+=`<div class="drow">
+          rows+=`<div class="drow dhover">
             <div style="width:6px;height:6px;border-radius:980px;flex:none;background:#bf5af2"></div>
-            <div style="flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.text)}</div>
+            <div style="flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">флоу «${esc(fl?fl.name:t.text)}»</div>
             <div class="dmeta">${d.getDate()} ${_MSHORT[d.getMonth()]}</div>
-            <div style="font-family:var(--mono);font-size:12px;font-weight:600;color:var(--green);width:56px;text-align:right">+$${val.toFixed(2)}</div>
-            <button class="dicon" onclick="event.stopPropagation();_rmTask(this)" data-tid="${t.id}" title="Удалить">✕</button>
+            <div style="font-family:var(--mono);font-size:12px;font-weight:600;color:var(--green);width:56px;text-align:right">$${val.toFixed(2)}</div>
+            <span class="dact"><button class="dicon" onclick="event.stopPropagation();_rmTask(this)" data-tid="${t.id}" title="Удалить">✕</button></span>
           </div>`;
         });
         h+=`<div class="dcard" style="padding:16px 19px">
-          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px"><div class="dcard-t">${c?esc(c.name):'Без клиента'}</div><div class="dnum" style="font-size:14px;letter-spacing:-.4px;color:var(--green)">$${total.toFixed(2)}</div></div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px"><div class="dcard-t">${c?esc(c.name):'Без клиента'}</div><div style="font-family:var(--mono);font-size:14px;font-weight:600;color:var(--green)">$${total.toFixed(2)}</div></div>
           <div style="display:flex;flex-direction:column;gap:2px">${rows}</div></div>`;
       });
       h+=`</div>`;

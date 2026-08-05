@@ -7,58 +7,68 @@ function _dropToDay(el,e,iso){
 }
 function _dayOverCol(el,e){ e.preventDefault(); el.style.background='rgba(64,203,224,.06)'; }
 function _dayLeaveCol(el){ el.style.background=''; }
+// ── Планировщик — 3 колонки дней, карточки ровно как в макете ──
+// Карточка: ручка-грип, текст, чип приоритета + клиент. Кнопки (готово/правка/
+// удалить) появляются по наведению, чтобы вид совпадал с макетом.
+// Ниже — месячный календарь приложения (навигация + модалка дня).
+function _dropToDay(el,e,iso){
+  e.preventDefault(); el.style.background='';
+  if(_dragId){ const id=_dragId; _dragId=null; moveTask(id,iso); }
+}
+function _dayOverCol(el,e){ e.preventDefault(); el.style.background='rgba(64,203,224,.06)'; }
+function _dayLeaveCol(el){ el.style.background=''; }
 function renderPlanner(){
   if(typeof plannerMonth==='undefined')window.plannerMonth=new Date(getTODAY().getFullYear(),getTODAY().getMonth(),1);
   const iso=isoToday();
   const tasks=load('dc_plantasks',{});
-  const PRIO={4:['СРОЧНО','var(--red)','rgba(255,69,58,.16)'],3:['ВЫСОКИЙ','#ffe066','rgba(255,214,10,.16)'],2:['СРЕДНИЙ','#5eb0ff','rgba(10,132,255,.16)'],1:['НИЗКИЙ','var(--text3)','rgba(255,255,255,.08)']};
+  // как в макете: ВЫСОКИЙ / СРЕДНИЙ / НИЗКИЙ
+  const PRIO={4:['СРОЧНО','#ff8078','rgba(255,69,58,.16)'],3:['ВЫСОКИЙ','#ff8078','rgba(255,69,58,.16)'],
+              2:['СРЕДНИЙ','#ffe066','rgba(255,214,10,.14)'],1:['НИЗКИЙ','rgba(255,255,255,.6)','rgba(255,255,255,.08)']};
 
-  // ── three day columns ──
   let cols='';
   for(let i=0;i<3;i++){
     const dt=new Date(getTODAY()); dt.setDate(dt.getDate()+i);
     const dIso=toISO(dt);
     const title=i===0?'Сегодня':i===1?'Завтра':(_DFULL[dt.getDay()].charAt(0).toUpperCase()+_DFULL[dt.getDay()].slice(1));
-    // tasks of that day + anything carried over (unfinished, still within its «до»)
     const list=Object.values(tasks).filter(t=>{
       if(t.flowId||_isTaskClientPaused(t)) return false;
       if(t.startIso===dIso) return true;
-      return !t.done&&t.startIso<dIso&&t.until&&t.until>=dIso;
+      return !t.done&&t.startIso<dIso&&t.until&&t.until>=dIso;   // перенесённые с прошлых дней
     }).sort((a,b)=>(+b.prio||0)-(+a.prio||0)||((a.sortOrder==null?1e9:a.sortOrder)-(b.sortOrder==null?1e9:b.sortOrder)));
     let items='';
     list.forEach(t=>{
       const over=_overdue(t);
       const pr=PRIO[+t.prio||0];
-      const carried=t.startIso<dIso;
       const chip=pr?`<span style="font-size:9.5px;font-weight:660;letter-spacing:.4px;padding:2px 7px;border-radius:980px;background:${pr[2]};color:${pr[1]}">${pr[0]}</span>`:'';
-      const cl=t.clientName?`<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${esc(t.clientName)}</span>`:'';
-      const carr=carried?`<span style="font-family:var(--mono);font-size:10px;color:${over?'var(--red)':'#ffe066'}">⤷ с ${fmtDate(new Date(t.startIso+'T00:00:00')).slice(0,5)}</span>`:'';
-      const dl=t.deadline?`<span style="font-family:var(--mono);font-size:10px;color:${over?'var(--red)':'#ffe066'}">⏳ ${fmtDate(new Date(t.deadline+'T00:00:00')).slice(0,5)}</span>`:'';
-      items+=`<div data-tid="${t.id}" draggable="true" ondragstart="_startDrag(this,event)" ondragend="_endDrag(this)" ondragover="_dragOver(this,event)" ondragleave="_dragLeave(this)" ondrop="_drop(this,event)"
-        style="display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border-radius:14px;background:${over?'linear-gradient(180deg,rgba(255,69,58,.14),rgba(255,69,58,.05))':'rgba(255,255,255,.05)'};border:1px solid ${over?'rgba(255,69,58,.24)':'rgba(255,255,255,.06)'};cursor:grab;transition:background .15s ease,transform .15s ease;${t.done?'opacity:.45;':''}">
+      const cl=`<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${t.clientName?esc(t.clientName):'общее'}</span>`;
+      items+=`<div class="dhover" data-tid="${t.id}" draggable="true" ondragstart="_startDrag(this,event)" ondragend="_endDrag(this)" ondragover="_dragOver(this,event)" ondragleave="_dragLeave(this)" ondrop="_drop(this,event)"
+        ondblclick="_editTask('${t.id}')" title="Двойной клик — редактировать"
+        style="display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border-radius:14px;background:${over?'linear-gradient(180deg,rgba(255,69,58,.13),rgba(255,69,58,.05))':'rgba(255,255,255,.05)'};border:1px solid ${over?'rgba(255,69,58,.22)':'rgba(255,255,255,.06)'};cursor:grab;transition:background .15s ease,transform .15s ease;${t.done?'opacity:.45;':''}">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.26)" stroke-width="2.4" stroke-linecap="round" style="margin-top:3px;flex:none"><path d="M4 8h16M4 16h16"/></svg>
-        <div onclick="event.stopPropagation();toggleDayTask('${t.id}');render()" style="width:15px;height:15px;margin-top:2px;border-radius:5px;flex:none;cursor:pointer;${t.done?'background:var(--green);display:flex;align-items:center;justify-content:center':'border:1.5px solid rgba(255,255,255,.22)'}">${t.done?'<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#06371a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>':''}</div>
         <div style="flex:1;min-width:0">
-          <div ondblclick="event.stopPropagation();_editTask('${t.id}')" style="font-size:12.5px;line-height:1.4;letter-spacing:-.1px;cursor:pointer;${t.done?'text-decoration:line-through;color:var(--text3)':over?'color:#ff8078':''}" title="Двойной клик — редактировать">${esc(t.text||t.name||'')}</div>
-          <div style="display:flex;align-items:center;gap:7px;margin-top:7px;flex-wrap:wrap">${chip}${cl}${carr}${dl}</div>
+          <div style="font-size:12.5px;line-height:1.4;letter-spacing:-.1px;${t.done?'text-decoration:line-through;color:var(--text3)':over?'color:#ff8078':''}">${esc(t.text||t.name||'')}</div>
+          <div style="display:flex;align-items:center;gap:7px;margin-top:7px;flex-wrap:wrap">${chip}${cl}</div>
         </div>
-        <button class="dicon neutral" onclick="event.stopPropagation();_editTask('${t.id}')" title="Редактировать" style="width:22px;height:22px;font-size:12px">✎</button>
-        <button class="dicon" onclick="event.stopPropagation();removeDayTask('${t.id}');render()" title="Удалить" style="width:22px;height:22px;font-size:12px">✕</button>
+        <div class="dact">
+          <button class="dicon neutral" onclick="event.stopPropagation();toggleDayTask('${t.id}');render()" title="${t.done?'Снять «готово»':'Отметить готовой'}" style="width:22px;height:22px;font-size:12px">✓</button>
+          <button class="dicon neutral" onclick="event.stopPropagation();_editTask('${t.id}')" title="Редактировать" style="width:22px;height:22px;font-size:12px">✎</button>
+          <button class="dicon" onclick="event.stopPropagation();removeDayTask('${t.id}');render()" title="Удалить" style="width:22px;height:22px;font-size:12px">✕</button>
+        </div>
       </div>`;
     });
-    cols+=`<div class="dcard dcard-p" ondragover="_dayOverCol(this,event)" ondragleave="_dayLeaveCol(this)" ondrop="_dropToDay(this,event,'${dIso}')">
+    cols+=`<div class="dcard dhover" ondragover="_dayOverCol(this,event)" ondragleave="_dayLeaveCol(this)" ondrop="_dropToDay(this,event,'${dIso}')" style="padding:16px 17px">
       <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:13px;gap:8px">
         <div class="dcard-t">${title}</div>
         <div style="display:flex;align-items:baseline;gap:8px">
           <div class="dmeta">${fmtDate(dt).slice(0,5)}</div>
-          <button class="dicon neutral" onclick="openDayModal('${dIso}')" title="Добавить задачу на этот день" style="font-size:15px">＋</button>
+          <span class="dact"><button class="dicon neutral" onclick="openDayModal('${dIso}')" title="Добавить задачу на этот день" style="width:22px;height:22px;font-size:14px">＋</button></span>
         </div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:8px">${items||'<div class="dmeta" style="padding:6px 0">Нет задач</div>'}</div>
+      <div style="display:flex;flex-direction:column;gap:8px">${items||'<div class="dmeta" style="padding:4px 0">Нет задач</div>'}</div>
     </div>`;
   }
 
-  // ── month calendar (kept: navigation + day modal + overdue marks) ──
+  // ── месячный календарь (навигация, модалка дня, метки просрочек) ──
   const y=plannerMonth.getFullYear(), m=plannerMonth.getMonth();
   const daysInMonth=new Date(y,m+1,0).getDate();
   const offset=(new Date(y,m,1).getDay()+6)%7;
@@ -84,7 +94,7 @@ function renderPlanner(){
   return `<div style="max-width:1040px">
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:22px">${cols}</div>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
-      <div class="dcard-t" style="font-size:16px">${MONTHS_RU[m]} ${y}</div>
+      <div class="dcard-t" style="font-size:16px">${(MONTHS_RU[m]||'').charAt(0).toUpperCase()+(MONTHS_RU[m]||'').slice(1)} ${y}</div>
       <div style="flex:1"></div>
       <button class="dbtn dbtn-sm" onclick="shiftPlannerMonth(-1)">‹ назад</button>
       <button class="dbtn dbtn-sm" onclick="shiftPlannerMonth(0)">сегодня</button>

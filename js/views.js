@@ -440,67 +440,6 @@ function renderDayToday(){
 
   let html=`<div style="max-width:1040px">`;
 
-  // ── marking list ──────────────────────────────────────────
-  const MF=[['all','Все',ac.length],['left','Осталось',leftCl.length],['done','Готово',doneCl.length],['overdue','Просрочки',overdueCl.length]];
-  if(!MF.some(f=>f[0]===dayMarkFilter)) dayMarkFilter='all';
-  html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">`+
-    MF.map(f=>`<button class="dpill ${dayMarkFilter===f[0]?'active':''}" onclick="dayMarkFilter='${f[0]}';render()">${f[1]}<span class="n">${f[2]}</span></button>`).join('')+
-    `<div style="flex:1"></div><button class="dbtn dbtn-sm" onclick="setView('today')" title="Сетка-календарь всех клиентов">▦ сетка</button></div>`;
-
-  if(overdueCl.length){
-    const names=overdueCl.slice(0,4).map(c=>esc(c.name)+' ('+fmtDate(new Date(c.deadline+'T00:00:00')).slice(0,5)+')').join(', ');
-    html+=`<div style="display:flex;align-items:center;gap:11px;padding:12px 16px;border-radius:16px;background:linear-gradient(180deg,rgba(255,69,58,.18),rgba(255,69,58,.08));border:1px solid rgba(255,69,58,.22);margin-bottom:14px;box-shadow:0 1px 0 rgba(255,255,255,.08) inset">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff453a" stroke-width="2" stroke-linecap="round" style="flex:none"><path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
-      <div style="font-size:13px;color:#ff8078;font-weight:540">${overdueCl.length} просрочк${overdueCl.length===1?'а':overdueCl.length<5?'и':''}: ${names}${overdueCl.length>4?' …':''}</div>
-    </div>`;
-  }
-
-  const shown = dayMarkFilter==='left'?leftCl : dayMarkFilter==='done'?doneCl : dayMarkFilter==='overdue'?overdueCl : ac;
-  if(!ac.length){
-    html+=`<div class="dcard dcard-p" style="text-align:center;padding:30px 20px;color:var(--text3);font-family:var(--mono);font-size:13px;line-height:1.7">В зоне «${_finZoneLabel()}» нет клиентов.<br>Добавь их на вкладке «Клиенты».<br><button class="dbtn dbtn-primary" style="margin-top:14px" onclick="setView('clients')">→ Клиенты</button></div>`;
-  } else if(!shown.length){
-    html+=`<div class="dcard dcard-p" style="text-align:center;padding:28px;color:var(--text3);font-family:var(--mono);font-size:13px">Здесь пусто.</div>`;
-  } else {
-    html+=`<div class="dcard" style="overflow:hidden;margin-bottom:22px">`;
-    shown.forEach(c=>{
-      const mk=markOf(c);
-      const dot=mk==='yes'?'var(--green)':mk==='draft'?'#bf5af2':mk==='no'?'var(--red)':'rgba(255,255,255,.22)';
-      const halo=mk==='yes'?'rgba(48,209,88,.18)':mk==='draft'?'rgba(191,90,242,.18)':mk==='no'?'rgba(255,69,58,.18)':'rgba(255,255,255,.06)';
-      const exp=dayExpandedCid===c.id;
-      const nFlows=getFlows(c.id).length;
-      const meta=[];
-      if(c.deadline){ const dl=new Date(c.deadline+'T00:00:00'); meta.push((c.deadline<iso?'просрочен ':'дедлайн ')+dl.getDate()+' '+_MSHORT[dl.getMonth()]); }
-      // отметки ЭТОЙ зоны (отправлено + черновики) — та же логика, что в сайдбаре и Финансах,
-      // иначе у клиента с одними черновиками показывалось «0 отправлено»
-      const zHist=historyData[c.name]||{};
-      let zSent=0, zDraft=0;
-      Object.keys(zHist).forEach(k=>{ if(!_markInActiveZone(c.id,k))return; if(zHist[k]==='yes')zSent++; else if(zHist[k]==='draft')zDraft++; });
-      meta.push(zSent+' отправлено'+(zDraft?' · '+zDraft+' черновик'+(zDraft>=2&&zDraft<=4?'а':zDraft>=5?'ов':''):''));
-      if(nFlows) meta.push(nFlows+' флоу');
-      if(c.paused) meta.push('на паузе');
-      const pay=(mk==='yes'||mk==='draft')?('$'+rateOf(c).toFixed(2)):'—';
-      const payCol=(mk==='yes'||mk==='draft')?'var(--green)':'var(--text3)';
-      const smsChip=c.smsEnabled?`<div class="dchip dchip-sms">SMS</div>`:'';
-      const seg=[['yes','Да','on-yes'],['draft','Черновик','on-draft'],['no','Нет','on-no']].map(o=>
-        `<button class="${mk===o[0]?'on '+o[2]:''}" onclick="event.stopPropagation();_setDayMark('${c.id}','${iso}','${o[0]}')" title="${mk===o[0]?'Нажми ещё раз, чтобы снять':''}">${o[1]}</button>`).join('');
-      html+=`<div style="border-bottom:1px solid rgba(255,255,255,.05)">
-        <div class="dclient-row" onclick="_dayToggleExpand('${c.id}')" style="display:flex;align-items:center;gap:13px;padding:13px 17px;cursor:pointer;${c.paused?'opacity:.5;':''}">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.32)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="flex:none;transition:transform .2s ease;transform:rotate(${exp?90:0}deg)"><path d="M9 6l6 6-6 6"/></svg>
-          <div style="width:8px;height:8px;border-radius:980px;flex:none;background:${dot};box-shadow:0 0 0 3px ${halo}"></div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:13.5px;font-weight:540;letter-spacing:-.15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</div>
-            <div class="dmeta" style="margin-top:3px">${meta.join(' · ')}</div>
-          </div>
-          ${smsChip}
-          <div class="dseg">${seg}</div>
-          <div style="font-family:var(--mono);font-size:12.5px;font-weight:600;width:48px;flex:none;text-align:right;color:${payCol}">${pay}</div>
-        </div>
-        ${exp?_dayInlineCalendar(c):''}
-      </div>`;
-    });
-    html+=`</div>`;
-  }
-
   // ── tasks (kept from the old tab, restyled) ───────────────
   const tasks=load('dc_plantasks',{});
   const todEmoji={morning:'🌅',day:'☀️',evening:'🌇',night:'🌙'};
@@ -588,6 +527,68 @@ function renderDayToday(){
     });
     html+=`</div>`;
   }
+
+  // ── marking list ──────────────────────────────────────────
+  const MF=[['all','Все',ac.length],['left','Осталось',leftCl.length],['done','Готово',doneCl.length],['overdue','Просрочки',overdueCl.length]];
+  if(!MF.some(f=>f[0]===dayMarkFilter)) dayMarkFilter='all';
+  html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">`+
+    MF.map(f=>`<button class="dpill ${dayMarkFilter===f[0]?'active':''}" onclick="dayMarkFilter='${f[0]}';render()">${f[1]}<span class="n">${f[2]}</span></button>`).join('')+
+    `<div style="flex:1"></div><button class="dbtn dbtn-sm" onclick="setView('today')" title="Сетка-календарь всех клиентов">▦ сетка</button></div>`;
+
+  if(overdueCl.length){
+    const names=overdueCl.slice(0,4).map(c=>esc(c.name)+' ('+fmtDate(new Date(c.deadline+'T00:00:00')).slice(0,5)+')').join(', ');
+    html+=`<div style="display:flex;align-items:center;gap:11px;padding:12px 16px;border-radius:16px;background:linear-gradient(180deg,rgba(255,69,58,.18),rgba(255,69,58,.08));border:1px solid rgba(255,69,58,.22);margin-bottom:14px;box-shadow:0 1px 0 rgba(255,255,255,.08) inset">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff453a" stroke-width="2" stroke-linecap="round" style="flex:none"><path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+      <div style="font-size:13px;color:#ff8078;font-weight:540">${overdueCl.length} просрочк${overdueCl.length===1?'а':overdueCl.length<5?'и':''}: ${names}${overdueCl.length>4?' …':''}</div>
+    </div>`;
+  }
+
+  const shown = dayMarkFilter==='left'?leftCl : dayMarkFilter==='done'?doneCl : dayMarkFilter==='overdue'?overdueCl : ac;
+  if(!ac.length){
+    html+=`<div class="dcard dcard-p" style="text-align:center;padding:30px 20px;color:var(--text3);font-family:var(--mono);font-size:13px;line-height:1.7">В зоне «${_finZoneLabel()}» нет клиентов.<br>Добавь их на вкладке «Клиенты».<br><button class="dbtn dbtn-primary" style="margin-top:14px" onclick="setView('clients')">→ Клиенты</button></div>`;
+  } else if(!shown.length){
+    html+=`<div class="dcard dcard-p" style="text-align:center;padding:28px;color:var(--text3);font-family:var(--mono);font-size:13px">Здесь пусто.</div>`;
+  } else {
+    html+=`<div class="dcard" style="overflow:hidden;margin-bottom:22px">`;
+    shown.forEach(c=>{
+      const mk=markOf(c);
+      const dot=mk==='yes'?'var(--green)':mk==='draft'?'#bf5af2':mk==='no'?'var(--red)':'rgba(255,255,255,.22)';
+      const halo=mk==='yes'?'rgba(48,209,88,.18)':mk==='draft'?'rgba(191,90,242,.18)':mk==='no'?'rgba(255,69,58,.18)':'rgba(255,255,255,.06)';
+      const exp=dayExpandedCid===c.id;
+      const nFlows=getFlows(c.id).length;
+      const meta=[];
+      if(c.deadline){ const dl=new Date(c.deadline+'T00:00:00'); meta.push((c.deadline<iso?'просрочен ':'дедлайн ')+dl.getDate()+' '+_MSHORT[dl.getMonth()]); }
+      // отметки ЭТОЙ зоны (отправлено + черновики) — та же логика, что в сайдбаре и Финансах,
+      // иначе у клиента с одними черновиками показывалось «0 отправлено»
+      const zHist=historyData[c.name]||{};
+      let zSent=0, zDraft=0;
+      Object.keys(zHist).forEach(k=>{ if(!_markInActiveZone(c.id,k))return; if(zHist[k]==='yes')zSent++; else if(zHist[k]==='draft')zDraft++; });
+      meta.push(zSent+' отправлено'+(zDraft?' · '+zDraft+' черновик'+(zDraft>=2&&zDraft<=4?'а':zDraft>=5?'ов':''):''));
+      if(nFlows) meta.push(nFlows+' флоу');
+      if(c.paused) meta.push('на паузе');
+      const pay=(mk==='yes'||mk==='draft')?('$'+rateOf(c).toFixed(2)):'—';
+      const payCol=(mk==='yes'||mk==='draft')?'var(--green)':'var(--text3)';
+      const smsChip=c.smsEnabled?`<div class="dchip dchip-sms">SMS</div>`:'';
+      const seg=[['yes','Да','on-yes'],['draft','Черновик','on-draft'],['no','Нет','on-no']].map(o=>
+        `<button class="${mk===o[0]?'on '+o[2]:''}" onclick="event.stopPropagation();_setDayMark('${c.id}','${iso}','${o[0]}')" title="${mk===o[0]?'Нажми ещё раз, чтобы снять':''}">${o[1]}</button>`).join('');
+      html+=`<div style="border-bottom:1px solid rgba(255,255,255,.05)">
+        <div class="dclient-row" onclick="_dayToggleExpand('${c.id}')" style="display:flex;align-items:center;gap:13px;padding:13px 17px;cursor:pointer;${c.paused?'opacity:.5;':''}">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.32)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="flex:none;transition:transform .2s ease;transform:rotate(${exp?90:0}deg)"><path d="M9 6l6 6-6 6"/></svg>
+          <div style="width:8px;height:8px;border-radius:980px;flex:none;background:${dot};box-shadow:0 0 0 3px ${halo}"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13.5px;font-weight:540;letter-spacing:-.15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</div>
+            <div class="dmeta" style="margin-top:3px">${meta.join(' · ')}</div>
+          </div>
+          ${smsChip}
+          <div class="dseg">${seg}</div>
+          <div style="font-family:var(--mono);font-size:12.5px;font-weight:600;width:48px;flex:none;text-align:right;color:${payCol}">${pay}</div>
+        </div>
+        ${exp?_dayInlineCalendar(c):''}
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
   html+=`</div>`;
   return html;
 }
@@ -725,27 +726,31 @@ function renderHistory(){
   const G='#30d158', P='#bf5af2', R='#ff453a', B='#0a84ff';
   const hhmm=t=>{ if(!t) return ''; const d=new Date(t); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
   const dayMap={};                       // iso → {rows:[], earned:number}
-  const push=(iso,row)=>{ if(!iso||iso.slice(0,7)!==mk) return; (dayMap[iso]=dayMap[iso]||{rows:[],earned:0}); dayMap[iso].rows.push(row); dayMap[iso].earned+=row.val||0; };
+  // force=true — вызывающий уже проверил принадлежность зоне через _markInActiveZone
+  // (то же правило, что в Финансах), поэтому суммы Истории и Финансов сходятся.
+  const push=(iso,row,force)=>{ if(!iso) return; if(!force&&iso.slice(0,7)!==mk) return; (dayMap[iso]=dayMap[iso]||{rows:[],earned:0}); dayMap[iso].rows.push(row); dayMap[iso].earned+=row.val||0; };
 
-  // 1) отметки рассылок — по дню, когда я их поставил
+  // 1) отметки рассылок — день = ДАТА РАССЫЛКИ (как в макете: «5 августа» = что ушло
+  //    в этот день), а не день, когда я нажал кнопку. Статус берём последний по времени.
   const _zNames=_zoneClientNames();
-  const rawByDay={};
-  gload('dc_actlog',[]).forEach(e=>{ if(!e.w||e.w.slice(0,7)!==mk)return; if(!e.c||!_zNames[String(e.c).toLowerCase()])return; (rawByDay[e.w]=rawByDay[e.w]||[]).push(e); });
-  Object.keys(rawByDay).forEach(w=>{
-    const ents=rawByDay[w].slice().sort((a,b)=>(a.t||0)-(b.t||0));
-    const finalMap={}; ents.forEach(e=>{ finalMap[e.c+'|'+e.d]=e; });      // последний статус за клиент|дату
-    Object.values(finalMap).forEach(e=>{
-      if(e.s!=='yes'&&e.s!=='draft'&&e.s!=='no') return;
-      const c=clients.find(x=>x.name===e.c);
-      const sms=c?!!((smsAll[c.id]||{})[e.d]):false;
-      const off=c?!!((disAll[c.id]||{})[e.d]):false;
-      const val=(e.s==='yes'||e.s==='draft')&&!off?(sms?SMS_DAY_RATE:EMAIL_RATE):0;
-      const what=e.s==='yes'?(sms?'имейл + SMS':'имейл'):e.s==='draft'?'черновик':'не сделано';
-      const other=e.d!==w?('за '+new Date(e.d+'T00:00:00').getDate()+' '+_MSHORT[new Date(e.d+'T00:00:00').getMonth()]):'';
-      push(w,{text:esc(e.c)+' — '+what, forDate:other, time:hhmm(e.t), val:(e.s==='draft'||e.s==='no')?0:val,
+  const finalMap={};
+  gload('dc_actlog',[]).slice().sort((a,b)=>(a.t||0)-(b.t||0)).forEach(e=>{
+    if(!e.c||!e.d) return;
+    if(!_zNames[String(e.c).toLowerCase()]) return;
+    finalMap[e.c+'|'+e.d]=e;                                   // последняя отметка за клиент|дату
+  });
+  Object.values(finalMap).forEach(e=>{
+    if(e.s!=='yes'&&e.s!=='draft'&&e.s!=='no') return;
+    const c=clients.find(x=>x.name===e.c);
+    if(c&&!_markInActiveZone(c.id,e.d)) return;                 // только эта зона
+    if(!c&&e.d.slice(0,7)!==mk) return;
+    const sms=c?!!((smsAll[c.id]||{})[e.d]):false;
+    const off=c?!!((disAll[c.id]||{})[e.d]):false;
+    const val=(e.s==='yes'||e.s==='draft')&&!off?(sms?SMS_DAY_RATE:EMAIL_RATE):0;
+    const what=e.s==='yes'?(sms?'имейл + SMS':'имейл'):e.s==='draft'?'черновик':'не сделано';
+    push(e.d,{text:esc(e.c)+' — '+what, forDate:'', time:hhmm(e.t), val:(e.s==='draft'||e.s==='no')?0:val,
               money:(e.s==='draft'||e.s==='no')?'—':'$'+val.toFixed(2),
-              color:e.s==='yes'?G:e.s==='draft'?P:R, cname:e.c});
-    });
+              color:e.s==='yes'?G:e.s==='draft'?P:R, cname:e.c}, true);
   });
 
   // 2) выставленные флоу
@@ -755,7 +760,7 @@ function renderHistory(){
     const c=clients.find(x=>x.id===t.cid);
     const fl=(t.cid?getFlows(t.cid):[]).find(f=>f.id===t.flowId);
     const val=fl?fl.count*0.60:0;
-    push(t.startIso,{text:(c?esc(c.name):'Без клиента')+' — флоу «'+esc(fl?fl.name:t.text)+'»', time:'', val:val, money:'$'+val.toFixed(2), color:P, cname:c?c.name:''});
+    push(t.startIso,{text:(c?esc(c.name):'Без клиента')+' — флоу «'+esc(fl?fl.name:t.text)+'»', time:'', val:val, money:'$'+val.toFixed(2), color:P, cname:c?c.name:''}, _markInActiveZone(t.cid,t.startIso));
   });
 
   // 3) инвойсы

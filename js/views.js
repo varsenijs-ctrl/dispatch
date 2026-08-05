@@ -470,7 +470,12 @@ function renderDayToday(){
       const nFlows=getFlows(c.id).length;
       const meta=[];
       if(c.deadline){ const dl=new Date(c.deadline+'T00:00:00'); meta.push((c.deadline<iso?'просрочен ':'дедлайн ')+dl.getDate()+' '+_MSHORT[dl.getMonth()]); }
-      meta.push(clientSentCount(c)+' отправлено');
+      // отметки ЭТОЙ зоны (отправлено + черновики) — та же логика, что в сайдбаре и Финансах,
+      // иначе у клиента с одними черновиками показывалось «0 отправлено»
+      const zHist=historyData[c.name]||{};
+      let zSent=0, zDraft=0;
+      Object.keys(zHist).forEach(k=>{ if(!_markInActiveZone(c.id,k))return; if(zHist[k]==='yes')zSent++; else if(zHist[k]==='draft')zDraft++; });
+      meta.push(zSent+' отправлено'+(zDraft?' · '+zDraft+' черновик'+(zDraft>=2&&zDraft<=4?'а':zDraft>=5?'ов':''):''));
       if(nFlows) meta.push(nFlows+' флоу');
       if(c.paused) meta.push('на паузе');
       const pay=(mk==='yes'||mk==='draft')?('$'+rateOf(c).toFixed(2)):'—';
@@ -736,8 +741,8 @@ function renderHistory(){
       const off=c?!!((disAll[c.id]||{})[e.d]):false;
       const val=(e.s==='yes'||e.s==='draft')&&!off?(sms?SMS_DAY_RATE:EMAIL_RATE):0;
       const what=e.s==='yes'?(sms?'имейл + SMS':'имейл'):e.s==='draft'?'черновик':'не сделано';
-      const other=e.d!==w?' · за '+new Date(e.d+'T00:00:00').getDate()+' '+_MSHORT[new Date(e.d+'T00:00:00').getMonth()]:'';
-      push(w,{text:esc(e.c)+' — '+what+other, time:hhmm(e.t), val:(e.s==='draft'||e.s==='no')?0:val,
+      const other=e.d!==w?('за '+new Date(e.d+'T00:00:00').getDate()+' '+_MSHORT[new Date(e.d+'T00:00:00').getMonth()]):'';
+      push(w,{text:esc(e.c)+' — '+what, forDate:other, time:hhmm(e.t), val:(e.s==='draft'||e.s==='no')?0:val,
               money:(e.s==='draft'||e.s==='no')?'—':'$'+val.toFixed(2),
               color:e.s==='yes'?G:e.s==='draft'?P:R, cname:e.c});
     });
@@ -776,6 +781,7 @@ function renderHistory(){
       rowsHtml+=`<div class="drow"${r.cname?` onclick="openCalByName('${jsq(r.cname)}')" style="cursor:pointer"`:''}>
         <div style="width:6px;height:6px;border-radius:980px;flex:none;background:${r.color}"></div>
         <div style="flex:1;min-width:0;font-size:12.5px;color:rgba(255,255,255,.86);letter-spacing:-.1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.text}</div>
+        ${r.forDate?`<div style="font-family:var(--mono);font-size:11px;color:rgba(255,255,255,.22)">${r.forDate}</div>`:''}
         <div style="font-family:var(--mono);font-size:11.5px;color:var(--text3)">${r.time}</div>
         <div style="font-family:var(--mono);font-size:12px;font-weight:600;width:48px;text-align:right">${r.money}</div>
       </div>`;

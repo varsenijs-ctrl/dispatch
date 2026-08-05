@@ -51,19 +51,22 @@ function renderFlows(){
 
     let cards='', hasAny=false;
     ac.forEach(c=>{
-      const flows=getFlows(c.id).filter(f=>!Object.values(tasks).some(t=>t.cid===c.id&&t.flowId===f.id&&t.done));
+      // Каталог ВСЕХ флоу клиента (как в макете). Раньше выставленные скрывались
+      // навсегда — и вкладка становилась пустой; теперь они просто помечены «выставлен».
+      const flows=getFlows(c.id);
       if(!flows.length) return;
       hasAny=true;
       const sum=flows.reduce((s,f)=>s+f.count*0.60,0);
-      const allDone=flows.every(f=>Object.values(tasks).some(t=>t.cid===c.id&&t.flowId===f.id&&t.startIso===iso&&t.done));
+      const allDone=flows.every(f=>Object.values(tasks).some(t=>t.cid===c.id&&t.flowId===f.id&&t.done));
       let rows='';
       flows.forEach(f=>{
         const doneToday=Object.values(tasks).find(t=>t.cid===c.id&&t.flowId===f.id&&t.startIso===iso&&t.done);
-        const late=f.deadline&&f.deadline<iso;
+        const issued=doneToday||Object.values(tasks).find(t=>t.cid===c.id&&t.flowId===f.id&&t.done);
+        const late=!issued&&f.deadline&&f.deadline<iso;
         rows+=`<div class="dhover" style="${ROW}${late?';border-color:rgba(255,69,58,.3)':''}">
           <div style="display:flex;align-items:center;gap:10px">
             ${ICON}
-            <div style="flex:1;min-width:0;font-size:12.5px;letter-spacing:-.1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${doneToday?'color:var(--green)':''}">${esc(f.name)}</div>
+            <div style="flex:1;min-width:0;font-size:12.5px;letter-spacing:-.1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${issued?'color:var(--green)':''}">${esc(f.name)}</div>
             <div style="font-family:var(--mono);font-size:11.5px;color:var(--text2);flex:none">$${(f.count*0.60).toFixed(2)}</div>
             <div class="dact">
               <input type="date" class="dinput dinput-sm ddate" value="${f.deadline||''}" onchange="event.stopPropagation();_setFlowDl(this)" data-cid="${c.id}" data-fid="${f.id}" title="Дедлайн" style="font-size:10px;padding:2px 4px;width:104px">
@@ -71,11 +74,11 @@ function renderFlows(){
               <button class="dicon" onclick="event.stopPropagation();_dfFlow(this)" data-cid="${c.id}" data-fid="${f.id}" title="Удалить флоу" style="width:22px;height:22px;font-size:12px">✕</button>
             </div>
           </div>
-          ${(f.deadline||f.count!==1)?`<div style="display:flex;align-items:center;gap:7px;margin-top:6px">
+          <div style="display:flex;align-items:center;gap:7px;margin-top:6px">
             <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${f.count}✉</span>
-            ${f.deadline?flowDeadlineBadge(f.deadline):''}
-            ${doneToday?'<span class="dchip dchip-ok">выставлен</span>':''}
-          </div>`:''}
+            ${(!issued&&f.deadline)?flowDeadlineBadge(f.deadline):''}
+            ${issued?`<span class="dchip dchip-ok">✓ выставлен${doneToday?' сегодня':''}</span>`:'<span class="dchip dchip-dim">не выставлен</span>'}
+          </div>
         </div>`;
       });
       cards+=`<div class="dcard dhover" style="padding:17px 18px">
@@ -94,8 +97,8 @@ function renderFlows(){
     });
     if(hasAny) h+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">${cards}</div>`;
     else h+=`<div class="dcard dcard-p" style="text-align:center;padding:44px 20px;color:var(--text3)">
-      <div style="font-size:30px;margin-bottom:10px">${totalPlanned>0?'🎉':'⚡'}</div>
-      <div style="font-size:14px">${totalPlanned>0?'Все флоу выставлены — смотри «Историю»':'Нет флоу — добавь их у клиента'}</div>
+      <div style="font-size:30px;margin-bottom:10px">⚡</div>
+      <div style="font-size:14px">В зоне «${_finZoneLabel()}» нет флоу — добавь их у клиента</div>
       <button class="dbtn dbtn-primary" style="margin-top:14px" onclick="setView('clients')">→ Клиенты</button></div>`;
 
   } else {

@@ -1,12 +1,3 @@
-// ── Планировщик — 3 колонки дней (по макету) + месяц ─────────
-// Колонки: сегодня / завтра / послезавтра. Карточку можно перетащить в другую
-// колонку — задача переедет на этот день. Ниже — месячный календарь (как был).
-function _dropToDay(el,e,iso){
-  e.preventDefault(); el.style.background='';
-  if(_dragId){ const id=_dragId; _dragId=null; moveTask(id,iso); }
-}
-function _dayOverCol(el,e){ e.preventDefault(); el.style.background='rgba(64,203,224,.06)'; }
-function _dayLeaveCol(el){ el.style.background=''; }
 // ── Планировщик — 3 колонки дней, карточки ровно как в макете ──
 // Карточка: ручка-грип, текст, чип приоритета + клиент. Кнопки (готово/правка/
 // удалить) появляются по наведению, чтобы вид совпадал с макетом.
@@ -17,6 +8,10 @@ function _dropToDay(el,e,iso){
 }
 function _dayOverCol(el,e){ e.preventDefault(); el.style.background='rgba(64,203,224,.06)'; }
 function _dayLeaveCol(el){ el.style.background=''; }
+// Месячный календарь — инструмент приложения, в макете его нет: держим свёрнутым,
+// разворачивается кнопкой (состояние помнится при переключении вкладок).
+let plannerShowMonth=false;
+function togglePlannerMonth(){ _sfx.play('click'); plannerShowMonth=!plannerShowMonth; render(); }
 function renderPlanner(){
   if(typeof plannerMonth==='undefined')window.plannerMonth=new Date(getTODAY().getFullYear(),getTODAY().getMonth(),1);
   const iso=isoToday();
@@ -92,16 +87,22 @@ function renderPlanner(){
   cal+='</div>';
 
   return `<div style="max-width:1040px">
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:22px">${cols}</div>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
-      <div class="dcard-t" style="font-size:16px">${(MONTHS_RU[m]||'').charAt(0).toUpperCase()+(MONTHS_RU[m]||'').slice(1)} ${y}</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px">${cols}</div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <button class="dbtn dbtn-sm${plannerShowMonth?' on':''}" onclick="togglePlannerMonth()">${plannerShowMonth?'▾':'▸'} календарь месяца</button>
       <div style="flex:1"></div>
-      <button class="dbtn dbtn-sm" onclick="shiftPlannerMonth(-1)">‹ назад</button>
-      <button class="dbtn dbtn-sm" onclick="shiftPlannerMonth(0)">сегодня</button>
-      <button class="dbtn dbtn-sm" onclick="shiftPlannerMonth(1)">вперёд ›</button>
       <button class="dbtn dbtn-primary dbtn-sm" onclick="openDayModal('${iso}')">+ задача</button>
     </div>
-    <div class="dcard" style="padding:16px">${cal}</div>
+    ${plannerShowMonth?`<div style="margin-top:14px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+        <div class="dcard-t" style="font-size:16px">${(MONTHS_RU[m]||'').charAt(0).toUpperCase()+(MONTHS_RU[m]||'').slice(1)} ${y}</div>
+        <div style="flex:1"></div>
+        <button class="dbtn dbtn-sm" onclick="shiftPlannerMonth(-1)">‹ назад</button>
+        <button class="dbtn dbtn-sm" onclick="shiftPlannerMonth(0)">сегодня</button>
+        <button class="dbtn dbtn-sm" onclick="shiftPlannerMonth(1)">вперёд ›</button>
+      </div>
+      <div class="dcard" style="padding:16px">${cal}</div>
+    </div>`:''}
   </div>`;
 }
 

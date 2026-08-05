@@ -277,9 +277,11 @@ function renderClients(){
 
   // ── sort + count ──
   const SORTS=[['alpha','А→Я'],['money','по деньгам'],['count','меньше отправлено'],['deadline','дедлайн']];
+  const _unused=_zoneUnusedClients().length;
   html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
     ${SORTS.map(s=>`<button class="dpill ${clientsSort===s[0]?'active':''}" onclick="setClientsSort('${s[0]}')">${s[1]}</button>`).join('')}
     <div style="flex:1"></div>
+    ${_unused?`<button class="dbtn dbtn-sm" onclick="cleanZoneRoster()" title="Убрать из этой зоны клиентов, по которым в ней нет ни одной отметки. Сами клиенты и их данные остаются в базе.">🧹 без отметок: ${_unused}</button>`:''}
     <span class="dmeta">${active.length} в зоне «${_finZoneLabel()}»</span>
   </div>`;
 

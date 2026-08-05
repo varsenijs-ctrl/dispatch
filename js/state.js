@@ -75,6 +75,28 @@ function _inheritRoster(mk){
   save('dc_zone_roster', map);
   return {from:src, n:map[mk].length};
 }
+// Клиенты зоны, по которым в НЕЙ ничего нет: ни отметок, ни флоу, ни задач.
+// Обычно это те, кто попал в зону скопом (когда «Сегодня» показывала всех подряд).
+function _zoneUnusedClients(){
+  const tasks=load('dc_plantasks',{});
+  return _zoneClients().filter(function(c){
+    const hist=historyData[c.name]||{};
+    const hasMark=Object.keys(hist).some(function(iso){ return hist[iso]&&_markInActiveZone(c.id,iso); });
+    if(hasMark) return false;
+    if(getFlows(c.id).length) return false;
+    return !Object.values(tasks).some(function(t){ return t.cid===c.id; });
+  });
+}
+// Убирает их ИЗ ЗОНЫ. Записи клиентов и вся история остаются в базе.
+function cleanZoneRoster(){
+  const un=_zoneUnusedClients();
+  if(!un.length){ showToast('В зоне нет клиентов без отметок'); return; }
+  const n=un.length;
+  if(!confirm(`Убрать из зоны «${_finZoneLabel()}» ${n} ${_plural(n,'клиента','клиентов','клиентов')} без единой отметки?\n\n${un.slice(0,8).map(c=>'• '+c.name).join('\n')}${n>8?'\n… и ещё '+(n-8):''}\n\nСами клиенты и все их данные останутся в базе — они просто уйдут из этой зоны.`)) return;
+  un.forEach(function(c){ _removeFromRoster(c.id); });
+  showToast(`✓ Убрано из зоны: ${n}`);
+  render();
+}
 // Кнопка на вкладке «Клиенты» для уже существующей пустой зоны.
 function copyRosterFromPrevZone(){
   const r = _inheritRoster(activeMonth);

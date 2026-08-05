@@ -457,7 +457,20 @@ function renderDayToday(){
 
   const shown = dayMarkFilter==='left'?leftCl : dayMarkFilter==='done'?doneCl : dayMarkFilter==='overdue'?overdueCl : ac;
   if(!ac.length){
-    html+=`<div class="dcard dcard-p" style="text-align:center;padding:30px 20px;color:var(--text3);font-family:var(--mono);font-size:13px;line-height:1.7">В зоне «${_finZoneLabel()}» нет клиентов.<br>Добавь их на вкладке «Клиенты».<br><button class="dbtn dbtn-primary" style="margin-top:14px" onclick="setView('clients')">→ Клиенты</button></div>`;
+    // Пустая зона: переносим состав клиентов из прошлой прямо отсюда — иначе кажется,
+    // что приложение «работает только в одной зоне».
+    const _rmT=_rosterMap();
+    const _pz=Object.keys(_rmT).filter(k=>k<activeMonth&&Array.isArray(_rmT[k])&&_rmT[k].length).sort().pop()
+           || Object.keys(_rmT).filter(k=>Array.isArray(_rmT[k])&&_rmT[k].length).sort()[0];
+    const _pl=_pz?(()=>{const p=_pz.split('-');return `${MONTHS_RU[+p[1]-1]} ${p[0]}`;})():'';
+    html+=`<div class="dcard dcard-p" style="text-align:center;padding:30px 20px;color:var(--text3);font-family:var(--mono);font-size:13px;line-height:1.7">В зоне «${_finZoneLabel()}» нет клиентов.
+      ${_pz?`<br>Перенеси список из прошлой зоны или добавь на вкладке «Клиенты».
+      <div style="margin-top:14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <button class="dbtn dbtn-primary" style="font-family:var(--font)" onclick="copyRosterFromPrevZone()">↩ Перенести ${_rmT[_pz].length} ${_plural(_rmT[_pz].length,'клиента','клиентов','клиентов')} из «${_pl}»</button>
+        <button class="dbtn" style="font-family:var(--font)" onclick="setView('clients')">→ Клиенты</button>
+      </div>`
+      :`<br>Добавь их на вкладке «Клиенты».<br><button class="dbtn dbtn-primary" style="margin-top:14px" onclick="setView('clients')">→ Клиенты</button>`}
+    </div>`;
   } else if(!shown.length){
     html+=`<div class="dcard dcard-p" style="text-align:center;padding:28px;color:var(--text3);font-family:var(--mono);font-size:13px">Здесь пусто.</div>`;
   } else {

@@ -416,11 +416,11 @@ function _dayInlineCalendar(c){
   }
   return `<div style="padding:4px 17px 20px">
     <div class="dsunk" style="padding:16px 18px 18px">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
-        <div style="font-size:13px;font-weight:620;letter-spacing:-.2px">${MONTHS_RU[m-1]} ${y} · ${esc(c.name)}</div>
-        <div class="dmeta">${marks} отмечено · $${money.toFixed(2)}</div>
+      <div class="dhover" style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+        <div style="font-size:13px;font-weight:620;letter-spacing:-.2px">${(MONTHS_RU[m-1]||'').charAt(0).toUpperCase()+(MONTHS_RU[m-1]||'').slice(1)} ${y} · ${esc(c.name)}</div>
+        <div class="dmeta">${marks} отправлено · $${money.toFixed(2)}</div>
         <div style="flex:1"></div>
-        <button class="dbtn dbtn-sm" onclick="event.stopPropagation();openCal('${c.id}')" title="Открыть полный календарь (3 месяца)">📅 все месяцы</button>
+        <span class="dact"><button class="dicon neutral" onclick="event.stopPropagation();openCal('${c.id}')" title="Открыть полный календарь (3 месяца)" style="width:22px;height:22px;font-size:12px">📅</button></span>
         <div style="font-size:11.5px;color:var(--text3)">Клик по дню: да → черновик → нет → пусто</div>
       </div>
       <div class="dcal" style="margin-bottom:6px">${['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС'].map(w=>`<div class="dcal-dow">${w}</div>`).join('')}</div>
@@ -497,7 +497,7 @@ function renderDayToday(){
       const seg=[['yes','Да','on-yes'],['draft','Черновик','on-draft'],['no','Нет','on-no']].map(o=>
         `<button class="${mk===o[0]?'on '+o[2]:''}" onclick="event.stopPropagation();_setDayMark('${c.id}','${iso}','${o[0]}')" title="${mk===o[0]?'Нажми ещё раз, чтобы снять':''}">${o[1]}</button>`).join('');
       html+=`<div style="border-bottom:1px solid rgba(255,255,255,.05)">
-        <div class="dclient-row" onclick="_dayToggleExpand('${c.id}')" style="display:flex;align-items:center;gap:13px;padding:13px 17px;cursor:pointer;${c.paused?'opacity:.5;':''}">
+        <div class="dclient-row" onclick="_dayToggleExpand('${c.id}')" title="${exp?'Свернуть календарь':'Нажми, чтобы открыть календарь месяца'}" style="display:flex;align-items:center;gap:13px;padding:13px 17px;cursor:pointer;${c.paused?'opacity:.5;':''}">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.32)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="flex:none;transition:transform .2s ease;transform:rotate(${exp?90:0}deg)"><path d="M9 6l6 6-6 6"/></svg>
           <div style="width:8px;height:8px;border-radius:980px;flex:none;background:${dot};box-shadow:0 0 0 3px ${halo}"></div>
           <div style="flex:1;min-width:0">

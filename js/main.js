@@ -1,6 +1,6 @@
 // Build stamp — bump on each deploy so you can tell at a glance whether the
 // running app has the latest files (если метки нет — крутится старый JS из кэша).
-const BUILD='08.05 · правки: планировщик, история, флоу, импорт';
+const BUILD='08.05 · авто-обновление + правки вкладок';
 console.log('Dispatch build: '+BUILD+' — _overdue '+(typeof _overdue==='function'?'OK':'ОТСУТСТВУЕТ (старый код)'));
 try{ const _bt=document.getElementById('build-tag'); if(_bt) _bt.textContent=BUILD; }catch(e){}
 try{ const _td=document.getElementById('topbar-date'); if(_td) _td.textContent=fmtDate(getTODAY())+' '+DAYS_RU[getTODAY().getDay()]+' · '+MONTHS_RU[getTODAY().getMonth()]; }catch(e){}
@@ -177,3 +177,53 @@ setTimeout(renderMonthBar, 0);
 
 })();
 try{localStorage.removeItem('dc_accent_color');}catch(e){}  // fixed teal accent (#40cbe0) — color picker removed
+
+// ── Авто-обновление ──────────────────────────────────────────
+// GitHub Pages кэширует index.html на 10 минут, а установленное PWA — ещё дольше,
+// поэтому после деплоя браузер продолжал крутить старый JS (и казалось, что
+// «ничего не поменялось»). Сверяем свою версию ассетов с серверной и, если она
+// устарела, один раз перезагружаемся по новому URL (чтобы не взять html из кэша).
+(function(){
+  const MY_V=(function(){
+    try{
+      const s=document.currentScript||[].slice.call(document.scripts).filter(x=>/js\/main\.js/.test(x.src||''))[0];
+      const m=s&&(s.src||'').match(/[?&]v=([A-Za-z0-9.\-]+)/);
+      return m?m[1]:'';
+    }catch(e){ return ''; }
+  })();
+  if(!MY_V) return;
+  let checking=false, lastCheck=0;
+  function banner(newV){
+    if(document.getElementById('dc-update-bar')) return;
+    const b=document.createElement('div');
+    b.id='dc-update-bar';
+    b.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:20px;z-index:9999;display:flex;align-items:center;gap:12px;'+
+      'padding:10px 14px 10px 16px;border-radius:980px;font-family:var(--font);font-size:12.5px;color:#062227;'+
+      'background:linear-gradient(180deg,#40cbe0,rgba(64,203,224,.82));box-shadow:0 10px 34px rgba(0,0,0,.5),0 1px 0 rgba(255,255,255,.45) inset';
+    b.innerHTML='Доступна новая версия'+
+      '<button style="border:none;cursor:pointer;font:inherit;font-weight:700;padding:5px 12px;border-radius:980px;background:rgba(6,34,39,.16);color:#062227">Обновить</button>';
+    b.querySelector('button').onclick=function(){ location.replace(location.pathname+'?v='+newV); };
+    document.body.appendChild(b);
+  }
+  function check(){
+    const now=Date.now();
+    if(checking||now-lastCheck<60000) return;      // не чаще раза в минуту
+    checking=true; lastCheck=now;
+    fetch('./index.html?cb='+now,{cache:'no-store'})
+      .then(r=>r.ok?r.text():Promise.reject())
+      .then(html=>{
+        const m=html.match(/js\/main\.js\?v=([A-Za-z0-9.\-]+)/);
+        const newV=m&&m[1];
+        if(!newV||newV===MY_V) return;
+        const tried=sessionStorage.getItem('dc_reloaded_for');
+        if(tried===newV){ banner(newV); return; }   // авто-перезагрузка не помогла → спросим
+        sessionStorage.setItem('dc_reloaded_for',newV);
+        location.replace(location.pathname+'?v='+newV);
+      })
+      .catch(()=>{})
+      .then(()=>{ checking=false; });
+  }
+  setTimeout(check,1500);                                            // при запуске
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden) check(); });  // при возврате в приложение
+  window.addEventListener('focus',check);
+})();

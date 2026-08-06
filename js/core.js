@@ -136,37 +136,50 @@ function _zoneClientNames(){ var set={}; _zac().forEach(function(c){ if(c&&c.nam
 // (that zone rosters them for June) and never bleeds into July.
 // This is the rule build "07.22 · сайдбар-как-финансы" used (the one that read 446) —
 // Finance, Обзор, Флоу and the sidebar ALL share it, so their numbers agree.
-function _markInActiveZone(cid, iso){
-  // СТРОГО по месяцу: отметка принадлежит только зоне своего календарного месяца.
-  // Прежнее правило («если клиент не расписан в зоне того месяца — считаем здесь»)
-  // тянуло в активную зону чужие месяцы: в июле/августе вылезали июньские отметки
-  // и деньги. Чтобы данные при этом не «пропали» из виду, _repairZoneRosters()
-  // разово добавляет клиента в ростер тех месяцев, где у него есть отметки.
-  return _inZone(iso);
+// Следующий месяц от ключа зоны: "2026-07" → "2026-08" (переход года учтён).
+function _nextMonthKey(mk){
+  var p=(mk||'').split('-').map(Number);
+  if(!p[0]||!p[1]) return mk||'';
+  var d=new Date(p[0], p[1], 1);                       // p[1] = месяц уже +1 (0-based)
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
 }
-// Разовый ремонт ростеров: клиент, у которого есть отметки в месяце M, должен быть
-// в списке клиентов зоны M — иначе его работа за тот месяц нигде не показывается.
-// Новые зоны не создаёт: дописывает только в уже существующие.
-function _repairZoneRosters(){
+// Месяцы, которые считает активная зона: свой + следующий (работа «в июле за август»
+// попадает в июльскую зону, а прошлые месяцы больше не протекают).
+function _zoneMonths(mk){ mk=mk||activeMonth; return [mk, _nextMonthKey(mk)]; }
+function _markInActiveZone(cid, iso){
+  var m=(iso||'').slice(0,7);
+  if(!m) return false;
+  return m===activeMonth || m===_nextMonthKey(activeMonth);
+}
+// Любой месяц, где есть отметки, должен быть доступен как зона и содержать своих
+// клиентов — иначе получалось, что месяц нигде не показывается, а данные в нём есть.
+// Идемпотентно: гоняем на каждой загрузке, лишнего не добавляем.
+function _ensureZonesForData(){
   try{
-    if(gload('dc_roster_repair_v1', false)) return {added:0};
-    var months=getMonths()||[];
-    var map=_rosterMap(), added=0;
     var hist=load('dc_history',{});
+    var months=getMonths()||[];
+    var map=_rosterMap();
+    var byMonth={}, addedZones=[], addedRoster=0;
     (load('dc_clients',[])||[]).forEach(function(c){
       var days=hist[c.name]||{};
-      var seen={};
-      Object.keys(days).forEach(function(iso){ if(days[iso]) seen[iso.slice(0,7)]=1; });
-      Object.keys(seen).forEach(function(mk){
-        if(months.indexOf(mk)<0) return;                       // зоны для этого месяца нет — не создаём
-        if(!Array.isArray(map[mk])) map[mk]=[];
-        if(map[mk].indexOf(c.id)<0){ map[mk].push(c.id); added++; }
+      Object.keys(days).forEach(function(iso){
+        if(!days[iso]) return;
+        var mk=iso.slice(0,7);
+        if(!/^\d{4}-\d{2}$/.test(mk)) return;
+        (byMonth[mk]=byMonth[mk]||{})[c.id]=1;
       });
     });
-    if(added) save('dc_zone_roster', map);
-    gsave('dc_roster_repair_v1', true);
-    return {added:added};
-  }catch(e){ return {added:0}; }
+    Object.keys(byMonth).forEach(function(mk){
+      if(months.indexOf(mk)<0){ months.push(mk); addedZones.push(mk); }
+      if(!Array.isArray(map[mk])) map[mk]=[];
+      Object.keys(byMonth[mk]).forEach(function(cid){
+        if(map[mk].indexOf(cid)<0){ map[mk].push(cid); addedRoster++; }
+      });
+    });
+    if(addedZones.length){ months.sort(); saveMonths(months); }
+    if(addedZones.length||addedRoster) save('dc_zone_roster', map);
+    return {zones:addedZones, roster:addedRoster};
+  }catch(e){ return {zones:[], roster:0}; }
 }
 // Normalized client-name key (case/space/punctuation-insensitive) so "Macro Beauty"
 // and "macrobeauty" collapse to the same key — used to de-duplicate client records.

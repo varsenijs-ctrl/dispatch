@@ -1175,6 +1175,27 @@ body::before{
 .dgdone:hover{border-color:rgba(255,255,255,.3);color:rgba(255,255,255,.3);}
 .dgdone.on{background:var(--green);border-color:transparent;color:#08080a;}
 
+/* ── Эффект подъёма при наведении (из макета) ──
+   .dlift — карточки задач: подсвечиваются, приподнимаются и дают тень.
+   .dlift-card — крупные карточки: только подъём + чуть светлее рамка. */
+.dlift{transition:background .16s ease,transform .16s ease,box-shadow .16s ease;}
+.dlift:hover{background:rgba(255,255,255,.085);transform:translateY(-2px);box-shadow:0 10px 24px rgba(0,0,0,.3);}
+.dlift-card{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;}
+.dlift-card:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.14);box-shadow:0 1px 0 rgba(255,255,255,.08) inset,0 16px 34px rgba(0,0,0,.3);}
+@media (hover:none){.dlift:hover,.dlift-card:hover{transform:none;}}
+
+/* строка-ряд внутри карточек Обзора/Истории: подсветка по наведению */
+.drow2{display:flex;align-items:center;gap:12px;padding:8px 10px;margin:0 -10px;border-radius:13px;transition:background .16s ease;}
+.drow2:hover{background:rgba(255,255,255,.05);}
+/* иконка события в кружке (История) */
+.devt{width:20px;height:20px;border-radius:7px;flex:none;display:flex;align-items:center;justify-content:center;}
+/* мини-бары в стат-карточках */
+.dbars{display:flex;align-items:flex-end;gap:2px;height:18px;flex:none;}
+.dbars span{width:3px;border-radius:980px;opacity:.45;}
+/* появление контента вкладки */
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+.dfade{animation:fadeUp .45s cubic-bezier(.2,.8,.2,1) both;}
+
 /* Extra controls that the mockup doesn't show: hidden until hover, so the default
    look matches the design while nothing from the app is lost. */
 .dact{opacity:0;transition:opacity .15s ease;display:flex;gap:2px;align-items:center;flex:none;}
@@ -1190,6 +1211,9 @@ body::before{
 
 /* Keep the new shell elements out of the mobile horizontal-nav layout */
 @media (max-width:720px){
+  /* Обзор: широкие сетки в одну/две колонки */
+  .home-grid-2{grid-template-columns:1fr!important;}
+  .home-stats-4{grid-template-columns:repeat(2,1fr)!important;}
   .dcard-p{padding:14px 15px;}
   .dth{display:none;}
   .dtr{flex-wrap:wrap;gap:8px 10px;padding:12px 14px;}

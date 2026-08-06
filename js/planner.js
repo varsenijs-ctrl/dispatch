@@ -36,7 +36,7 @@ function renderPlanner(){
       const pr=PRIO[+t.prio||0];
       const chip=pr?`<span style="font-size:9.5px;font-weight:660;letter-spacing:.4px;padding:2px 7px;border-radius:980px;background:${pr[2]};color:${pr[1]}">${pr[0]}</span>`:'';
       const cl=`<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${t.clientName?esc(t.clientName):'общее'}</span>`;
-      items+=`<div class="dhover" data-tid="${t.id}" draggable="true" ondragstart="_startDrag(this,event)" ondragend="_endDrag(this)" ondragover="_dragOver(this,event)" ondragleave="_dragLeave(this)" ondrop="_drop(this,event)"
+      items+=`<div class="dhover dlift" data-tid="${t.id}" draggable="true" ondragstart="_startDrag(this,event)" ondragend="_endDrag(this)" ondragover="_dragOver(this,event)" ondragleave="_dragLeave(this)" ondrop="_drop(this,event)"
         ondblclick="_editTask('${t.id}')" title="Двойной клик — редактировать"
         style="display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border-radius:14px;background:${over?'linear-gradient(180deg,rgba(255,69,58,.13),rgba(255,69,58,.05))':'rgba(255,255,255,.05)'};border:1px solid ${over?'rgba(255,69,58,.22)':'rgba(255,255,255,.06)'};cursor:grab;transition:background .15s ease,transform .15s ease;${t.done?'opacity:.45;':''}">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.26)" stroke-width="2.4" stroke-linecap="round" style="margin-top:3px;flex:none"><path d="M4 8h16M4 16h16"/></svg>

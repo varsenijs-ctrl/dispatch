@@ -47,6 +47,7 @@ function topbarAdd(){
   if(view==='flows'){ return; }              // flows are added per-client on that tab
   if(typeof openDayModal==='function'){ openDayModal(isoToday()); return; }  // default: add a task for today
 }
+let _lastRenderedView=null;   // чтобы возвращать прокрутку только внутри той же вкладки
 function render(){
   const _now=getTODAY();
   const dateEl=document.getElementById('topbar-date');
@@ -54,6 +55,14 @@ function render(){
   updateTopbar();
   updateSidebar();
   const el=document.getElementById('main-content');
+  // Перерисовка заменяет весь HTML, из-за чего страница прыгала в начало после каждой
+  // отметки. Запоминаем прокрутку (вертикальную и горизонтальную у помеченных сеток)
+  // и возвращаем её сразу после вставки — визуально ничего не дёргается.
+  const _keepTop=el?el.scrollTop:0;
+  const _keepLeft={};
+  if(el) el.querySelectorAll('[data-keepscroll]').forEach(n=>{ _keepLeft[n.getAttribute('data-keepscroll')]=n.scrollLeft; });
+  const _sameView=(_lastRenderedView===view);
+  _lastRenderedView=view;
   try{
   // Views with UI-only state (open panels, filters, expanded rows) must never come from
   // the data-version cache — toggling a flag doesn't bump _rv, so cached HTML would win
@@ -64,6 +73,15 @@ function render(){
     finance:renderFinance,flows:renderFlows,invoices:renderInvoices};
   const _rfn=_rmap[view];
   if(_rfn) el.innerHTML=_noC.includes(view)?_rfn():_cached(view,_rfn);
+  if(el&&_sameView){
+    el.scrollTop=_keepTop;
+    el.querySelectorAll('[data-keepscroll]').forEach(n=>{
+      const k=n.getAttribute('data-keepscroll');
+      if(_keepLeft[k]!=null) n.scrollLeft=_keepLeft[k];
+    });
+  } else if(el){
+    el.scrollTop=0;                                   // новая вкладка открывается сверху
+  }
   }catch(err){
     el.innerHTML='<div style="padding:30px;color:var(--red);font-family:monospace;font-size:12px;background:rgba(255,0,0,.05);border-radius:18px;border:1px solid rgba(255,0,0,.2)"><div style="font-weight:700;margin-bottom:8px">⚠ Ошибка рендера: '+err.message+'</div><pre style="opacity:.7;font-size:11px">'+err.stack+'</pre></div>';
     console.error('Render error:', err);
@@ -660,7 +678,7 @@ function renderToday(){
     </div>`;
   });
 
-  html+=`<div class="dcard" style="padding:18px;overflow-x:auto">
+  html+=`<div class="dcard" data-keepscroll="grid" style="padding:18px;overflow-x:auto">
     <div style="display:flex;gap:${GAP}px;padding-left:${NAMECOL+GAP}px;margin-bottom:7px">${head}</div>
     ${rows}
   </div></div>`;

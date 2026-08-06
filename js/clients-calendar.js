@@ -122,20 +122,21 @@ function buildCalDay(cls,isToday,cid,iso,d,dot,smsBtn,flowDay,flowInfo,flows,val
 
 function renderCalModal(cid){
   const c=clients.find(x=>x.id===cid);if(!c)return;
-  const allDatesRaw=collectAllDates(cid);
-  // Календарь строго по активной зоне: отметки других месяцев сюда не попадают —
-  // переключил зону, и календарь чистый (раньше рисовались 3 месяца вокруг сегодня,
-  // поэтому в августе продолжали висеть июльские отметки).
-  const allDates={};
-  Object.keys(allDatesRaw).forEach(function(iso){ if(iso.slice(0,7)===activeMonth) allDates[iso]=allDatesRaw[iso]; });
+  const allDates=collectAllDates(cid);
   const vals=Object.values(allDates);
-  document.getElementById('cal-stats').textContent=`${_finZoneLabel()} · ✓ ${vals.filter(v=>v==='yes').length} отправлено  ✗ ${vals.filter(v=>v==='no').length} не отправлено  ~ ${vals.filter(v=>v==='draft').length} черновик`;
-  const months=[activeMonth];
+  document.getElementById('cal-stats').textContent=`✓ ${vals.filter(v=>v==='yes').length} отправлено  ✗ ${vals.filter(v=>v==='no').length} не отправлено  ~ ${vals.filter(v=>v==='draft').length} черновик`;
+  // Предыдущий / текущий / следующий месяц — относительно АКТИВНОЙ ЗОНЫ (а не сегодняшней
+  // даты, как было раньше): в июльской зоне это июнь–июль–август.
+  const months=[];
+  const _az=activeMonth.split('-').map(Number);
+  for(let delta=-1;delta<=1;delta++){const d=new Date(_az[0],_az[1]-1+delta,1);months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);}
   let html='';
   months.forEach(mk=>{
     const [y,m]=mk.split('-').map(Number);
     const daysInMonth=new Date(y,m,0).getDate();const firstDow=new Date(y,m-1,1).getDay();const offset=(firstDow+6)%7;
-    html+=`<div class="cal-month"><div class="cal-month-title">${MONTHS_RU[m-1]} ${y}</div><div class="cal-grid">${['пн','вт','ср','чт','пт','сб','вс'].map(d=>`<div class="cal-dow">${d}</div>`).join('')}`;
+    // подпись у месяцев вне активной зоны: отметка там уйдёт в другую зону
+    const _other=mk!==activeMonth?` <span style="font-family:var(--mono);font-size:10px;color:var(--text3);font-weight:400;letter-spacing:.04em">· другая зона</span>`:'';
+    html+=`<div class="cal-month"><div class="cal-month-title">${MONTHS_RU[m-1]} ${y}${_other}</div><div class="cal-grid">${['пн','вт','ср','чт','пт','сб','вс'].map(d=>`<div class="cal-dow">${d}</div>`).join('')}`;
     for(let i=0;i<offset;i++)html+=`<div class="cal-day empty"></div>`;
     const smsDays=load('dc_sms_days',{});const cidSms=smsDays[cid]||{};
     const flowDaysCal=getFlowDays(cid);

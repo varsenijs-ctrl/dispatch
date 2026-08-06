@@ -1,6 +1,6 @@
 // Build stamp — bump on each deploy so you can tell at a glance whether the
 // running app has the latest files (если метки нет — крутится старый JS из кэша).
-const BUILD='08.06 · скролл сетки не листает вкладки';
+const BUILD='08.06 · свайпы убраны';
 console.log('Dispatch build: '+BUILD+' — _overdue '+(typeof _overdue==='function'?'OK':'ОТСУТСТВУЕТ (старый код)'));
 try{ const _bt=document.getElementById('build-tag'); if(_bt) _bt.textContent=BUILD; }catch(e){}
 try{ const _td=document.getElementById('topbar-date'); if(_td) _td.textContent=fmtDate(getTODAY())+' '+DAYS_RU[getTODAY().getDay()]+' · '+MONTHS_RU[getTODAY().getMonth()]; }catch(e){}
@@ -49,24 +49,10 @@ setTimeout(renderMonthBar, 0);
     if(a && a.scrollIntoView){ try{ a.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'}); }catch(e){} }
   }
 
-  // Есть ли под элементом контейнер с горизонтальной прокруткой, у которого ОСТАЛСЯ
-  // запас в сторону жеста? dx<0 — влево, dx>0 — вправо, dx=0 — любая сторона (touchstart,
-  // когда направление ещё неизвестно). Нужно, чтобы сетка «Рассылок» листалась по датам,
-  // а не переключала вкладку.
-  function _hScrollRoom(el, dx){
-    let n = el;
-    while(n && n.nodeType===1 && n!==document.body){
-      const st = getComputedStyle(n);
-      if((st.overflowX==='auto' || st.overflowX==='scroll') && n.scrollWidth > n.clientWidth + 1){
-        const maxLeft = n.scrollWidth - n.clientWidth - 1;
-        if(dx === 0) return true;                       // палец лёг на прокручиваемую сетку
-        if(dx < 0 && n.scrollLeft > 0) return true;     // ещё можно влево
-        if(dx > 0 && n.scrollLeft < maxLeft) return true;  // ещё можно вправо
-      }
-      n = n.parentElement;
-    }
-    return false;
-  }
+  // ── Жесты убраны ──
+  // Свайпы вкладок (трекпад + палец) удалены по просьбе: они перехватывали
+  // горизонтальную прокрутку сеток («Рассылки») и срабатывали не вовремя.
+  // Навигация осталась: клик по вкладке, стрелки ←/→ и цифры 1–9.
 
   function modalsOpen(){
     return document.getElementById('cal-modal').style.display !== 'none'
@@ -100,60 +86,9 @@ setTimeout(renderMonthBar, 0);
     if(i > 0) navTo(VIEWS[i-1]);
   }
 
-  // ── Trackpad / mouse wheel: exactly ONE switch per swipe ──
-  // A trackpad swipe emits a burst of wheel events plus a long inertial "momentum"
-  // tail. Switch once when the horizontal threshold is crossed, then stay LOCKED and
-  // swallow everything until the wheel has been quiet for a beat — the whole momentum
-  // tail is the SAME gesture. Result: one tab per swipe, never a multi-flip.
-  let wAccumX = 0, wAccumY = 0;
-  let wLocked = false;
-  let wIdleTimer = null;
-  const W_THRESHOLD = 55;
-  const W_IDLE = 260;                       // gesture ends after this much quiet
-  function _wDisarm(){ wLocked = false; wAccumX = 0; wAccumY = 0; }
 
-  // CAPTURE phase: run before the hovered element scrolls, so a horizontal swipe
-  // over a scrollable list can't get "latched"/eaten by that list — we intercept it
-  // and switch tabs. Vertical intent is left alone, so the list still scrolls.
-  document.addEventListener('wheel', e => {
-    if(modalsOpen()) return;
-    // genuinely horizontal-scroll UI + form controls keep their own wheel behaviour
-    if(e.target.closest('.navlist,.month-bar,.hist-wrap,.day-modal,.modal,.modal-overlay,input,textarea,select')) return;
-    // Сетка «Рассылок» и другие широкие таблицы прокручиваются по горизонтали —
-    // пока внутри есть куда скроллить в сторону жеста, вкладку не переключаем.
-    if(_hScrollRoom(e.target, e.deltaX)) return;
-    const ax = Math.abs(e.deltaX), ay = Math.abs(e.deltaY);
-    clearTimeout(wIdleTimer);
-    wIdleTimer = setTimeout(_wDisarm, W_IDLE);   // any wheel keeps the gesture alive
-    if(wLocked){ if(ax > ay) e.preventDefault(); return; }   // already switched → swallow the horizontal tail
-    if(ax > ay) e.preventDefault();         // this event is horizontal → it's ours, don't let the list latch it
-    wAccumX += e.deltaX; wAccumY += e.deltaY;
-    // switch once the gesture is decisively horizontal (net X dominates net Y)
-    if(Math.abs(wAccumX) >= W_THRESHOLD && Math.abs(wAccumX) > Math.abs(wAccumY)){
-      const dir = wAccumX > 0 ? 1 : -1;
-      wLocked = true; wAccumX = 0; wAccumY = 0;
-      if(dir > 0) goNext(); else goPrev();
-    }
-  }, { capture: true, passive: false });
 
-  // ── Touch (mobile) ──
-  // Ignore swipes that begin inside something horizontally scrollable (the tab
-  // strip, calendar grid, tables) or a form control — there a sideways drag means
-  // "scroll this", not "switch view".
-  let tx = 0, ty = 0, tIgnore = false;
-  document.addEventListener('touchstart', e => {
-    tx = e.touches[0].clientX;
-    ty = e.touches[0].clientY;
-    tIgnore = !!(e.target.closest && e.target.closest('.navlist,.month-bar,.hist-wrap,.day-modal,.modal,.modal-overlay,input,textarea,select'))
-           || _hScrollRoom(e.target, 0);   // палец на широкой сетке — это её прокрутка, не смена вкладки
-  }, { passive: true });
-  document.addEventListener('touchend', e => {
-    if(tIgnore || modalsOpen()) return;
-    const dx = e.changedTouches[0].clientX - tx;
-    const dy = e.changedTouches[0].clientY - ty;
-    if(Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
-    if(dx < 0) goNext(); else goPrev();
-  }, { passive: true });
+
 
   // ── Keyboard ──
   document.addEventListener('keydown', e => {

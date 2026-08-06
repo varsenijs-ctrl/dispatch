@@ -576,6 +576,24 @@ function renderDayToday(){
 // ── Рассылки — сетка клиенты × дни месяца (по макету) ─────────
 // Клик по ячейке циклит статус, галочка слева отмечает клиента сделанным за сегодня
 // (та же кнопка «готово», что была на старой вкладке), справа — деньги за месяц.
+// Режим отметок в сетке «Рассылки»: 'status' (да → черновик → нет → пусто) или 'sms'.
+let gridMode='status';
+// Клик по ячейке сетки: в режиме SMS (или с Shift) переключает SMS этого дня,
+// иначе циклит статус. SMS можно ставить и на пустой день — отметка появится
+// сама, когда поставишь статус.
+function _gridCellClick(ev, cid, dIso){
+  if(ev&&ev.shiftKey) return _gridToggleSms(cid,dIso);
+  if(gridMode==='sms') return _gridToggleSms(cid,dIso);
+  _dayCycleInline(cid,dIso);
+}
+function _gridToggleSms(cid, dIso){
+  const smsDays=load('dc_sms_days',{});
+  if(!smsDays[cid]) smsDays[cid]={};
+  if(smsDays[cid][dIso]) delete smsDays[cid][dIso]; else smsDays[cid][dIso]=true;
+  save('dc_sms_days',smsDays);
+  _sfx.play('click');
+  render();
+}
 function renderToday(){
   const iso=isoToday();
   const ac=_zac().sort((a,b)=>a.name.localeCompare(b.name,'ru'));   // only THIS zone's clients
@@ -589,9 +607,14 @@ function renderToday(){
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px;flex-wrap:wrap">
       ${[['Отправлено','#30d158'],['Черновик','#bf5af2'],['Не сделано','#ff453a']].map(l=>
         `<div style="display:flex;align-items:center;gap:7px;flex:none;white-space:nowrap"><div style="width:11px;height:11px;border-radius:4px;flex:none;background:${l[1]}"></div><span style="font-size:12px;color:var(--text2)">${l[0]}</span></div>`).join('')}
+      <div style="display:flex;align-items:center;gap:7px;flex:none;white-space:nowrap"><div style="width:11px;height:11px;border-radius:4px;flex:none;background:var(--blue)"></div><span style="font-size:12px;color:var(--text2)">SMS</span></div>
       <div style="width:1px;height:14px;background:rgba(255,255,255,.1)"></div>
-      <span style="font-size:12px;color:var(--text3)">Клик по ячейке меняет статус · «Готово» отмечает клиента за сегодня</span>
+      <span style="font-size:12px;color:var(--text3)">${gridMode==='sms'
+        ? 'Режим SMS: клик по ячейке добавляет/убирает SMS'
+        : 'Клик по ячейке меняет статус · Shift+клик — SMS'}</span>
       <div style="flex:1"></div>
+      <button class="dpill ${gridMode==='status'?'active':''}" onclick="gridMode='status';render()" title="Клик по ячейке меняет статус">статус</button>
+      <button class="dpill ${gridMode==='sms'?'active':''}" onclick="gridMode='sms';render()" title="Клик по ячейке отмечает SMS за этот день">SMS</button>
       <span class="dmeta">${doneCount}/${ac.length} готово · ${pct}%</span>
       <button class="dbtn dbtn-sm" onclick="setView('day_today')" title="Отметки списком со статусами">☰ списком</button>
     </div>`;
@@ -618,9 +641,11 @@ function renderToday(){
       const dIso=y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
       const v=hist[dIso]||'';
       if((v==='yes'||v==='draft')&&!cidDis[dIso]) money+=cidSms[dIso]?SMS_DAY_RATE:EMAIL_RATE;
-      const cls='dgcell'+(v?' g-'+v:'')+(dIso===iso?' today':'');
+      // SMS: синяя обводка ячейки + уголок. Клик — статус, Shift+клик (или режим SMS) — SMS.
+      const hasSms=!!cidSms[dIso];
+      const cls='dgcell'+(v?' g-'+v:'')+(dIso===iso?' today':'')+(hasSms?' has-sms':'');
       const ring=dIso===iso?'box-shadow:0 0 0 1.5px var(--accent)':'';
-      cells+=`<button class="${cls}" style="${ring}" onclick="_dayCycleInline('${c.id}','${dIso}')" title="${dIso}${v?' · '+v:''}${cidSms[dIso]?' · SMS':''}"></button>`;
+      cells+=`<button class="${cls}" style="${ring}" onclick="_gridCellClick(event,'${c.id}','${dIso}')" title="${dIso}${v?' · '+v:''}${hasSms?' · SMS':''} — ${gridMode==='sms'?'клик: SMS':'клик: статус, Shift+клик: SMS'}"></button>`;
     }
     const isDone=!!manual[c.id];
     rows+=`<div style="display:flex;align-items:center;gap:${GAP}px;margin-bottom:${GAP}px">

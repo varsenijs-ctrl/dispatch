@@ -361,6 +361,16 @@ var todayFilter='all';   // all | overdue | today | deadline | next
 let dayMarkFilter='all';     // all | left | done | overdue
 let dayExpandedCid=null;     // client whose inline calendar is open (one at a time)
 function _dayToggleExpand(cid){ _sfx.play('click'); dayExpandedCid=(dayExpandedCid===cid?null:cid); render(); }
+// Сменить клиента задачи прямо из строки на «Сегодня» (выпадающий список).
+function _taskSetClient(tid, cid){
+  const tasks=load('dc_plantasks',{});
+  const t=tasks[tid]; if(!t) return;
+  const c=cid?clients.find(x=>x.id===cid):null;
+  t.cid=c?c.id:''; t.clientName=c?c.name:'';
+  save('dc_plantasks',tasks);
+  showToast(c?('Клиент: '+c.name):'Клиент убран');
+  render();
+}
 // Set a status directly (clicking the active one clears it). Same plumbing as the
 // calendar modal: history + undo + action log + Google Sheet.
 function _setDayMark(cid,iso,val){
@@ -440,81 +450,6 @@ function renderDayToday(){
 
   let html=`<div style="max-width:1040px">`;
 
-  // ── marking list ──────────────────────────────────────────
-  const MF=[['all','Все',ac.length],['left','Осталось',leftCl.length],['done','Готово',doneCl.length],['overdue','Просрочки',overdueCl.length]];
-  if(!MF.some(f=>f[0]===dayMarkFilter)) dayMarkFilter='all';
-  html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">`+
-    MF.map(f=>`<button class="dpill ${dayMarkFilter===f[0]?'active':''}" onclick="dayMarkFilter='${f[0]}';render()">${f[1]}<span class="n">${f[2]}</span></button>`).join('')+
-    `<div style="flex:1"></div><button class="dbtn dbtn-sm" onclick="setView('today')" title="Сетка-календарь всех клиентов">▦ сетка</button></div>`;
-
-  if(overdueCl.length){
-    const names=overdueCl.slice(0,4).map(c=>esc(c.name)+' ('+fmtDate(new Date(c.deadline+'T00:00:00')).slice(0,5)+')').join(', ');
-    html+=`<div style="display:flex;align-items:center;gap:11px;padding:12px 16px;border-radius:16px;background:linear-gradient(180deg,rgba(255,69,58,.18),rgba(255,69,58,.08));border:1px solid rgba(255,69,58,.22);margin-bottom:14px;box-shadow:0 1px 0 rgba(255,255,255,.08) inset">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff453a" stroke-width="2" stroke-linecap="round" style="flex:none"><path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
-      <div style="font-size:13px;color:#ff8078;font-weight:540">${overdueCl.length} просрочк${overdueCl.length===1?'а':overdueCl.length<5?'и':''}: ${names}${overdueCl.length>4?' …':''}</div>
-    </div>`;
-  }
-
-  const shown = dayMarkFilter==='left'?leftCl : dayMarkFilter==='done'?doneCl : dayMarkFilter==='overdue'?overdueCl : ac;
-  if(!ac.length){
-    // Пустая зона: переносим состав клиентов из прошлой прямо отсюда — иначе кажется,
-    // что приложение «работает только в одной зоне».
-    const _rmT=_rosterMap();
-    const _pz=Object.keys(_rmT).filter(k=>k<activeMonth&&Array.isArray(_rmT[k])&&_rmT[k].length).sort().pop()
-           || Object.keys(_rmT).filter(k=>Array.isArray(_rmT[k])&&_rmT[k].length).sort()[0];
-    const _pl=_pz?(()=>{const p=_pz.split('-');return `${MONTHS_RU[+p[1]-1]} ${p[0]}`;})():'';
-    html+=`<div class="dcard dcard-p" style="text-align:center;padding:30px 20px;color:var(--text3);font-family:var(--mono);font-size:13px;line-height:1.7">В зоне «${_finZoneLabel()}» нет клиентов.
-      ${_pz?`<br>Перенеси список из прошлой зоны или добавь на вкладке «Клиенты».
-      <div style="margin-top:14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-        <button class="dbtn dbtn-primary" style="font-family:var(--font)" onclick="copyRosterFromPrevZone()">↩ Перенести ${_rmT[_pz].length} ${_plural(_rmT[_pz].length,'клиента','клиентов','клиентов')} из «${_pl}»</button>
-        <button class="dbtn" style="font-family:var(--font)" onclick="setView('clients')">→ Клиенты</button>
-      </div>`
-      :`<br>Добавь их на вкладке «Клиенты».<br><button class="dbtn dbtn-primary" style="margin-top:14px" onclick="setView('clients')">→ Клиенты</button>`}
-    </div>`;
-  } else if(!shown.length){
-    html+=`<div class="dcard dcard-p" style="text-align:center;padding:28px;color:var(--text3);font-family:var(--mono);font-size:13px">Здесь пусто.</div>`;
-  } else {
-    html+=`<div class="dcard" style="overflow:hidden;margin-bottom:22px">`;
-    shown.forEach(c=>{
-      const mk=markOf(c);
-      const dot=mk==='yes'?'var(--green)':mk==='draft'?'#bf5af2':mk==='no'?'var(--red)':'rgba(255,255,255,.22)';
-      const halo=mk==='yes'?'rgba(48,209,88,.18)':mk==='draft'?'rgba(191,90,242,.18)':mk==='no'?'rgba(255,69,58,.18)':'rgba(255,255,255,.06)';
-      const exp=dayExpandedCid===c.id;
-      const nFlows=getFlows(c.id).length;
-      const meta=[];
-      if(c.deadline){ const dl=new Date(c.deadline+'T00:00:00'); meta.push((c.deadline<iso?'просрочен ':'дедлайн ')+dl.getDate()+' '+_MSHORT[dl.getMonth()]); }
-      // отметки ЭТОЙ зоны (отправлено + черновики) — та же логика, что в сайдбаре и Финансах,
-      // иначе у клиента с одними черновиками показывалось «0 отправлено»
-      const zHist=historyData[c.name]||{};
-      let zSent=0, zDraft=0;
-      Object.keys(zHist).forEach(k=>{ if(!_markInActiveZone(c.id,k))return; if(zHist[k]==='yes')zSent++; else if(zHist[k]==='draft')zDraft++; });
-      meta.push(zSent+' отправлено'+(zDraft?' · '+zDraft+' черновик'+(zDraft>=2&&zDraft<=4?'а':zDraft>=5?'ов':''):''));
-      if(nFlows) meta.push(nFlows+' флоу');
-      if(c.paused) meta.push('на паузе');
-      const pay=(mk==='yes'||mk==='draft')?('$'+rateOf(c).toFixed(2)):'—';
-      const payCol=(mk==='yes'||mk==='draft')?'var(--green)':'var(--text3)';
-      const smsChip=c.smsEnabled?`<div class="dchip dchip-sms">SMS</div>`:'';
-      const seg=[['yes','Да','on-yes'],['draft','Черновик','on-draft'],['no','Нет','on-no']].map(o=>
-        `<button class="${mk===o[0]?'on '+o[2]:''}" onclick="event.stopPropagation();_setDayMark('${c.id}','${iso}','${o[0]}')" title="${mk===o[0]?'Нажми ещё раз, чтобы снять':''}">${o[1]}</button>`).join('');
-      html+=`<div style="border-bottom:1px solid rgba(255,255,255,.05)">
-        <div class="dclient-row" onclick="_dayToggleExpand('${c.id}')" title="${exp?'Свернуть календарь':'Нажми, чтобы открыть календарь месяца'}" style="display:flex;align-items:center;gap:13px;padding:13px 17px;cursor:pointer;${c.paused?'opacity:.5;':''}">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.32)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="flex:none;transition:transform .2s ease;transform:rotate(${exp?90:0}deg)"><path d="M9 6l6 6-6 6"/></svg>
-          <div style="width:8px;height:8px;border-radius:980px;flex:none;background:${dot};box-shadow:0 0 0 3px ${halo}"></div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:13.5px;font-weight:540;letter-spacing:-.15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</div>
-            <div class="dmeta" style="margin-top:3px">${meta.join(' · ')}</div>
-          </div>
-          ${smsChip}
-          <div class="dseg">${seg}</div>
-          <div style="font-family:var(--mono);font-size:12.5px;font-weight:600;width:48px;flex:none;text-align:right;color:${payCol}">${pay}</div>
-        </div>
-        ${exp?_dayInlineCalendar(c):''}
-      </div>`;
-    });
-    html+=`</div>`;
-  }
-
-
   // ── tasks (kept from the old tab, restyled) ───────────────
   const tasks=load('dc_plantasks',{});
   const todEmoji={morning:'🌅',day:'☀️',evening:'🌇',night:'🌙'};
@@ -565,17 +500,49 @@ function renderDayToday(){
     const todIcon=t.tod&&todEmoji[t.tod]?`<span style="font-size:13px;margin-right:5px">${todEmoji[t.tod]}</span>`:'';
     const bc=over?'rgba(255,69,58,.28)':todLate?'rgba(255,69,58,.22)':'rgba(255,255,255,.06)';
     const bg=over?'linear-gradient(180deg,rgba(255,69,58,.14),rgba(255,69,58,.05))':'rgba(255,255,255,.05)';
-    return `<div data-tid="${t.id}" draggable="true" ondragstart="_startDrag(this,event)" ondragend="_endDrag(this)" ondragover="_dragOver(this,event)" ondragleave="_dragLeave(this)" ondrop="_drop(this,event)"
-      style="display:flex;align-items:flex-start;gap:10px;padding:11px 13px;border:1px solid ${bc};border-radius:14px;margin-bottom:7px;background:${bg}">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.26)" stroke-width="2.4" stroke-linecap="round" style="margin-top:4px;flex:none;cursor:grab" title="Перетащить"><path d="M4 8h16M4 16h16"/></svg>
-      <div onclick="toggleDayTask('${t.id}');render()" style="width:16px;height:16px;border-radius:6px;border:1.5px solid ${over?'rgba(255,69,58,.6)':'rgba(255,255,255,.22)'};margin-top:2px;flex:none;cursor:pointer"></div>
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px">${prioFlag(t.prio)}${todIcon}<span class="task-text" ondblclick="event.stopPropagation();_editTask('${t.id}')" style="font-size:13px;font-weight:540;letter-spacing:-.1px;cursor:pointer;${over?'color:#ff8078':''}" title="Двойной клик — редактировать">${esc(t.text)}</span>${clientBadge}</div>
-        ${metaHtml}${note}
+    // ── строка задачи в стиле макета: каретка → точка статуса → чекбокс → текст,
+    //    справа выпадающий список клиента, переключатель Да/Черновик/Нет и сумма.
+    //    Каретка раскрывает календарь месяца этого клиента (как на «Рассылках»).
+    const mk=_cl?markOf(_cl):'';
+    const dot=mk==='yes'?'var(--green)':mk==='draft'?'#bf5af2':mk==='no'?'var(--red)':'rgba(255,255,255,.22)';
+    const halo=mk==='yes'?'rgba(48,209,88,.18)':mk==='draft'?'rgba(191,90,242,.18)':mk==='no'?'rgba(255,69,58,.18)':'rgba(255,255,255,.06)';
+    const exp=_cl&&dayExpandedCid===_cl.id;
+    const caret=_cl
+      ? `<svg onclick="event.stopPropagation();_dayToggleExpand('${_cl.id}')" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.32)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="flex:none;cursor:pointer;margin-top:3px;transition:transform .2s ease;transform:rotate(${exp?90:0}deg)" title="${exp?'Свернуть календарь':'Открыть календарь клиента'}"><path d="M9 6l6 6-6 6"/></svg>`
+      : `<span style="width:13px;flex:none"></span>`;
+    // Клиента задачи показываем даже если он не в ростере этой зоны (ClickUp-задачи
+    // часто привязаны к клиентам другого месяца) — иначе селект врал «без клиента».
+    const selList=ac.slice();
+    if(_cl && !selList.some(c=>c.id===_cl.id)) selList.unshift(_cl);
+    const opts=[`<option value=""${_cl?'':' selected'}>— без клиента —</option>`]
+      .concat(selList.map(c=>`<option value="${c.id}"${_cl&&_cl.id===c.id?' selected':''}>${esc(c.name)}${ac.some(x=>x.id===c.id)?'':' (др. зона)'}</option>`)).join('');
+    const clientSel=`<select class="dinput dinput-sm" onclick="event.stopPropagation()" onchange="event.stopPropagation();_taskSetClient('${t.id}',this.value)" title="Клиент задачи" style="flex:none;max-width:150px;font-size:11px;padding:4px 6px">${opts}</select>`;
+    const seg=_cl
+      ? `<div class="dseg">`+[['yes','Да','on-yes'],['draft','Черновик','on-draft'],['no','Нет','on-no']].map(o=>
+          `<button class="${mk===o[0]?'on '+o[2]:''}" onclick="event.stopPropagation();_setDayMark('${_cl.id}','${iso}','${o[0]}')" title="${mk===o[0]?'Нажми ещё раз, чтобы снять':'Отметить рассылку за сегодня'}">${o[1]}</button>`).join('')+`</div>`
+      : `<div class="dmeta" style="flex:none">выбери клиента →</div>`;
+    const pay=(_cl&&(mk==='yes'||mk==='draft'))?('$'+rateOf(_cl).toFixed(2)):'—';
+    const payCol=(_cl&&(mk==='yes'||mk==='draft'))?'var(--green)':'var(--text3)';
+    const smsChip=(_cl&&_cl.smsEnabled)?`<div class="dchip dchip-sms" style="flex:none">SMS</div>`:'';
+    return `<div class="dhover" data-tid="${t.id}" draggable="true" ondragstart="_startDrag(this,event)" ondragend="_endDrag(this)" ondragover="_dragOver(this,event)" ondragleave="_dragLeave(this)" ondrop="_drop(this,event)"
+      style="border:1px solid ${bc};border-radius:14px;margin-bottom:7px;background:${bg}">
+      <div style="display:flex;align-items:flex-start;gap:11px;padding:11px 13px">
+        ${caret}
+        <div style="width:8px;height:8px;border-radius:980px;flex:none;margin-top:6px;background:${dot};box-shadow:0 0 0 3px ${halo}"></div>
+        <div onclick="toggleDayTask('${t.id}');render()" title="Отметить задачу выполненной" style="width:16px;height:16px;border-radius:6px;border:1.5px solid ${over?'rgba(255,69,58,.6)':'rgba(255,255,255,.22)'};margin-top:2px;flex:none;cursor:pointer"></div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px">${prioFlag(t.prio)}${todIcon}<span class="task-text" ondblclick="event.stopPropagation();_editTask('${t.id}')" style="font-size:13px;font-weight:540;letter-spacing:-.1px;cursor:pointer;${over?'color:#ff8078':''}" title="Двойной клик — редактировать">${esc(t.text)}</span></div>
+          ${metaHtml}${note}
+        </div>
+        ${smsChip}${clientSel}${seg}
+        <div style="font-family:var(--mono);font-size:12.5px;font-weight:600;width:48px;flex:none;text-align:right;margin-top:2px;color:${payCol}">${pay}</div>
+        <span class="dact" style="margin-top:1px">
+          <input type="date" class="dinput dinput-sm ddate" value="${t.startIso}" onclick="event.stopPropagation()" onchange="moveTask('${t.id}',this.value)" title="Перенести на другой день" style="font-size:10px;padding:3px 6px">
+          <button class="dicon neutral" onclick="event.stopPropagation();_editTask('${t.id}')" title="Редактировать">✎</button>
+          <button class="dicon" onclick="event.stopPropagation();removeDayTask('${t.id}');render()" title="Удалить">✕</button>
+        </span>
       </div>
-      <input type="date" class="dinput dinput-sm ddate" value="${t.startIso}" onclick="event.stopPropagation()" onchange="moveTask('${t.id}',this.value)" title="Перенести на другой день" style="font-size:10px;padding:3px 6px">
-      <button class="dicon neutral" onclick="event.stopPropagation();_editTask('${t.id}')" title="Редактировать">✎</button>
-      <button class="dicon" onclick="event.stopPropagation();removeDayTask('${t.id}');render()" title="Удалить">✕</button>
+      ${exp?_dayInlineCalendar(_cl):''}
     </div>`;
   }
 

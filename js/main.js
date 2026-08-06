@@ -1,6 +1,6 @@
 // Build stamp — bump on each deploy so you can tell at a glance whether the
 // running app has the latest files (если метки нет — крутится старый JS из кэша).
-const BUILD='08.06 · Later вместо Draft';
+const BUILD='08.06 · скролл сетки не листает вкладки';
 console.log('Dispatch build: '+BUILD+' — _overdue '+(typeof _overdue==='function'?'OK':'ОТСУТСТВУЕТ (старый код)'));
 try{ const _bt=document.getElementById('build-tag'); if(_bt) _bt.textContent=BUILD; }catch(e){}
 try{ const _td=document.getElementById('topbar-date'); if(_td) _td.textContent=fmtDate(getTODAY())+' '+DAYS_RU[getTODAY().getDay()]+' · '+MONTHS_RU[getTODAY().getMonth()]; }catch(e){}
@@ -47,6 +47,25 @@ setTimeout(renderMonthBar, 0);
   function scrollActiveTabIntoView(){
     const a=document.querySelector('.navlist .tab.active');
     if(a && a.scrollIntoView){ try{ a.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'}); }catch(e){} }
+  }
+
+  // Есть ли под элементом контейнер с горизонтальной прокруткой, у которого ОСТАЛСЯ
+  // запас в сторону жеста? dx<0 — влево, dx>0 — вправо, dx=0 — любая сторона (touchstart,
+  // когда направление ещё неизвестно). Нужно, чтобы сетка «Рассылок» листалась по датам,
+  // а не переключала вкладку.
+  function _hScrollRoom(el, dx){
+    let n = el;
+    while(n && n.nodeType===1 && n!==document.body){
+      const st = getComputedStyle(n);
+      if((st.overflowX==='auto' || st.overflowX==='scroll') && n.scrollWidth > n.clientWidth + 1){
+        const maxLeft = n.scrollWidth - n.clientWidth - 1;
+        if(dx === 0) return true;                       // палец лёг на прокручиваемую сетку
+        if(dx < 0 && n.scrollLeft > 0) return true;     // ещё можно влево
+        if(dx > 0 && n.scrollLeft < maxLeft) return true;  // ещё можно вправо
+      }
+      n = n.parentElement;
+    }
+    return false;
   }
 
   function modalsOpen(){
@@ -100,6 +119,9 @@ setTimeout(renderMonthBar, 0);
     if(modalsOpen()) return;
     // genuinely horizontal-scroll UI + form controls keep their own wheel behaviour
     if(e.target.closest('.navlist,.month-bar,.hist-wrap,.day-modal,.modal,.modal-overlay,input,textarea,select')) return;
+    // Сетка «Рассылок» и другие широкие таблицы прокручиваются по горизонтали —
+    // пока внутри есть куда скроллить в сторону жеста, вкладку не переключаем.
+    if(_hScrollRoom(e.target, e.deltaX)) return;
     const ax = Math.abs(e.deltaX), ay = Math.abs(e.deltaY);
     clearTimeout(wIdleTimer);
     wIdleTimer = setTimeout(_wDisarm, W_IDLE);   // any wheel keeps the gesture alive
@@ -122,7 +144,8 @@ setTimeout(renderMonthBar, 0);
   document.addEventListener('touchstart', e => {
     tx = e.touches[0].clientX;
     ty = e.touches[0].clientY;
-    tIgnore = !!(e.target.closest && e.target.closest('.navlist,.month-bar,.hist-wrap,.day-modal,.modal,.modal-overlay,input,textarea,select'));
+    tIgnore = !!(e.target.closest && e.target.closest('.navlist,.month-bar,.hist-wrap,.day-modal,.modal,.modal-overlay,input,textarea,select'))
+           || _hScrollRoom(e.target, 0);   // палец на широкой сетке — это её прокрутка, не смена вкладки
   }, { passive: true });
   document.addEventListener('touchend', e => {
     if(tIgnore || modalsOpen()) return;

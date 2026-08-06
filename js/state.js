@@ -77,6 +77,39 @@ function _inheritRoster(mk){
   save('dc_zone_roster', map);
   return {from:src, n:map[mk].length};
 }
+// ── отметки за будущие даты ──────────────────────────────────
+// Их обычно заносил импорт из таблицы (там дни месяца заполнены заранее), а работа
+// по ним ещё не сделана. Считаем и умеем убрать одним нажатием.
+function _futureMarks(){
+  const t=isoToday(); const byClient={}; let n=0;
+  Object.keys(historyData).forEach(function(name){
+    const h=historyData[name]||{};
+    Object.keys(h).forEach(function(iso){ if(h[iso]&&iso>t){ n++; byClient[name]=(byClient[name]||0)+1; } });
+  });
+  return {n:n, byClient:byClient};
+}
+function clearFutureMarks(){
+  const f=_futureMarks(), t=isoToday();
+  if(!f.n){ showToast('Отметок за будущие даты нет'); return; }
+  const names=Object.keys(f.byClient);
+  const list=names.slice(0,8).map(function(x){ return '• '+x+' — '+f.byClient[x]; }).join('\n');
+  if(!confirm(`Убрать ${f.n} ${_plural(f.n,'отметку','отметки','отметок')} за даты ПОСЛЕ ${fmtDate(getTODAY())}?\n\n`
+    +`Затронет ${names.length} ${_plural(names.length,'клиента','клиентов','клиентов')}:\n${list}${names.length>8?'\n… и ещё '+(names.length-8):''}\n\n`
+    +`Отметки за сегодня и прошедшие дни останутся. Действие необратимо — если сомневаешься, сначала сделай «Экспорт в файл» на вкладке «Клиенты».`)) return;
+  const smsDays=load('dc_sms_days',{});
+  Object.keys(historyData).forEach(function(name){
+    const h=historyData[name]||{};
+    Object.keys(h).forEach(function(iso){ if(iso>t) delete h[iso]; });
+  });
+  Object.keys(smsDays).forEach(function(cid){                 // SMS-флаги будущих дней тоже не нужны
+    Object.keys(smsDays[cid]||{}).forEach(function(iso){ if(iso>t) delete smsDays[cid][iso]; });
+  });
+  save('dc_sms_days', smsDays);
+  saveAll();
+  showToast(`✓ Убрано ${f.n} ${_plural(f.n,'отметка','отметки','отметок')} за будущие даты`);
+  render();
+}
+
 // Клиенты зоны, по которым в НЕЙ ничего нет: ни отметок, ни флоу, ни задач.
 // Обычно это те, кто попал в зону скопом (когда «Сегодня» показывала всех подряд).
 function _zoneUnusedClients(){

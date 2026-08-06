@@ -137,12 +137,36 @@ function _zoneClientNames(){ var set={}; _zac().forEach(function(c){ if(c&&c.nam
 // This is the rule build "07.22 · сайдбар-как-финансы" used (the one that read 446) —
 // Finance, Обзор, Флоу and the sidebar ALL share it, so their numbers agree.
 function _markInActiveZone(cid, iso){
-  var m=(iso||'').slice(0,7);
-  if(!m) return false;
-  if(m===activeMonth) return true;
-  var mp=_rosterMap();
-  if(Array.isArray(mp[m]) && mp[m].indexOf(cid)>=0) return false;   // belongs to the zone of month m
-  return true;
+  // СТРОГО по месяцу: отметка принадлежит только зоне своего календарного месяца.
+  // Прежнее правило («если клиент не расписан в зоне того месяца — считаем здесь»)
+  // тянуло в активную зону чужие месяцы: в июле/августе вылезали июньские отметки
+  // и деньги. Чтобы данные при этом не «пропали» из виду, _repairZoneRosters()
+  // разово добавляет клиента в ростер тех месяцев, где у него есть отметки.
+  return _inZone(iso);
+}
+// Разовый ремонт ростеров: клиент, у которого есть отметки в месяце M, должен быть
+// в списке клиентов зоны M — иначе его работа за тот месяц нигде не показывается.
+// Новые зоны не создаёт: дописывает только в уже существующие.
+function _repairZoneRosters(){
+  try{
+    if(gload('dc_roster_repair_v1', false)) return {added:0};
+    var months=getMonths()||[];
+    var map=_rosterMap(), added=0;
+    var hist=load('dc_history',{});
+    (load('dc_clients',[])||[]).forEach(function(c){
+      var days=hist[c.name]||{};
+      var seen={};
+      Object.keys(days).forEach(function(iso){ if(days[iso]) seen[iso.slice(0,7)]=1; });
+      Object.keys(seen).forEach(function(mk){
+        if(months.indexOf(mk)<0) return;                       // зоны для этого месяца нет — не создаём
+        if(!Array.isArray(map[mk])) map[mk]=[];
+        if(map[mk].indexOf(c.id)<0){ map[mk].push(c.id); added++; }
+      });
+    });
+    if(added) save('dc_zone_roster', map);
+    gsave('dc_roster_repair_v1', true);
+    return {added:added};
+  }catch(e){ return {added:0}; }
 }
 // Normalized client-name key (case/space/punctuation-insensitive) so "Macro Beauty"
 // and "macrobeauty" collapse to the same key — used to de-duplicate client records.

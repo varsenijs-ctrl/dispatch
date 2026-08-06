@@ -1,12 +1,15 @@
-name: ClickUp → Dispatch daily sync
+name: ClickUp → Dispatch sync
 
-# Runs every morning on GitHub's servers (no computer needed), pulls your ClickUp
-# tasks, rewrites js/pending-inject.js and pushes — GitHub Pages then redeploys.
-# You can also trigger it by hand from the Actions tab (Run workflow).
+# Крутится на серверах GitHub (компьютер не нужен): тянет задачи из ClickUp,
+# перезаписывает js/pending-inject.js и пушит — Cloudflare публикует сам.
+# Раньше запускался раз в сутки, поэтому задачи, созданные днём, появлялись
+# в приложении только на следующее утро. Теперь — каждые 15 минут; коммит
+# делается только если список реально изменился, так что пустых деплоев нет.
+# Вручную: Actions → этот workflow → Run workflow.
 
 on:
   schedule:
-    - cron: '0 5 * * *'        # 05:00 UTC ≈ 08:00 МСК daily
+    - cron: '*/15 * * * *'     # каждые 15 минут
   workflow_dispatch: {}
 
 permissions:

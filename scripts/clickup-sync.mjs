@@ -91,9 +91,14 @@ try {
   const path = 'js/pending-inject.js';
   let src = readFileSync(path, 'utf8');
 
+  // Version stamp must change on EVERY sync, not once a day: it becomes the
+  // ?v= cache-buster in index.html, and with a date-only stamp a second sync
+  // on the same day rewrote RAW while browsers kept serving the cached file —
+  // so tasks created during the day never showed up. Include UTC hh:mm.
   const now = new Date();
   const pad = n => String(n).padStart(2, '0');
-  const version = `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(now.getUTCDate())}T001`;
+  const version = `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(now.getUTCDate())}`
+                + `T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}`;
 
   src = src.replace(/var INJECT_VERSION\s*=\s*'[^']*';/, `var INJECT_VERSION = '${version}';`);
 

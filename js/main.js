@@ -1,6 +1,6 @@
 // Build stamp — bump on each deploy so you can tell at a glance whether the
 // running app has the latest files (если метки нет — крутится старый JS из кэша).
-const BUILD='08.06 · черновики считаются в истории';
+const BUILD='08.07 · ClickUp каждые 15 минут';
 console.log('Dispatch build: '+BUILD+' — _overdue '+(typeof _overdue==='function'?'OK':'ОТСУТСТВУЕТ (старый код)'));
 try{ const _bt=document.getElementById('build-tag'); if(_bt) _bt.textContent=BUILD; }catch(e){}
 try{ const _td=document.getElementById('topbar-date'); if(_td) _td.textContent=fmtDate(getTODAY())+' '+DAYS_RU[getTODAY().getDay()]+' · '+MONTHS_RU[getTODAY().getMonth()]; }catch(e){}
@@ -151,6 +151,33 @@ try{localStorage.removeItem('dc_accent_color');}catch(e){}  // fixed teal accent
     }catch(e){ return ''; }
   })();
   if(!MY_V) return;
+
+  // Версия списка задач из ClickUp (js/pending-inject.js?v=…). Бот переписывает
+  // этот файл каждые 15 минут, поэтому открытую страницу не надо перезагружать
+  // целиком: достаточно подгрузить свежий инжектор — он сам перезапишет
+  // dc_plantasks (зеркало ClickUp) — и перерисовать вкладку.
+  let MY_PI=(function(){
+    try{
+      const s=[].slice.call(document.scripts).filter(x=>/js\/pending-inject\.js/.test(x.src||''))[0];
+      const m=s&&(s.src||'').match(/[?&]v=([A-Za-z0-9.\-]+)/);
+      return m?m[1]:'';
+    }catch(e){ return ''; }
+  })();
+  let piLoading=false;
+  function pullTasks(newPI){
+    if(piLoading || !newPI || newPI===MY_PI) return;
+    piLoading=true; MY_PI=newPI;
+    const s=document.createElement('script');
+    s.src='js/pending-inject.js?v='+newPI;
+    s.onload=function(){
+      piLoading=false;
+      try{ if(typeof render==='function') render(); }catch(e){}
+      try{ if(typeof renderMonthBar==='function') renderMonthBar(); }catch(e){}
+    };
+    s.onerror=function(){ piLoading=false; };
+    document.body.appendChild(s);
+  }
+
   let checking=false, lastCheck=0;
   function banner(newV){
     if(document.getElementById('dc-update-bar')) return;
@@ -171,6 +198,8 @@ try{localStorage.removeItem('dc_accent_color');}catch(e){}  // fixed teal accent
     fetch('./index.html?cb='+now,{cache:'no-store'})
       .then(r=>r.ok?r.text():Promise.reject())
       .then(html=>{
+        const pm=html.match(/js\/pending-inject\.js\?v=([A-Za-z0-9.\-]+)/);
+        if(pm) pullTasks(pm[1]);                       // новые задачи из ClickUp — без перезагрузки
         const m=html.match(/js\/main\.js\?v=([A-Za-z0-9.\-]+)/);
         const newV=m&&m[1];
         if(!newV||newV===MY_V) return;
@@ -185,4 +214,5 @@ try{localStorage.removeItem('dc_accent_color');}catch(e){}  // fixed teal accent
   setTimeout(check,1500);                                            // при запуске
   document.addEventListener('visibilitychange',function(){ if(!document.hidden) check(); });  // при возврате в приложение
   window.addEventListener('focus',check);
+  setInterval(check,5*60*1000);   // и сама, раз в 5 минут: задачи из ClickUp приезжают, пока вкладка открыта
 })();

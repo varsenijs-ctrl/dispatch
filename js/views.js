@@ -1018,15 +1018,15 @@ function renderHistory(){
     const what=g.s==='yes'
       ? (n===1?(withSms?'имейл + SMS':'имейл'):(n+' '+_plural(n,'имейл','имейла','имейлов')+(withSms?' · '+withSms+' с SMS':'')))
       : g.s==='draft'
-        ? (n===1?'черновик':(n+' '+_plural(n,'черновик','черновика','черновиков')))
+        ? (n===1?(withSms?'черновик + SMS':'черновик'):(n+' '+_plural(n,'черновик','черновика','черновиков')+(withSms?' · '+withSms+' с SMS':'')))
         : (n===1?'не сделано':(n+' '+_plural(n,'день','дня','дней')+' не сделано'));
-    const money=(g.s==='yes')?('$'+val.toFixed(2)):(g.s==='draft'?('черновик · $'+val.toFixed(2)):'—');
     push(g.w,{
       text:esc(g.c)+' — '+what,
       forDates:rangeLabel(g.dates),
       time:hhmm(g.t),
-      val:(g.s==='yes')?val:0,                        // в сумму дня идёт только отправленное
-      money:(g.s==='yes')?('$'+val.toFixed(2)):(g.s==='draft'?'~$'+val.toFixed(2):'—'),
+      // черновик оплачивается так же, как отправленное (как в Финансах и сайдбаре)
+      val:(g.s==='yes'||g.s==='draft')?val:0,
+      money:(g.s==='yes'||g.s==='draft')?('$'+val.toFixed(2)):'—',
       ev:g.s==='yes'?EV.sent:g.s==='draft'?EV.draft:EV.miss,
       cname:g.c
     });

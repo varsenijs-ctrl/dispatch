@@ -958,62 +958,96 @@ function _setLogCell(el){
 // ── История — по макету «Dark iOS dashboard 2» ────────────────
 // Карточка на день: «5 августа, среда · N событий» и сумма справа. В строке —
 // иконка типа события в кружке, текст, время и деньги.
+// ── История — как история браузера ───────────────────────────
+// День = когда ты РАБОТАЛ. Внутри дня — что именно сделал: отметки за один заход
+// по одному клиенту сводятся в одну запись с диапазоном дат
+// («BareRitual — 14 имейлов · 5–31 авг»), плюс выставленные флоу и инвойсы.
 function renderHistory(){
   const mk=activeMonth;
   const parts=mk.split('-'); const yy=+parts[0], mm=+parts[1];
   const monthName=((MONTHS_RU[mm-1]||mk).charAt(0).toUpperCase()+(MONTHS_RU[mm-1]||'').slice(1))+' '+yy;
   const smsAll=load('dc_sms_days',{}), disAll=load('dc_pay_disabled',{});
-  // иконки событий: отправлено / черновик / не сделано / флоу / инвойс
   const EV={
-    sent:  {d:'M20 6L9 17l-5-5',                                   color:'#30d158', bg:'rgba(48,209,88,.14)'},
-    draft: {d:'M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z',   color:'#d08bf5', bg:'rgba(191,90,242,.14)'},
-    miss:  {d:'M18 6L6 18M6 6l12 12',                               color:'#ff8078', bg:'rgba(255,69,58,.14)'},
+    sent:  {d:'M20 6L9 17l-5-5',                                  color:'#30d158', bg:'rgba(48,209,88,.14)'},
+    draft: {d:'M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z',  color:'#d08bf5', bg:'rgba(191,90,242,.14)'},
+    miss:  {d:'M18 6L6 18M6 6l12 12',                              color:'#ff8078', bg:'rgba(255,69,58,.14)'},
     flow:  {d:'M6 3v12M18 9a3 3 0 100-6 3 3 0 000 6zM6 21a3 3 0 100-6 3 3 0 000 6zM15 6H9a3 3 0 00-3 3v3', color:'#d08bf5', bg:'rgba(191,90,242,.14)'},
     inv:   {d:'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M9 13h6M9 17h6', color:'#5eb0ff', bg:'rgba(10,132,255,.14)'}
   };
   const hhmm=t=>{ if(!t) return ''; const d=new Date(t); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
-  const dayMap={};
-  const push=(iso,row,force)=>{ if(!iso) return; if(!force&&iso.slice(0,7)!==mk) return;
-    (dayMap[iso]=dayMap[iso]||{rows:[],earned:0}); dayMap[iso].rows.push(row); dayMap[iso].earned+=row.val||0; };
+  const dm=iso=>{ const d=new Date(iso+'T00:00:00'); return d.getDate()+' '+_MSHORT[d.getMonth()]; };
+  // «5–31 авг» / «12 авг» / «12 авг + 3 дня» (если даты вразброс по разным месяцам)
+  const rangeLabel=list=>{
+    const s=list.slice().sort();
+    if(s.length===1) return dm(s[0]);
+    const a=new Date(s[0]+'T00:00:00'), b=new Date(s[s.length-1]+'T00:00:00');
+    if(a.getMonth()===b.getMonth()) return a.getDate()+'–'+b.getDate()+' '+_MSHORT[b.getMonth()];
+    return dm(s[0])+' – '+dm(s[s.length-1]);
+  };
 
-  // 1) отметки рассылок — день = дата рассылки, статус = последний по журналу
+  const dayMap={};   // день РАБОТЫ → {rows, earned}
+  const push=(w,row)=>{ if(!w||w.slice(0,7)!==mk) return;
+    (dayMap[w]=dayMap[w]||{rows:[],earned:0}); dayMap[w].rows.push(row); dayMap[w].earned+=row.val||0; };
+
+  // ── 1) отметки рассылок: группируем по (день работы → клиент → статус) ──
   const _zNames=_zoneClientNames();
-  const finalMap={};
-  gload('dc_actlog',[]).slice().sort((a,b)=>(a.t||0)-(b.t||0)).forEach(e=>{
-    if(!e.c||!e.d) return;
-    if(!_zNames[String(e.c).toLowerCase()]) return;
-    finalMap[e.c+'|'+e.d]=e;
+  const log=gload('dc_actlog',[]).slice().sort((a,b)=>(a.t||0)-(b.t||0));
+  const finalOf={};                                  // клиент|дата → последний статус (что в итоге стоит)
+  log.forEach(e=>{ if(e&&e.c&&e.d) finalOf[e.c+'|'+e.d]=e; });
+  const groups={};                                   // w|client|status → {dates, t, c, s}
+  log.forEach(e=>{
+    if(!e||!e.c||!e.d||!e.w) return;
+    if(!e.s) return;                                  // снятие отметки не показываем отдельной строкой
+    if(!_zNames[String(e.c).toLowerCase()]) return;    // только клиенты этой зоны
+    if(finalOf[e.c+'|'+e.d]!==e) return;               // учитываем только итоговый статус даты
+    const k=e.w+'|'+e.c+'|'+e.s;
+    const g=groups[k]||(groups[k]={w:e.w,c:e.c,s:e.s,dates:[],t:0});
+    if(g.dates.indexOf(e.d)<0) g.dates.push(e.d);
+    if((e.t||0)>g.t) g.t=e.t||0;
   });
-  Object.values(finalMap).forEach(e=>{
-    if(e.s!=='yes'&&e.s!=='draft'&&e.s!=='no') return;
-    const c=clients.find(x=>x.name===e.c);
-    if(c&&!_markInActiveZone(c.id,e.d)) return;
-    if(!c&&e.d.slice(0,7)!==mk) return;
-    const sms=c?!!((smsAll[c.id]||{})[e.d]):false;
-    const off=c?!!((disAll[c.id]||{})[e.d]):false;
-    const val=(e.s==='yes'||e.s==='draft')&&!off?(sms?SMS_DAY_RATE:EMAIL_RATE):0;
-    const what=e.s==='yes'?(sms?'имейл + SMS':'имейл'):e.s==='draft'?'черновик':'не сделано';
-    const ev=e.s==='yes'?EV.sent:e.s==='draft'?EV.draft:EV.miss;
-    push(e.d,{text:esc(e.c)+' — '+what, time:hhmm(e.t), val:(e.s==='draft'||e.s==='no')?0:val,
-              money:(e.s==='draft'||e.s==='no')?'—':'$'+val.toFixed(2), ev:ev, cname:e.c}, true);
+  Object.values(groups).forEach(g=>{
+    const c=clients.find(x=>x.name===g.c);
+    let val=0, withSms=0;
+    g.dates.forEach(d=>{
+      const sms=c?!!((smsAll[c.id]||{})[d]):false;
+      const off=c?!!((disAll[c.id]||{})[d]):false;
+      if(sms) withSms++;
+      if((g.s==='yes'||g.s==='draft')&&!off) val+=sms?SMS_DAY_RATE:EMAIL_RATE;
+    });
+    const n=g.dates.length;
+    const what=g.s==='yes'
+      ? (n===1?(withSms?'имейл + SMS':'имейл'):(n+' '+_plural(n,'имейл','имейла','имейлов')+(withSms?' · '+withSms+' с SMS':'')))
+      : g.s==='draft'
+        ? (n===1?'черновик':(n+' '+_plural(n,'черновик','черновика','черновиков')))
+        : (n===1?'не сделано':(n+' '+_plural(n,'день','дня','дней')+' не сделано'));
+    const money=(g.s==='yes')?('$'+val.toFixed(2)):(g.s==='draft'?('черновик · $'+val.toFixed(2)):'—');
+    push(g.w,{
+      text:esc(g.c)+' — '+what,
+      forDates:rangeLabel(g.dates),
+      time:hhmm(g.t),
+      val:(g.s==='yes')?val:0,                        // в сумму дня идёт только отправленное
+      money:(g.s==='yes')?('$'+val.toFixed(2)):(g.s==='draft'?'~$'+val.toFixed(2):'—'),
+      ev:g.s==='yes'?EV.sent:g.s==='draft'?EV.draft:EV.miss,
+      cname:g.c
+    });
   });
 
-  // 2) выставленные флоу
+  // ── 2) выставленные флоу (день работы = дата, на которую отмечено) ──
   Object.values(load('dc_plantasks',{})).forEach(t=>{
     if(!t.flowId||!t.done) return;
     if(!_inRoster(t.cid)) return;
     const c=clients.find(x=>x.id===t.cid);
     const fl=(t.cid?getFlows(t.cid):[]).find(f=>f.id===t.flowId);
     const val=fl?fl.count*0.60:0;
-    push(t.startIso,{text:(c?esc(c.name):'Без клиента')+' — флоу «'+esc(fl?fl.name:t.text)+'»', time:'', val:val,
-                     money:'$'+val.toFixed(2), ev:EV.flow, cname:c?c.name:''}, _markInActiveZone(t.cid,t.startIso));
+    push(t.startIso,{text:(c?esc(c.name):'Без клиента')+' — флоу «'+esc(fl?fl.name:t.text)+'»',
+      forDates:'', time:'', val:val, money:'$'+val.toFixed(2), ev:EV.flow, cname:c?c.name:''});
   });
 
-  // 3) инвойсы
+  // ── 3) инвойсы ──
   loadInvoices().forEach(i=>{
     const val=i.count*INV_RATE;
-    push(i.date,{text:'Инвойсы — '+i.count+' шт'+(i.note?' · '+esc(i.note):''), time:'', val:val,
-                 money:'$'+val.toFixed(2), ev:EV.inv, cname:''});
+    push(i.date,{text:'Инвойсы — '+i.count+' шт'+(i.note?' · '+esc(i.note):''),
+      forDates:'', time:'', val:val, money:'$'+val.toFixed(2), ev:EV.inv, cname:''});
   });
 
   const days=Object.keys(dayMap).sort((a,b)=>b.localeCompare(a));
@@ -1022,10 +1056,10 @@ function renderHistory(){
 
   let html=`<div class="dfade" style="max-width:900px">`;
   if(!days.length){
-    return html+`<div class="dcard dcard-p" style="text-align:center;padding:34px 22px;color:var(--text3);font-family:var(--mono);font-size:13px;line-height:1.8">В «${monthName}» пока ничего не было.<br>Отмечай статусы на «Сегодня» или «Рассылках» —<br>здесь появятся дни с отметками, флоу и инвойсами.<br><button class="dbtn dbtn-primary" style="margin-top:14px;font-family:var(--font)" onclick="setView('day_today')">→ Сегодня</button></div></div>`;
+    return html+`<div class="dcard dcard-p" style="text-align:center;padding:34px 22px;color:var(--text3);font-family:var(--mono);font-size:13px;line-height:1.8">В «${monthName}» ты пока ничего не отмечал.<br>Ставь статусы на «Сегодня» или «Рассылках» —<br>здесь появится, что и когда было сделано.<br><button class="dbtn dbtn-primary" style="margin-top:14px;font-family:var(--font)" onclick="setView('day_today')">→ Сегодня</button></div></div>`;
   }
   html+=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
-    <div class="dmeta">${monthName} · ${days.length} ${_plural(days.length,'день','дня','дней')} · ${events} ${_plural(events,'событие','события','событий')}</div>
+    <div class="dmeta">${monthName} · ${days.length} ${_plural(days.length,'рабочий день','рабочих дня','рабочих дней')} · ${events} ${_plural(events,'запись','записи','записей')}</div>
     <div style="flex:1"></div>
     <div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--green)">$${total.toFixed(2)}</div>
   </div>`;
@@ -1034,22 +1068,25 @@ function renderHistory(){
     const D=dayMap[w];
     const dt=new Date(w+'T00:00:00');
     const title=dt.getDate()+' '+_MGEN[dt.getMonth()]+', '+_DFULL[dt.getDay()]+(w===isoToday()?' · сегодня':'');
-    const rows=D.rows.slice().sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
+    const rows=D.rows.slice().sort((a,b)=>(b.time||'').localeCompare(a.time||''));   // позже сделанное — выше
     const rowsHtml=rows.map(function(r){
       return `<div class="drow2"${r.cname?` onclick="openCalByName('${jsq(r.cname)}')" style="cursor:pointer"`:''}>
         <span class="devt" style="background:${r.ev.bg}">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="${r.ev.color}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="${r.ev.d}"/></svg>
         </span>
-        <div style="flex:1;min-width:0;font-size:12.5px;color:rgba(255,255,255,.86);letter-spacing:-.1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.text}</div>
-        <div style="font-family:var(--mono);font-size:11px;color:rgba(255,255,255,.28)">${r.time}</div>
-        <div style="font-family:var(--mono);font-size:12px;font-weight:600;width:48px;text-align:right">${r.money}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12.5px;color:rgba(255,255,255,.86);letter-spacing:-.1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.text}</div>
+          ${r.forDates?`<div style="font-family:var(--mono);font-size:10.5px;color:rgba(255,255,255,.28);margin-top:3px">за ${r.forDates}</div>`:''}
+        </div>
+        <div style="font-family:var(--mono);font-size:11px;color:rgba(255,255,255,.28);flex:none">${r.time}</div>
+        <div style="font-family:var(--mono);font-size:12px;font-weight:600;width:56px;text-align:right;flex:none">${r.money}</div>
       </div>`;
     }).join('');
     html+=`<div class="dcard dlift-card" style="padding:17px 20px;border-radius:20px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;gap:10px">
         <div style="display:flex;align-items:baseline;gap:10px;min-width:0">
           <div style="font-size:14.5px;font-weight:650;letter-spacing:-.3px;white-space:nowrap">${title}</div>
-          <div style="font-family:var(--mono);font-size:10.5px;color:rgba(255,255,255,.28);white-space:nowrap">${D.rows.length} ${_plural(D.rows.length,'событие','события','событий')}</div>
+          <div style="font-family:var(--mono);font-size:10.5px;color:rgba(255,255,255,.28);white-space:nowrap">${D.rows.length} ${_plural(D.rows.length,'запись','записи','записей')}</div>
         </div>
         <div style="font-family:var(--mono);font-size:16px;font-weight:600;letter-spacing:-.5px;color:var(--green);flex:none">$${D.earned.toFixed(2)}</div>
       </div>

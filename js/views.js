@@ -521,7 +521,7 @@ function renderDayToday(){
     const clientChip=cname?`<span class="dchip dchip-sms" style="font-weight:560;letter-spacing:0;flex:none">${esc(cname)}</span>`:'';
     const smsChip=(_cl&&_cl.smsEnabled)?`<div class="dchip" style="flex:none;background:rgba(10,132,255,.18);color:#5eb0ff;border:1px solid rgba(10,132,255,.24)">SMS</div>`:'';
     const seg=`<div class="dseg" onclick="event.stopPropagation()">`+
-      [['yes','Yes','on-yes','сделано'],['draft','Draft','on-draft','отложено'],['no','No','on-no','не сделано']].map(o=>
+      [['yes','Yes','on-yes','сделано'],['draft','Later','on-draft','отложено'],['no','No','on-no','не сделано']].map(o=>
         `<button class="${stt===o[0]?'on '+o[2]:''}" onclick="event.stopPropagation();_setTaskStatus('${t.id}','${o[0]}')" title="${o[3]}${stt===o[0]?' · нажми ещё раз, чтобы снять':''}">${o[1]}</button>`).join('')+`</div>`;
     return `<div class="dhover" data-tid="${t.id}" draggable="true" ondragstart="_startDrag(this,event)" ondragend="_endDrag(this)" ondragover="_dragOver(this,event)" ondragleave="_dragLeave(this)" ondrop="_drop(this,event)"
       style="border:1px solid ${bc};border-radius:14px;margin-bottom:7px;background:${bg}">

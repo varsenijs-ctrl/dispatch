@@ -1142,17 +1142,15 @@ body::before{
 .dday.today{border-color:var(--accent)!important;}
 .dday-num{font-family:var(--mono);font-size:14px;font-weight:600;color:rgba(255,255,255,.42);}
 .dday-dot{width:5px;height:5px;border-radius:980px;background:transparent;}
-/* Мини-тумблер в ячейке дня. Как в макете: цвет = цвет статуса, ползунок вправо для
-   «да/черновик» и влево для «нет». Клик по нему переключает SMS этого дня — когда SMS
-   включён, тумблер получает синюю обводку (единственное отличие от макета, чтобы
-   не потерять управление SMS). */
-.dday-sms{position:absolute;right:7px;bottom:7px;width:26px;height:15px;border-radius:980px;padding:2px;display:flex;
-  justify-content:flex-start;background:rgba(255,255,255,.16);transition:all .2s cubic-bezier(.2,.8,.2,1);}
-.dday-sms i{width:11px;height:11px;border-radius:980px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.45);display:block;}
-.st-yes   .dday-sms{background:var(--green);justify-content:flex-end;}
-.st-draft .dday-sms{background:#bf5af2;justify-content:flex-end;}
-.st-no    .dday-sms{background:var(--red);justify-content:flex-start;}
-.dday-sms.on{box-shadow:0 0 0 1.5px var(--blue),0 0 6px rgba(10,132,255,.5);}
+/* SMS за этот день — бейдж в углу ячейки вместо тумблера: тумблер выглядел всегда
+   «включённым» и было непонятно, есть SMS или нет. Серый = нет, синий залитый = есть. */
+.dday-sms{position:absolute;right:5px;bottom:5px;padding:2px 4px;border-radius:6px;cursor:pointer;
+  font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.04em;line-height:1;
+  background:rgba(255,255,255,.10);color:rgba(235,235,245,.45);border:1px solid rgba(255,255,255,.14);
+  transition:background .15s,color .15s,box-shadow .15s;}
+.dday-sms:hover{background:rgba(10,132,255,.28);color:#fff;border-color:rgba(10,132,255,.5);}
+.dday-sms.on{background:var(--blue);color:#fff;border-color:transparent;box-shadow:0 1px 5px rgba(10,132,255,.55);}
+.dday-sms.on:hover{background:#3aa0ff;}
 
 /* status colours for calendar/grid cells */
 .st-yes{background:linear-gradient(180deg,rgba(48,209,88,.20),rgba(48,209,88,.08));border-color:rgba(48,209,88,.42);}

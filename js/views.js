@@ -443,7 +443,8 @@ function _dayInlineCalendar(c){
     const v=hist[iso]||'';
     const cls='dday'+(v?' st-'+v:'')+(iso===tIso?' today':'');
     const sms=!!cidSms[iso];
-    const smsToggle=v?`<span class="dday-sms${sms?' on':''}" onclick="event.stopPropagation();_dayToggleSmsInline('${c.id}','${iso}')" title="${sms?'SMS есть — убрать':'SMS нет — добавить'}"><i></i></span>`:'';
+    // Вместо тумблера — понятный бейдж: серый «SMS» = нет, синий залитый = есть.
+    const smsToggle=v?`<span class="dday-sms${sms?' on':''}" onclick="event.stopPropagation();_dayToggleSmsInline('${c.id}','${iso}')" title="${sms?'SMS есть — нажми, чтобы убрать (день станет $'+EMAIL_RATE.toFixed(2)+')':'SMS нет — нажми, чтобы добавить (день станет $'+SMS_DAY_RATE.toFixed(2)+')'}">SMS</span>`:'';
     cells+=`<button class="${cls}" onclick="_dayCycleInline('${c.id}','${iso}')" title="${iso}${v?' · '+v:''}">
       <span class="dday-num">${d}</span><span class="dday-dot"></span>${smsToggle}</button>`;
   }

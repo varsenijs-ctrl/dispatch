@@ -22,15 +22,64 @@ function resetToInitial(){
   clients=[];log={};historyData={};
   initPreload();render();
 }
+// Импорт «только названия»: в буфере одна строка через табы, столбик имён или
+// вообще одно название — создаём клиентов и добавляем их в активную зону.
+// Отметки не ставим: их проставишь сам на «Сегодня» или в календаре.
+function _importNamesOnly(rows, statusEl){
+  const SKIP={'дата':1,'date':1,'клиент':1,'клиенты':1,'client':1,'clients':1,'компания':1,'компании':1,
+              'company':1,'название':1,'названия':1,'name':1,'names':1,'итого':1,'total':1,'сумма':1};
+  const names=[];
+  rows.forEach(r=>r.forEach(cell=>{
+    const v=(cell||'').trim();
+    if(!v) return;
+    const low=v.toLowerCase();
+    if(SKIP[low]) return;                                  // служебные заголовки
+    if(low==='yes'||low==='no'||low==='draft') return;      // статусы
+    if(/^\d{4}-\d{2}-\d{2}$/.test(v)||/^\d{1,2}\.\d{1,2}(\.\d{2,4})?$/.test(v)) return;   // даты
+    if(/^[\d\s.,%$-]+$/.test(v)) return;                    // числа, суммы, проценты
+    if(names.some(n=>_normName(n)===_normName(v))) return;  // дубликаты внутри вставки
+    names.push(v);
+  }));
+  if(!names.length){
+    statusEl.className='import-status err';
+    statusEl.textContent='Не нашёл названий клиентов — вставь их в столбик или через табуляцию';
+    return;
+  }
+  let added=0; const cids=[];
+  names.forEach(n=>{
+    let ex=clients.find(c=>c.active&&_normName(c.name)===_normName(n));   // не плодим дубли
+    if(!ex){
+      ex={id:'c_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),name:n,active:true,smsEnabled:false,schedule:'',deadline:null};
+      clients.push(ex); added++;
+    }
+    cids.push(ex.id);
+  });
+  saveAll();
+  const _rm=_rosterMap(); if(!Array.isArray(_rm[activeMonth])) _rm[activeMonth]=[];
+  let inZone=0;
+  cids.forEach(id=>{ if(_rm[activeMonth].indexOf(id)<0){ _rm[activeMonth].push(id); inZone++; } });
+  save('dc_zone_roster', _rm);
+  const msg=`✓ ${names.length} ${_plural(names.length,'клиент','клиента','клиентов')} в зону «${_finZoneLabel()}»`
+    +`${added?' (+'+added+' '+_plural(added,'новый','новых','новых')+')':' (все уже были в базе)'}`
+    +`${inZone?'':' · в зоне уже были'} · отметки поставь сам`;
+  statusEl.className='import-status ok'; statusEl.textContent=msg;
+  try{ showToast(msg); }catch(e){}
+  const ta=document.getElementById('paste-data'); if(ta) ta.value='';
+  render();
+}
 function importFromPaste(){
   const raw=document.getElementById('paste-data')?.value?.trim();
   const statusEl=document.getElementById('import-status');
   if(!raw){statusEl.className='import-status err';statusEl.textContent='Вставь данные из таблицы';return;}
   statusEl.className='import-status loading';statusEl.textContent='Разбираю данные...';
   const lines=raw.split('\n').map(l=>l.trim()).filter(l=>l);
-  if(lines.length<2){statusEl.className='import-status err';statusEl.textContent='Слишком мало строк';return;}
+  if(!lines.length){statusEl.className='import-status err';statusEl.textContent='Вставь данные из таблицы';return;}
   const sep=lines[0].includes('\t')?'\t':',';
   const rows=lines.map(l=>{if(sep==='\t')return l.split('\t').map(c=>c.trim());const cells=[];let cur='';let inQ=false;for(let i=0;i<l.length;i++){const ch=l[i];if(ch==='"'){inQ=!inQ;}else if(ch===','&&!inQ){cells.push(cur);cur='';}else cur+=ch;}cells.push(cur);return cells.map(c=>c.replace(/^"|"$/g,'').trim());});
+  // Вставили только названия компаний (без колонки дат) — добавляем клиентов в зону
+  // и выходим: полноценная таблица с датами разбирается дальше.
+  const _hasDateCol=rows.some(r=>{const v=(r[0]||'').trim();return /^\d{4}-\d{2}-\d{2}$/.test(v)||/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(v);});
+  if(!_hasDateCol) return _importNamesOnly(rows, statusEl);
   let headerRow=0;
   for(let i=0;i<Math.min(5,rows.length);i++){const cols=rows[i].slice(1).filter(c=>c&&c.trim());if(cols.length>0&&!rows[i][0].match(/^\d{4}-\d{2}-\d{2}$/)&&!rows[i][0].match(/^\d{1,2}\.\d{1,2}/)){headerRow=i;break;}}
   const headers=rows[headerRow];const colClients=headers.slice(1).map(h=>h.trim()).filter(h=>h);

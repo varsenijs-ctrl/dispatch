@@ -1,0 +1,37 @@
+name: Deploy to GitHub Pages
+
+# Публикация сайта через GitHub Actions. Старый («legacy») билдер Pages в этом
+# репозитории то падал с «Page build failed», то висел по 10+ минут и упирался
+# в лимит 10 сборок/час — этот путь от него не зависит.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Публикуем по одному деплою за раз, но НЕ отменяем начатый: иначе пуш,
+# сделанный следом, обрывал предыдущую публикацию.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .            # статический сайт лежит в корне репозитория
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

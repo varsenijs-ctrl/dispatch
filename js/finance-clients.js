@@ -279,10 +279,12 @@ function renderClients(){
   const SORTS=[['alpha','А→Я'],['money','по деньгам'],['count','меньше отправлено'],['deadline','дедлайн']];
   const _unused=_zoneUnusedClients().length;
   const _futureN=_futureMarks().n;
+  const _crossN=_crossZoneMarks().n;
   html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
     ${SORTS.map(s=>`<button class="dpill ${clientsSort===s[0]?'active':''}" onclick="setClientsSort('${s[0]}')">${s[1]}</button>`).join('')}
     <div style="flex:1"></div>
     ${_unused?`<button class="dbtn dbtn-sm" onclick="cleanZoneRoster()" title="Убрать из этой зоны клиентов, по которым в ней нет ни одной отметки. Сами клиенты и их данные остаются в базе.">🧹 без отметок: ${_unused}</button>`:''}
+    ${_crossN?`<button class="dbtn dbtn-sm" onclick="clearCrossZoneMarks()" title="Убрать отметки, которые были поставлены, когда ты находился в другом месяце (старый календарь показывал сразу три месяца). Отметки своей зоны не тронутся.">🧯 из чужой зоны: ${_crossN}</button>`:''}
     ${_futureN?`<button class="dbtn dbtn-sm" onclick="clearFutureMarks()" title="Убрать отметки за даты позже сегодняшнего дня — обычно их занёс импорт из таблицы. Прошлые отметки не тронутся.">🧽 будущие отметки: ${_futureN}</button>`:''}
     <span class="dmeta">${active.length} в зоне «${_finZoneLabel()}»</span>
   </div>`;

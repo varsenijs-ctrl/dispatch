@@ -110,6 +110,49 @@ function clearFutureMarks(){
   render();
 }
 
+// ── отметки, поставленные ИЗ ДРУГОЙ ЗОНЫ ─────────────────────
+// Старый календарь клиента рисовал сразу три месяца, поэтому кликом можно было
+// отметить чужой месяц: сидишь в июле — отметка улетает в август, а потом в
+// августовской зоне видишь «отметки, которых не делал». Журнал действий помнит,
+// в какой день отметка была поставлена (w) и к какой дате относится (d) — по
+// расхождению месяцев их и находим. Ставится только то, что с тех пор не меняли руками.
+function _crossZoneMarks(){
+  const log=gload('dc_actlog',[]).slice().sort(function(a,b){ return (a.t||0)-(b.t||0); });
+  const last={}; log.forEach(function(e){ if(e&&e.c&&e.d&&e.w) last[e.c+'|'+e.d]=e; });
+  const items=[]; const byClient={};
+  Object.keys(last).forEach(function(k){
+    const e=last[k];
+    if(!e.s) return;                                        // отметка уже снята
+    if(e.w.slice(0,7)===e.d.slice(0,7)) return;             // поставлена в своём месяце — норма
+    const cur=(historyData[e.c]||{})[e.d];
+    if(cur!==e.s) return;                                   // с тех пор переставили вручную — не трогаем
+    items.push(e); byClient[e.c]=(byClient[e.c]||0)+1;
+  });
+  return {n:items.length, items:items, byClient:byClient};
+}
+function clearCrossZoneMarks(){
+  const f=_crossZoneMarks();
+  if(!f.n){ showToast('Таких отметок нет'); return; }
+  const names=Object.keys(f.byClient);
+  const list=names.slice(0,8).map(function(x){ return '• '+x+' — '+f.byClient[x]; }).join('\n');
+  const ex=f.items.slice(0,3).map(function(e){ return '   '+e.c+': отмечено '+e.w+' за '+e.d; }).join('\n');
+  if(!confirm(`Убрать ${f.n} ${_plural(f.n,'отметку','отметки','отметок')}, поставленные из другой зоны?\n\n`
+    +`Это отметки, которые ты проставил, находясь в другом месяце (например, сидя в июле кликнул по августовскому дню):\n${ex}\n\n`
+    +`Затронет ${names.length} ${_plural(names.length,'клиента','клиентов','клиентов')}:\n${list}${names.length>8?'\n… и ещё '+(names.length-8):''}\n\n`
+    +`Отметки, сделанные в своей зоне, останутся. Действие необратимо — при сомнении сначала «Экспорт в файл».`)) return;
+  const smsDays=load('dc_sms_days',{});
+  f.items.forEach(function(e){
+    if(historyData[e.c]) delete historyData[e.c][e.d];
+    const c=clients.find(function(x){ return x.name===e.c; });
+    if(c&&smsDays[c.id]) delete smsDays[c.id][e.d];
+    try{ _logAct(e.c, e.d, ''); }catch(err){}                // фиксируем снятие в журнале
+  });
+  save('dc_sms_days', smsDays);
+  saveAll();
+  showToast(`✓ Убрано ${f.n} ${_plural(f.n,'отметка','отметки','отметок')} из чужих зон`);
+  render();
+}
+
 // Клиенты зоны, по которым в НЕЙ ничего нет: ни отметок, ни флоу, ни задач.
 // Обычно это те, кто попал в зону скопом (когда «Сегодня» показывала всех подряд).
 function _zoneUnusedClients(){

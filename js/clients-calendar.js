@@ -122,11 +122,15 @@ function buildCalDay(cls,isToday,cid,iso,d,dot,smsBtn,flowDay,flowInfo,flows,val
 
 function renderCalModal(cid){
   const c=clients.find(x=>x.id===cid);if(!c)return;
-  const allDates=collectAllDates(cid);
+  const allDatesRaw=collectAllDates(cid);
+  // Календарь строго по активной зоне: отметки других месяцев сюда не попадают —
+  // переключил зону, и календарь чистый (раньше рисовались 3 месяца вокруг сегодня,
+  // поэтому в августе продолжали висеть июльские отметки).
+  const allDates={};
+  Object.keys(allDatesRaw).forEach(function(iso){ if(iso.slice(0,7)===activeMonth) allDates[iso]=allDatesRaw[iso]; });
   const vals=Object.values(allDates);
-  document.getElementById('cal-stats').textContent=`✓ ${vals.filter(v=>v==='yes').length} отправлено  ✗ ${vals.filter(v=>v==='no').length} не отправлено  ~ ${vals.filter(v=>v==='draft').length} черновик`;
-  const months=[];
-  for(let delta=-1;delta<=1;delta++){const d=new Date(getTODAY().getFullYear(),getTODAY().getMonth()+delta,1);months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);}
+  document.getElementById('cal-stats').textContent=`${_finZoneLabel()} · ✓ ${vals.filter(v=>v==='yes').length} отправлено  ✗ ${vals.filter(v=>v==='no').length} не отправлено  ~ ${vals.filter(v=>v==='draft').length} черновик`;
+  const months=[activeMonth];
   let html='';
   months.forEach(mk=>{
     const [y,m]=mk.split('-').map(Number);

@@ -318,21 +318,21 @@ function renderClients(){
       const hasHistory=historyData[c.name]&&Object.keys(historyData[c.name]).length>0;
       const past=c.deadline&&c.deadline<iso;
       html+=`<div class="dtr" style="${c.paused?'opacity:.5':''}">
-        <div style="flex:1;min-width:0;display:flex;align-items:center;gap:7px">
+        <div class="cl-name" style="flex:1;min-width:0;display:flex;align-items:center;gap:7px">
           <span onclick="openCal('${c.id}')" style="font-size:13.5px;font-weight:540;letter-spacing:-.15px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Открыть календарь">${esc(c.name)}</span>
           ${c.paused?'<span class="dchip dchip-warn">пауза</span>':''}
           ${hasHistory?'<span class="dchip dchip-dim">история</span>':''}
         </div>
-        <div style="width:52px;display:flex;justify-content:center">
+        <div class="cl-sms" style="width:52px;display:flex;justify-content:center">
           <button class="dsw${c.smsEnabled?' on':''}" data-action="toggle-sms-client" data-id="${c.id}" role="switch" aria-checked="${c.smsEnabled?'true':'false'}" title="SMS вкл/выкл"><i></i></button>
         </div>
-        <div style="width:120px;display:flex;justify-content:flex-end">
+        <div class="cl-dl" style="width:120px;display:flex;justify-content:flex-end">
           <input type="date" class="deadline-edit dinput dinput-sm ddate" data-id="${c.id}" value="${c.deadline||''}" title="Дедлайн" style="font-size:11px;padding:4px 6px;${past?'color:#ff8078;border-color:rgba(255,69,58,.3)':''}">
         </div>
-        <div style="width:70px;text-align:right;font-family:var(--mono);font-size:12.5px">${clientSentCount(c)}</div>
-        <div style="width:48px;text-align:right;font-family:var(--mono);font-size:12.5px;color:${nFlows?'#d08bf5':'var(--text3)'}">${nFlows}</div>
-        <div style="width:76px;text-align:right;font-family:var(--mono);font-size:12.5px;font-weight:600;color:${money>0?'var(--green)':'var(--text3)'}">$${money.toFixed(2)}</div>
-        <div style="width:104px;display:flex;justify-content:flex-end;gap:4px">
+        <div class="cl-sent" style="width:70px;text-align:right;font-family:var(--mono);font-size:12.5px">${clientSentCount(c)}</div>
+        <div class="cl-flows" style="width:48px;text-align:right;font-family:var(--mono);font-size:12.5px;color:${nFlows?'#d08bf5':'var(--text3)'}">${nFlows}</div>
+        <div class="cl-money" style="width:76px;text-align:right;font-family:var(--mono);font-size:12.5px;font-weight:600;color:${money>0?'var(--green)':'var(--text3)'}">$${money.toFixed(2)}</div>
+        <div class="cl-acts" style="width:104px;display:flex;justify-content:flex-end;gap:4px">
           <button class="dicon neutral" onclick="event.stopPropagation();togglePauseClient('${c.id}')" title="${c.paused?'Возобновить':'Поставить на паузу'}">${c.paused?'▶':'⏸'}</button>
           <button class="dicon neutral" onclick="event.stopPropagation();addFlow('${c.id}')" title="Добавить флоу">⚡</button>
           <button class="dicon neutral" onclick="event.stopPropagation();openCal('${c.id}')" title="Календарь">📅</button>

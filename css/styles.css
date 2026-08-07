@@ -1295,6 +1295,24 @@ body::before{
   .home-hello{margin-bottom:12px!important;gap:10px!important;}
   .home-hello-txt{display:none!important;}
 
+  /* «Клиенты»: 7 колонок по фиксированной ширине (470px) на телефон не влезают —
+     имя ужималось в «af…», а тумблер SMS наезжал на него. Раскладываем в три
+     строки: имя · SMS+дедлайн · счётчики и кнопки. Шапку таблицы (.dth) на
+     телефоне не видно, поэтому числа подписываем. */
+  .dtr .cl-name{flex:1 1 100%!important;}
+  .dtr .cl-name>span:first-child{white-space:normal!important;font-size:14.5px!important;}
+  .dtr .cl-sms,.dtr .cl-dl,.dtr .cl-acts{width:auto!important;}
+  .dtr .cl-dl{flex:1 1 auto;justify-content:flex-start!important;}
+  .dtr .cl-dl input{font-size:11.5px!important;padding:5px 8px!important;}
+  .dtr .cl-sent,.dtr .cl-flows,.dtr .cl-money{width:auto!important;text-align:left!important;
+    display:flex;align-items:baseline;gap:4px;}
+  .dtr .cl-sent::before,.dtr .cl-flows::before{font-family:var(--font);font-size:9.5px;
+    font-weight:640;letter-spacing:.6px;text-transform:uppercase;color:var(--text3);}
+  .dtr .cl-sent::before{content:'отпр';}
+  .dtr .cl-flows::before{content:'флоу';}
+  .dtr .cl-money{margin-left:auto;font-size:13.5px!important;}
+  .dtr .cl-acts{flex:1 1 100%;justify-content:flex-start!important;gap:6px!important;}
+
   /* Сводные тройки («Флоу», «Инвойсы»): на 390px карточки сжимаются, и число
      28px ломалось на три строки («0 / 0») — уменьшаем цифру под ширину */
   .main .dcard[style*="min-width:150"],

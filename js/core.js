@@ -84,13 +84,27 @@ function monthKey(d){ return d.getFullYear()+'-'+(d.getMonth()+1).toString().pad
 // Months for the bottom bar = every month that has data (history/tasks) + the
 // current month + any manually-added. Derived so a task/mark for another month
 // (e.g. doing something in July for August) makes that month selectable.
+// Зоны в баре = созданные вручную (dc_months) + текущий месяц. Месяцы, которые
+// всплывают только из данных (отметка на будущее, дедлайн задачи из ClickUp), зоной
+// НЕ становятся, если их уже видно из соседней: зона показывает свой месяц и
+// следующий, поэтому «выставил в августе пару имейлов на сентябрь» остаётся
+// августовской работой — сентябрь больше не заводится и не заполняется сам.
+// Месяц, которого не видно ниоткуда, зону всё-таки получает — данные не теряются.
 function getMonths(){
-  var set={};
-  try{ (JSON.parse(localStorage.getItem('dc_months')||'[]')||[]).forEach(function(m){ set[m]=1; }); }catch(e){}
-  try{ var h=JSON.parse(localStorage.getItem('dc_history')||'{}'); Object.keys(h).forEach(function(n){ var d=h[n]||{}; Object.keys(d).forEach(function(iso){ if(iso&&iso.length>=7) set[iso.slice(0,7)]=1; }); }); }catch(e){}
-  try{ var t=JSON.parse(localStorage.getItem('dc_plantasks')||'{}'); Object.keys(t).forEach(function(id){ var x=t[id]; if(!x)return; if(x.startIso) set[x.startIso.slice(0,7)]=1; if(x.deadline) set[x.deadline.slice(0,7)]=1; }); }catch(e){}
-  var now=new Date(); set[now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')]=1;
-  return Object.keys(set).filter(function(m){ return /^\d{4}-\d{2}$/.test(m); }).sort();
+  var explicit={}, derived={};
+  try{ (JSON.parse(localStorage.getItem('dc_months')||'[]')||[]).forEach(function(m){ explicit[m]=1; }); }catch(e){}
+  var now=new Date(); explicit[now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')]=1;
+  try{ var h=JSON.parse(localStorage.getItem('dc_history')||'{}'); Object.keys(h).forEach(function(n){ var d=h[n]||{}; Object.keys(d).forEach(function(iso){ if(iso&&iso.length>=7) derived[iso.slice(0,7)]=1; }); }); }catch(e){}
+  try{ var t=JSON.parse(localStorage.getItem('dc_plantasks')||'{}'); Object.keys(t).forEach(function(id){ var x=t[id]; if(!x)return; if(x.startIso) derived[x.startIso.slice(0,7)]=1; if(x.deadline) derived[x.deadline.slice(0,7)]=1; }); }catch(e){}
+  var ok=function(m){ return /^\d{4}-\d{2}$/.test(m); };
+  var out={};
+  Object.keys(explicit).forEach(function(m){ if(ok(m)) out[m]=1; });
+  Object.keys(derived).filter(ok).sort().forEach(function(m){
+    if(out[m]) return;
+    if(out[_prevMonthKey(m)]) return;      // виден как «следующий месяц» соседней зоны
+    out[m]=1;
+  });
+  return Object.keys(out).sort();
 }
 function _pausedClientNames(){ var s={}; (typeof clients!=='undefined'?clients:[]).forEach(function(c){ if(c&&c.paused) s[String(c.name).toLowerCase()]=1; }); return s; }
 function _isTaskClientPaused(t){ if(!t) return false; var p=_pausedClientNames(); if(t.clientName && p[String(t.clientName).toLowerCase()]) return true; if(t.cid){ var c=(typeof clients!=='undefined'?clients:[]).find(function(x){return x&&x.id===t.cid;}); if(c&&c.paused) return true; } return false; }
@@ -146,14 +160,23 @@ function _nextMonthKey(mk){
 }
 // Месяцы, которые считает активная зона: свой + следующий (работа «в июле за август»
 // попадает в июльскую зону, а прошлые месяцы больше не протекают).
+function _prevMonthKey(mk){
+  var p=(mk||'').split('-').map(Number);
+  if(!p[0]||!p[1]) return mk||'';
+  var d=new Date(p[0], p[1]-2, 1);                      // p[1]-1 = 0-based, ещё -1 = предыдущий
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
 function _zoneMonths(mk){ mk=mk||activeMonth; return [mk, _nextMonthKey(mk)]; }
 function _markInActiveZone(cid, iso){
   var m=(iso||'').slice(0,7);
   if(!m) return false;
   return m===activeMonth || m===_nextMonthKey(activeMonth);
 }
-// Любой месяц, где есть отметки, должен быть доступен как зона и содержать своих
-// клиентов — иначе получалось, что месяц нигде не показывается, а данные в нём есть.
+// Ни один месяц с отметками не должен пропасть из вида. Но зона и так показывает
+// свой месяц И следующий, поэтому отметки, выставленные «наперёд» (в августе на
+// сентябрь), уже видны в августовской зоне — новую зону для них создавать НЕ надо,
+// иначе сентябрь появляется в баре сам собой и сам заполняется клиентами.
+// Зона создаётся только для месяца, которого не видно ни из одной существующей.
 // Идемпотентно: гоняем на каждой загрузке, лишнего не добавляем.
 function _ensureZonesForData(){
   try{
@@ -170,17 +193,62 @@ function _ensureZonesForData(){
         (byMonth[mk]=byMonth[mk]||{})[c.id]=1;
       });
     });
+    // какая зона показывает этот месяц: он сам или предыдущая (её «следующий месяц»)
+    function _zoneShowing(mk){
+      if(months.indexOf(mk)>=0) return mk;
+      var prev=_prevMonthKey(mk);
+      return months.indexOf(prev)>=0 ? prev : '';
+    }
     Object.keys(byMonth).forEach(function(mk){
-      if(months.indexOf(mk)<0){ months.push(mk); addedZones.push(mk); }
-      if(!Array.isArray(map[mk])) map[mk]=[];
+      var zone=_zoneShowing(mk);
+      if(!zone){ months.push(mk); addedZones.push(mk); zone=mk; }
+      if(!Array.isArray(map[zone])) map[zone]=[];
       Object.keys(byMonth[mk]).forEach(function(cid){
-        if(map[mk].indexOf(cid)<0){ map[mk].push(cid); addedRoster++; }
+        if(map[zone].indexOf(cid)<0){ map[zone].push(cid); addedRoster++; }
       });
     });
     if(addedZones.length){ months.sort(); saveMonths(months); }
     if(addedZones.length||addedRoster) save('dc_zone_roster', map);
     return {zones:addedZones, roster:addedRoster};
   }catch(e){ return {zones:[], roster:0}; }
+}
+
+// Разовая уборка зон, которые старое правило создало само: будущий месяц, который
+// и так виден из предыдущей зоны (сентябрь при работающем августе). Данные не
+// теряются — отметки лежат в одном общем хранилище, а клиентов переносим в
+// ростер той зоны, что этот месяц показывает. Дальше зоны создаются только вручную.
+function _cleanupAutoZones(){
+  try{
+    if(localStorage.getItem('dc_autozone_cleanup_v1')) return {removed:[]};
+    var months=getMonths()||[];
+    var now=new Date();
+    var thisMonth=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+    var map=_rosterMap(), removed=[];
+    months.slice().forEach(function(mk){
+      if(mk<=thisMonth) return;                      // прошлые и текущий не трогаем
+      var prev=_prevMonthKey(mk);
+      if(months.indexOf(prev)<0) return;             // никто его не показывает — оставляем
+      (map[mk]||[]).forEach(function(cid){            // клиентов — в показывающую зону
+        if(!Array.isArray(map[prev])) map[prev]=[];
+        if(map[prev].indexOf(cid)<0) map[prev].push(cid);
+      });
+      delete map[mk];
+      months=months.filter(function(m){ return m!==mk; });
+      removed.push(mk);
+    });
+    if(removed.length){
+      saveMonths(months);
+      save('dc_zone_roster', map);
+      if(removed.indexOf(activeMonth)>=0){           // стояли в удалённой зоне — вернём в предыдущую
+        var back=_prevMonthKey(activeMonth);
+        if(months.indexOf(back)<0) back=months[months.length-1];
+        activeMonth=back; setActiveMonth(back);
+      }
+      console.log('Dispatch: убраны зоны, созданные автоматически — '+removed.join(', '));
+    }
+    localStorage.setItem('dc_autozone_cleanup_v1','1');
+    return {removed:removed};
+  }catch(e){ return {removed:[]}; }
 }
 // Normalized client-name key (case/space/punctuation-insensitive) so "Macro Beauty"
 // and "macrobeauty" collapse to the same key — used to de-duplicate client records.

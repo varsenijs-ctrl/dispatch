@@ -1,6 +1,6 @@
 // Build stamp — bump on each deploy so you can tell at a glance whether the
 // running app has the latest files (если метки нет — крутится старый JS из кэша).
-const BUILD='08.07 · клиенты на телефоне';
+const BUILD='08.07 · зоны только вручную';
 console.log('Dispatch build: '+BUILD+' — _overdue '+(typeof _overdue==='function'?'OK':'ОТСУТСТВУЕТ (старый код)'));
 try{ const _bt=document.getElementById('build-tag'); if(_bt) _bt.textContent=BUILD; }catch(e){}
 try{ const _td=document.getElementById('topbar-date'); if(_td) _td.textContent=fmtDate(getTODAY())+' '+DAYS_RU[getTODAY().getDay()]+' · '+MONTHS_RU[getTODAY().getMonth()]; }catch(e){}
@@ -9,6 +9,7 @@ try{ _migrateManualDone(); }catch(e){} // persistent "done" marks (no daily rese
 try{ _seedActLog(); }catch(e){}        // seed the История action log from existing marks (one-time)
 try{ _consolidateClientsToJune(); clients = load('dc_clients',[]); historyData = load('dc_history',{}); }catch(e){}  // one-time: move a set of clients' history into июнь 2026
 try{ _dedupeClients(); clients = load('dc_clients',[]); }catch(e){}   // one-time: remove empty duplicate client records (Macro Beauty ↔ macrobeauty)
+try{ _cleanupAutoZones(); }catch(e){}     // разово: убрать зоны будущих месяцев, созданные автоматически
 try{ _ensureZonesForData(); }catch(e){}   // месяц с отметками всегда доступен как зона и содержит своих клиентов
 render();
 try{ if(typeof _syncInit==='function') _syncInit(); }catch(e){}  // cloud sync (if configured)

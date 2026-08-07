@@ -19,7 +19,7 @@
 
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css?v=20260807ci">
+<link rel="stylesheet" href="css/styles.css?v=20260807cu">
 </head>
 <body>
 <!-- Liquid-glass refraction filter: warps the backdrop behind .month-bar like glass bending light -->
@@ -108,6 +108,8 @@
       <button class="tab" onclick="setView('finance')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Финансы</button>
       <button class="tab" onclick="setView('flows')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/></svg>Флоу</button>
       <button class="tab" onclick="setView('invoices')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Инвойсы</button>
+      <!-- Пятая пилюля мобильного таб-бара: открывает лист с остальными вкладками (на десктопе скрыта) -->
+      <button class="tab tab-more" id="tab-more" onclick="toggleMoreSheet()" title="Ещё"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg>Ещё</button>
     </nav>
     <div class="sidebar-cards">
     <div class="sidebar-section">
@@ -134,6 +136,18 @@
     <div class="month-bar" id="month-bar"></div>
   </div>
   <div class="main" id="main-content"></div>
+</div>
+
+<!-- Лист «Ещё» (только телефон): вкладки, не влезшие в пять пилюль таб-бара -->
+<div class="more-sheet" id="more-sheet">
+  <div class="more-sheet-back" onclick="closeMoreSheet()"></div>
+  <div class="more-sheet-card">
+    <button class="more-item" data-view="history" onclick="moreGo('history')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 109 9 9 9 0 00-9-9zM12 7v5l3.5 2"/></svg>История</button>
+    <button class="more-item" data-view="clients" onclick="moreGo('clients')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8M22 21v-2a4 4 0 00-3-3.9M16 3.1a4 4 0 010 7.8"/></svg>Клиенты</button>
+    <button class="more-item" data-view="finance" onclick="moreGo('finance')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 6.5c0-2-2.2-3-5-3s-5 1-5 3.4S9 10 12 10.6s5 1.2 5 3.5-2.2 3.4-5 3.4-5-1-5-3"/></svg>Финансы</button>
+    <button class="more-item" data-view="flows" onclick="moreGo('flows')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v12M18 9a3 3 0 100-6 3 3 0 000 6zM6 21a3 3 0 100-6 3 3 0 000 6zM15 6H9a3 3 0 00-3 3v3"/></svg>Флоу</button>
+    <button class="more-item" data-view="invoices" onclick="moreGo('invoices')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M9 13h6M9 17h6"/></svg>Инвойсы</button>
+  </div>
 </div>
 
 
@@ -274,16 +288,16 @@
 
 <!-- ?v= is bumped on every deploy so browsers/PWA never serve a stale js/*.js.
      Keep this in sync with BUILD in js/main.js. -->
-<script src="js/core.js?v=20260807ci"></script>
-<script src="js/state.js?v=20260807ci"></script>
-<script src="js/views.js?v=20260807ci"></script>
-<script src="js/planner.js?v=20260807ci"></script>
-<script src="js/finance-clients.js?v=20260807ci"></script>
-<script src="js/flows.js?v=20260807ci"></script>
-<script src="js/clients-calendar.js?v=20260807ci"></script>
-<script src="js/sync.js?v=20260807ci"></script>
-<script src="js/ui.js?v=20260807ci"></script>
+<script src="js/core.js?v=20260807cu"></script>
+<script src="js/state.js?v=20260807cu"></script>
+<script src="js/views.js?v=20260807cu"></script>
+<script src="js/planner.js?v=20260807cu"></script>
+<script src="js/finance-clients.js?v=20260807cu"></script>
+<script src="js/flows.js?v=20260807cu"></script>
+<script src="js/clients-calendar.js?v=20260807cu"></script>
+<script src="js/sync.js?v=20260807cu"></script>
+<script src="js/ui.js?v=20260807cu"></script>
 <script src="js/pending-inject.js?v=20260807T1930"></script>
-<script src="js/main.js?v=20260807ci"></script>
+<script src="js/main.js?v=20260807cu"></script>
 </body>
 </html>

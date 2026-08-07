@@ -467,3 +467,16 @@ function _consolidateClientsToJune(){
     console.log('Dispatch: data globalized — zones merged into one store.');
   }catch(e){ console.error('globalize failed', e); }
 })();
+
+// ── Удалённые вручную задачи из ClickUp ──────────────────────────────────────
+// Синк с ClickUp бежит каждые 15 минут и больше ничего не удаляет сам, поэтому
+// задачу, убранную руками, он бы возвращал снова и снова. Запоминаем её id, и
+// pending-inject.js такую задачу заново не добавляет.
+function _injectRemovedList(){
+  try{ var l=JSON.parse(localStorage.getItem('dc_inject_removed')||'[]'); return Array.isArray(l)?l:[]; }catch(e){ return []; }
+}
+function _rememberRemovedInject(t){
+  if(!t || !t.injectId) return;
+  var l=_injectRemovedList();
+  if(l.indexOf(t.injectId)<0){ l.push(t.injectId); try{ localStorage.setItem('dc_inject_removed', JSON.stringify(l)); }catch(e){} }
+}

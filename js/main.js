@@ -1,6 +1,6 @@
 // Build stamp — bump on each deploy so you can tell at a glance whether the
 // running app has the latest files (если метки нет — крутится старый JS из кэша).
-const BUILD='08.07 · ClickUp каждые 15 минут';
+const BUILD='08.07 · мобильный таб-бар';
 console.log('Dispatch build: '+BUILD+' — _overdue '+(typeof _overdue==='function'?'OK':'ОТСУТСТВУЕТ (старый код)'));
 try{ const _bt=document.getElementById('build-tag'); if(_bt) _bt.textContent=BUILD; }catch(e){}
 try{ const _td=document.getElementById('topbar-date'); if(_td) _td.textContent=fmtDate(getTODAY())+' '+DAYS_RU[getTODAY().getDay()]+' · '+MONTHS_RU[getTODAY().getMonth()]; }catch(e){}
@@ -66,6 +66,7 @@ setTimeout(renderMonthBar, 0);
       const oc = t.getAttribute('onclick') || '';
       t.classList.toggle('active', oc.includes("'"+v+"'"));
     });
+    try{ syncMoreTab(v); }catch(e){}   // пилюля «Ещё» в мобильном таб-баре
   }
 
   // ── Gesture navigation ──
@@ -101,6 +102,8 @@ setTimeout(renderMonthBar, 0);
     }
 
     if(e.key==='Escape'){
+      const _ms=document.getElementById('more-sheet');
+      if(_ms && _ms.classList.contains('open')){ closeMoreSheet(); return; }
       if(document.getElementById('cal-modal').style.display!=='none'){ closeCal(); return; }
       if(document.getElementById('day-modal').style.display!=='none'){ closeDayModal(); return; }
     }

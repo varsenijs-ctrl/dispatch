@@ -233,7 +233,9 @@ function toggleDayTask(id){
   renderDayTasks(currentDayIso);render();
 }
 function removeDayTask(id){_sfx.play('delete');
-  const tasks=load('dc_plantasks',{});delete tasks[id];save('dc_plantasks',tasks);
+  const tasks=load('dc_plantasks',{});
+  try{ _rememberRemovedInject(tasks[id]); }catch(e){}   // из ClickUp — чтобы синк не вернул её обратно
+  delete tasks[id];save('dc_plantasks',tasks);
   if(document.getElementById('day-modal').style.display!=='none')renderDayTasks(currentDayIso);
   render();
 }

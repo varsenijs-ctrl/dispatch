@@ -139,3 +139,26 @@ function _iosSwitch(el){
   setTimeout(function(){ el.classList.remove('flip'); }, 480);
   return on;
 }
+
+// ── Лист «Ещё» (мобильный таб-бар) ───────────────────────────────────────────
+// В таб-бар влезает пять пилюль, поэтому История/Клиенты/Финансы/Флоу/Инвойсы
+// живут в выезжающем листе — на телефоне доступны все девять вкладок.
+const MORE_VIEWS = ['history','clients','finance','flows','invoices'];
+function toggleMoreSheet(){
+  const s=document.getElementById('more-sheet'); if(!s) return;
+  if(s.classList.contains('open')){ closeMoreSheet(); return; }
+  s.querySelectorAll('.more-item').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-view')===view);
+  });
+  s.classList.add('open');
+  try{ _sfx.play('click'); }catch(e){}
+}
+function closeMoreSheet(){
+  const s=document.getElementById('more-sheet'); if(s) s.classList.remove('open');
+}
+function moreGo(v){ closeMoreSheet(); window.setView(v); }
+// Пилюля «Ещё» подсвечена, пока открыта одна из её вкладок
+function syncMoreTab(v){
+  const m=document.getElementById('tab-more');
+  if(m) m.classList.toggle('active', MORE_VIEWS.indexOf(v)>=0);
+}

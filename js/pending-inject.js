@@ -1,6 +1,6 @@
 // ── Dispatch ← ClickUp auto-sync ────────────────────────────────────────────
-// This file is regenerated DAILY by .github/workflows/clickup-sync.yml (the
-// GitHub Action fetches your ClickUp tasks and rewrites the RAW list + version).
+// This file is regenerated EVERY 15 MINUTES by .github/workflows/clickup-sync.yml
+// (the GitHub Action fetches your ClickUp tasks and rewrites the RAW list + version).
 //
 // Client matching happens HERE, in the browser, against your real client list
 // (localStorage dc_clients__*), so each task gets a proper client (cid + badge)
@@ -12,7 +12,7 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-08-07T1930';   // bumped daily by the Action
+  var INJECT_VERSION = '2026-08-07T1930';   // bumped by the Action on every sync
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
@@ -58,8 +58,8 @@
     }
   ]/*RAW_END*/;
 
-  // RAW is re-processed on every load; any ClickUp id ever injected (dc_inject_seen)
-  // is skipped — new tasks appear, nothing duplicates, deleted tasks stay deleted.
+  // RAW пересчитывается при каждой загрузке: задача узнаётся по своему ClickUp id,
+  // поэтому дубликатов нет, а удалённая руками (dc_inject_removed) не возвращается.
   // Data is global now — one task store, no zones.
   var _t = new Date();
   var _p = function(n){ return String(n).padStart(2,'0'); };
@@ -124,18 +124,19 @@
     return cleanText(text);
   }
 
-  // ── Mirror the CURRENT ClickUp board ─────────────────────────────────────
-  // The app's ClickUp tasks ALWAYS equal the RAW list above: new tasks appear, tasks
-  // closed/removed in ClickUp disappear, dates/deadline/priority stay in sync. There is
-  // no accumulating "seen/deleted" list that could suppress active tasks over time.
-  // ClickUp is the source of truth — to drop a ClickUp task, close/remove it in ClickUp
-  // (deleting it in the app won't stick). MANUAL (non-injected) tasks are never touched.
+  // ── Добавляем задачи из ClickUp ──────────────────────────────────────────
+  // Новые задачи появляются, у уже добавленных обновляются даты/дедлайн/приоритет.
+  // Ничего не удаляется: задача, исчезнувшая из ClickUp (закрыли, переназначили),
+  // остаётся в приложении — убрать её можно вручную. Одна и та же задача не
+  // добавляется дважды (по её ClickUp id). РУЧНЫЕ задачи не трогаем вообще.
   var tasks; try{ tasks = JSON.parse(localStorage.getItem('dc_plantasks')||'{}')||{}; }catch(e){ tasks={}; }
-  var added = 0, matched = 0, updated = 0, removed = 0;
-  var rawIds = {};
+  var gone = {};   // задачи, удалённые вручную — не возвращаем их при каждом синке
+  try{ (JSON.parse(localStorage.getItem('dc_inject_removed')||'[]')||[]).forEach(function(x){ gone[x]=1; }); }catch(e){}
+  var added = 0, matched = 0, updated = 0;
   RAW.forEach(function(r){
     if(!r || !r.id) return;
-    var id = 'inject_' + r.id; rawIds[id] = 1;
+    var id = 'inject_' + r.id;
+    if(gone[r.id] && !tasks[id]) return;
     var newDue   = isoFromMs(r.due);                          // ClickUp DUE  → deadline
     var newStart = isoFromMs(r.start) || newDue || TODAY_ISO; // ClickUp START → startIso (falls back to due)
     var newPrio  = +r.prio || 0;
@@ -160,12 +161,11 @@
     };
     added++; if(c) matched++;
   });
-  // Remove injected tasks no longer in ClickUp. Guarded: if RAW is empty (a failed/
-  // empty sync) we DON'T wipe the list.
-  if(RAW.length){
-    Object.keys(tasks).forEach(function(k){ if(tasks[k] && tasks[k].injectId && !rawIds[k]){ delete tasks[k]; removed++; } });
-  }
+  // Задачи, которых больше нет в ClickUp, НЕ удаляются: их переназначили,
+  // закрыли или убрали в ClickUp, а работа за тобой всё равно записана — пусть
+  // остаётся в планировщике, пока сам не удалишь. Раньше это был жёсткий mirror,
+  // и такие задачи молча исчезали из приложения.
   localStorage.setItem('dc_plantasks', JSON.stringify(tasks));
   try{ localStorage.removeItem('dc_inject_seen'); }catch(e){}   // legacy suppression list — no longer used
-  console.log('Dispatch ← ClickUp: mirror ('+added+' added, '+updated+' synced, '+removed+' removed, '+matched+' matched) · '+INJECT_VERSION);
+  console.log('Dispatch ← ClickUp: ('+added+' added, '+updated+' synced, '+matched+' matched, старые сохранены) · '+INJECT_VERSION);
 })();

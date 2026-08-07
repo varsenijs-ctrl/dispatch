@@ -38,7 +38,16 @@ function updateSidebar(){
 const VIEW_TITLES={home:'Обзор',day_today:'Сегодня',today:'Рассылки',planner:'Планировщик',history:'История',clients:'Клиенты',finance:'Финансы',flows:'Флоу',invoices:'Инвойсы'};
 function updateTopbar(){
   const t=document.getElementById('topbar-tabtitle'); if(t)t.textContent=VIEW_TITLES[view]||'';
-  const z=document.getElementById('topbar-zone'); if(z)z.textContent=(typeof _finZoneLabel==='function'?_finZoneLabel():activeMonth);
+  const z=document.getElementById('topbar-zone');
+  if(z){
+    const zl=(typeof _finZoneLabel==='function'?_finZoneLabel():activeMonth);
+    // На телефоне шапка — единственный заголовок экрана, поэтому в подзаголовок
+    // идёт ещё и сегодняшняя дата (на десктопе она есть в самих вкладках).
+    if(window.innerWidth<=720){
+      const d=getTODAY();
+      z.textContent=`${_DFULL[d.getDay()]}, ${d.getDate()} ${_MGEN[d.getMonth()]} · ${zl}`;
+    } else z.textContent=zl;
+  }
 }
 // Context-aware "Добавить" button in the topbar.
 function topbarAdd(){
@@ -314,8 +323,8 @@ function renderHome(){
   const left=ac.filter(c=>!((historyData[c.name]||{})[iso])).length;
 
   return `<div class="dfade" style="max-width:1240px">
-    <div style="display:flex;align-items:flex-end;gap:20px;margin-bottom:22px;flex-wrap:wrap">
-      <div style="flex:1;min-width:220px">
+    <div class="home-hello" style="display:flex;align-items:flex-end;gap:20px;margin-bottom:22px;flex-wrap:wrap">
+      <div class="home-hello-txt" style="flex:1;min-width:220px">
         <div style="font-size:32px;font-weight:700;letter-spacing:-1.1px;line-height:1.05">${greet}, Арсений</div>
         <div style="font-family:var(--mono);font-size:12.5px;color:rgba(255,255,255,.32);margin-top:8px">${_DFULL[getTODAY().getDay()]}, ${getTODAY().getDate()} ${_MGEN[getTODAY().getMonth()]} ${getTODAY().getFullYear()} · ${left} ${_plural(left,'клиент','клиента','клиентов')} ждут отметки</div>
       </div>
@@ -758,7 +767,7 @@ function renderDayToday(){
     return `<div class="dhover" data-tid="${t.id}" draggable="true" ondragstart="_startDrag(this,event)" ondragend="_endDrag(this)" ondragover="_dragOver(this,event)" ondragleave="_dragLeave(this)" ondrop="_drop(this,event)"
       style="border:1px solid ${bc};border-radius:14px;margin-bottom:7px;background:${bg}">
       <div${rowClick||' style="cursor:default"'} title="${_cl?(exp?'Свернуть календарь':'Нажми, чтобы открыть календарь клиента'):''}">
-      <div style="display:flex;align-items:flex-start;gap:11px;padding:11px 13px">
+      <div class="dtaskline" style="display:flex;align-items:flex-start;gap:11px;padding:11px 13px">
         ${caret}
         <div style="width:8px;height:8px;border-radius:980px;flex:none;margin-top:6px;background:${dot};box-shadow:0 0 0 3px ${halo}"></div>
         <div style="flex:1;min-width:0">
@@ -843,7 +852,9 @@ function renderToday(){
       <div style="width:1px;height:14px;background:rgba(255,255,255,.1)"></div>
       <span style="font-size:12px;color:var(--text3)">${gridMode==='sms'
         ? 'Режим SMS: клик по ячейке добавляет/убирает SMS'
-        : 'Клик по ячейке меняет статус · Shift+клик — SMS'}</span>
+        : (window.innerWidth<=720
+            ? 'Тап по ячейке меняет статус · для SMS включи режим «SMS»'
+            : 'Клик по ячейке меняет статус · Shift+клик — SMS')}</span>
       <div style="flex:1"></div>
       <button class="dpill ${gridMode==='status'?'active':''}" onclick="gridMode='status';render()" title="Клик по ячейке меняет статус">статус</button>
       <button class="dpill ${gridMode==='sms'?'active':''}" onclick="gridMode='sms';render()" title="Клик по ячейке отмечает SMS за этот день">SMS</button>
@@ -856,7 +867,8 @@ function renderToday(){
   }
 
   // header: day numbers (today accented)
-  const NAMECOL=206, GAP=3;
+  // На телефоне колонка с именем узкая — иначе в сетку влезает всего 4–5 дней
+  const NAMECOL=(window.innerWidth<=720?124:206), GAP=3;
   let head='';
   for(let d=1;d<=daysInMonth;d++){
     const dIso=y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');

@@ -12,7 +12,7 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-08-10T1246';   // bumped by the Action on every sync
+  var INJECT_VERSION = '2026-08-10T1414';   // bumped by the Action on every sync
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
@@ -25,19 +25,19 @@
       "prio": 0
     },
     {
-      "id": "869ed2yk5",
-      "name": "Revair | Subscription Flow - Publish",
-      "list": "Revair",
-      "start": "",
-      "due": "1786060800000",
-      "prio": 0
-    },
-    {
       "id": "869ed30qb",
       "name": "Revair | Review Collection Step - Addition to Post Purchase Flow - Publish",
       "list": "Revair",
       "start": "",
-      "due": "1786233600000",
+      "due": "1786320000000",
+      "prio": 0
+    },
+    {
+      "id": "869ed2yk5",
+      "name": "Revair | Subscription Flow - Publish",
+      "list": "Revair",
+      "start": "",
+      "due": "1786320000000",
       "prio": 0
     },
     {

@@ -11,15 +11,27 @@ function renderFlows(){
   const ICON='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#d08bf5" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M6 3v12M18 9a3 3 0 100-6 3 3 0 000 6zM6 21a3 3 0 100-6 3 3 0 000 6zM15 6H9a3 3 0 00-3 3v3"/></svg>';
   const ROW='padding:10px 12px;border-radius:14px;background:linear-gradient(180deg,rgba(191,90,242,.16),rgba(191,90,242,.07));border:1px solid rgba(191,90,242,.18);box-shadow:0 1px 0 rgba(255,255,255,.07) inset';
 
+  // Флоу этой зоны: выставленные ЗДЕСЬ + ещё не выставленные нигде. Флоу,
+  // выставленный в другом месяце, к этой зоне не относится и в списке не висит
+  // (раньше показывался весь каталог клиента, и августовская вкладка была забита
+  // июньскими «✓ выставлен»). У новых флоу есть метка зоны создания — флоу,
+  // созданный в другой зоне и ещё не выставленный, остаётся в своей.
+  function _flowOfZone(cid, f){
+    const ft=Object.values(tasks).filter(t=>t.cid===cid&&t.flowId===f.id);
+    if(ft.some(t=>t.done&&_markInActiveZone(cid,t.startIso))) return true;   // выставлен здесь
+    if(ft.some(t=>t.done)) return false;                                     // выставлен в другой зоне
+    return !f.zone || f.zone===activeMonth;                                  // без метки — из старых данных
+  }
+  const zoneFlows=cid=>getFlows(cid).filter(f=>_flowOfZone(cid,f));
+
   let totalDone=0,totalPlanned=0,totalEarned=0,totalPotential=0;
   ac.forEach(c=>{
-    getFlows(c.id).forEach(f=>{
+    zoneFlows(c.id).forEach(f=>{
       const ft=Object.values(tasks).filter(t=>t.cid===c.id&&t.flowId===f.id);
       const doneInZone=ft.some(t=>t.done&&_markInActiveZone(c.id,t.startIso));
-      const doneAnywhere=ft.some(t=>t.done);
       const val=f.count*0.60;
       if(doneInZone){ totalDone++; totalPlanned++; totalEarned+=val; totalPotential+=val; }
-      else if(!doneAnywhere){ totalPlanned++; totalPotential+=val; }
+      else { totalPlanned++; totalPotential+=val; }
     });
   });
 
@@ -32,12 +44,40 @@ function renderFlows(){
       <button class="dpill ${_flowsTab==='today'?'active':''}" onclick="_flowsTab='today';render()">Активные</button>
       <button class="dpill ${_flowsTab==='history'?'active':''}" onclick="_flowsTab='history';render()">История</button>
       <div style="flex:1"></div>
-      <button class="dbtn dbtn-sm" onclick="setView('clients')" title="Флоу добавляются у клиента">+ флоу у клиента</button>
+      <button class="dbtn dbtn-sm" onclick="setView('clients')" title="Все клиенты зоны и их флоу">→ Клиенты</button>
     </div>`;
+
+  // Новый флоу — прямо здесь, без похода в «Клиенты»
+  if(_flowsTab==='today'){
+    h+=`<div class="dcard flow-add" style="padding:14px 16px;margin-bottom:14px;display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <div class="dcaps" style="margin-bottom:5px">Клиент</div>
+        ${ac.length
+          ? `<select id="flowtab-client" class="dinput" style="width:100%;box-sizing:border-box;padding:9px 12px;font-size:12.5px">
+              ${ac.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}
+             </select>`
+          : `<div class="dmeta">В зоне «${_finZoneLabel()}» нет клиентов — добавь их во «Клиентах»</div>`}
+      </div>
+      <div style="flex:1;min-width:160px">
+        <div class="dcaps" style="margin-bottom:5px">Название флоу</div>
+        <input id="flowtab-name" class="dinput" placeholder="Welcome / Sunset / Post Purchase…" onkeydown="if(event.key==='Enter')addFlowFromTab()" style="width:100%;box-sizing:border-box;padding:9px 12px;font-size:12.5px">
+      </div>
+      <div class="fa-half" style="width:104px">
+        <div class="dcaps" style="margin-bottom:5px">Мейлов</div>
+        <input id="flowtab-count" type="number" min="1" value="3" class="dinput" onkeydown="if(event.key==='Enter')addFlowFromTab()" style="width:100%;box-sizing:border-box;padding:9px 12px;font-size:12.5px">
+      </div>
+      <div class="fa-half" style="width:150px">
+        <div class="dcaps" style="margin-bottom:5px">Дедлайн</div>
+        <input id="flowtab-dl" type="date" class="dinput ddate" style="width:100%;box-sizing:border-box;padding:9px 12px;font-size:12px">
+      </div>
+      <button class="dbtn dbtn-primary" onclick="addFlowFromTab()" ${ac.length?'':'disabled style="opacity:.4"'}>＋ Добавить флоу</button>
+      <div class="dmeta" style="flex:1 1 100%">1 мейл = $0.60 · флоу попадёт в зону «${_finZoneLabel()}»</div>
+    </div>`;
+  }
 
   if(_flowsTab==='today'){
     const overdueItems=[];
-    ac.forEach(c=>getFlows(c.id).forEach(f=>{
+    ac.forEach(c=>zoneFlows(c.id).forEach(f=>{
       if(!f.deadline||f.deadline>=iso) return;
       const issued=Object.values(tasks).some(t=>t.cid===c.id&&t.flowId===f.id&&t.done);
       if(!issued) overdueItems.push({c:c,f:f});
@@ -51,9 +91,9 @@ function renderFlows(){
 
     let cards='', hasAny=false;
     ac.forEach(c=>{
-      // Каталог ВСЕХ флоу клиента (как в макете). Раньше выставленные скрывались
-      // навсегда — и вкладка становилась пустой; теперь они просто помечены «выставлен».
-      const flows=getFlows(c.id);
+      // Флоу этой зоны (выставленные здесь + ещё не выставленные). Выставленные
+      // в других месяцах не показываем — они принадлежат своей зоне.
+      const flows=zoneFlows(c.id);
       if(!flows.length) return;
       hasAny=true;
       const sum=flows.reduce((s,f)=>s+f.count*0.60,0);
@@ -63,7 +103,7 @@ function renderFlows(){
         const doneToday=Object.values(tasks).find(t=>t.cid===c.id&&t.flowId===f.id&&t.startIso===iso&&t.done);
         const issued=doneToday||Object.values(tasks).find(t=>t.cid===c.id&&t.flowId===f.id&&t.done);
         const late=!issued&&f.deadline&&f.deadline<iso;
-        rows+=`<div class="dhover" style="${ROW}${late?';border-color:rgba(255,69,58,.3)':''}">
+        rows+=`<div class="dhover flow-row" style="${ROW}${late?';border-color:rgba(255,69,58,.3)':''}">
           <div style="display:flex;align-items:center;gap:10px">
             ${ICON}
             <div style="flex:1;min-width:0;font-size:12.5px;letter-spacing:-.1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${issued?'color:var(--green)':''}">${esc(f.name)}</div>
@@ -95,11 +135,11 @@ function renderFlows(){
         <div style="display:flex;flex-direction:column;gap:8px">${rows}</div>
       </div>`;
     });
-    if(hasAny) h+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">${cards}</div>`;
+    if(hasAny) h+=`<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">${cards}</div>`;
     else h+=`<div class="dcard dcard-p" style="text-align:center;padding:44px 20px;color:var(--text3)">
       <div style="font-size:30px;margin-bottom:10px">⚡</div>
-      <div style="font-size:14px">В зоне «${_finZoneLabel()}» нет флоу — добавь их у клиента</div>
-      <button class="dbtn dbtn-primary" style="margin-top:14px" onclick="setView('clients')">→ Клиенты</button></div>`;
+      <div style="font-size:14px">В зоне «${_finZoneLabel()}» пока нет флоу</div>
+      <div class="dmeta" style="margin-top:6px">Создай флоу в форме выше — он появится здесь</div></div>`;
 
   } else {
     const hm=(typeof _flowsHistoryMode!=='undefined'&&_flowsHistoryMode)||'date';
@@ -137,7 +177,7 @@ function renderFlows(){
     } else {
       const byClient={};
       doneTasks.forEach(t=>{ (byClient[t.cid||'x']=byClient[t.cid||'x']||[]).push(t); });
-      h+=`<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px">`;
+      h+=`<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">`;
       Object.keys(byClient).forEach(cid=>{
         const c=clients.find(x=>x.id===cid);
         const list=byClient[cid];
@@ -315,10 +355,32 @@ function saveFlowModal(){
   // the flow tag UI (see _setFlowDl). Start with none.
   const deadline = null;
   const flows = getFlows(_flowModalCid);
-  flows.push({id:'fl_'+Date.now(), name:name, count:count, deadline:deadline});
+  flows.push({id:'fl_'+Date.now(), name:name, count:count, deadline:deadline, zone:activeMonth});
   saveFlows(_flowModalCid, flows);
   closeFlowModal();
   _sfx.play('done');
+  render();
+}
+
+// Создание флоу прямо во вкладке «Флоу» — без похода в «Клиенты».
+function addFlowFromTab(){
+  const cidEl=document.getElementById('flowtab-client');
+  const nameEl=document.getElementById('flowtab-name');
+  const cntEl=document.getElementById('flowtab-count');
+  const dlEl=document.getElementById('flowtab-dl');
+  if(!cidEl||!nameEl||!cntEl) return;
+  const cid=cidEl.value;
+  const name=(nameEl.value||'').trim();
+  const count=parseInt(cntEl.value||'0',10);
+  if(!cid){ _sfx.play('error'); showToast('Выбери клиента'); return; }
+  if(!name){ _sfx.play('error'); showToast('Введи название флоу'); nameEl.focus(); return; }
+  if(!count||count<1){ _sfx.play('error'); showToast('Мейлов — минимум 1'); cntEl.focus(); return; }
+  const flows=getFlows(cid);
+  flows.push({id:'fl_'+Date.now(), name:name, count:count, deadline:(dlEl&&dlEl.value)||null, zone:activeMonth});
+  saveFlows(cid, flows);
+  const c=(typeof clients!=='undefined'?clients:[]).find(x=>x.id===cid);
+  _sfx.play('done');
+  showToast(`✓ Флоу «${name}» → ${c?c.name:'клиент'} · $${(count*0.60).toFixed(2)}`);
   render();
 }
 function deleteFlow(cid,fid){

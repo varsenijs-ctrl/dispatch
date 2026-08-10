@@ -877,6 +877,9 @@ body::before{
   .main [style*="max-width:9"]{max-width:100%!important;}
   .main [style*="repeat(4,1fr)"]{grid-template-columns:repeat(2,1fr)!important;}
   .main [style*="repeat(3,1fr)"]{grid-template-columns:1fr!important;}
+  /* те же сетки после перехода на minmax(0,1fr) (иначе карточки не сжимались) */
+  .main [style*="repeat(3,minmax(0,1fr))"],
+  .main [style*="repeat(2,minmax(0,1fr))"]{grid-template-columns:1fr!important;}
   .main [style*="1fr 1fr"]{grid-template-columns:1fr!important;}
   .main [style*="260px 1fr"]{grid-template-columns:1fr!important;}
   .main [style*="min-width:150"],
@@ -1202,6 +1205,12 @@ body::before{
 .dhover:hover .dact,.dhover:focus-within .dact{opacity:1;}
 @media (hover:none){.dact{opacity:.8;}}   /* touch devices: always reachable */
 
+/* Строка флоу узкая (три карточки в ряд), а скрытые кнопки всё равно держали место —
+   от названия оставалось «S…». Сворачиваем их по ширине, разворачиваем по наведению. */
+.flow-row .dact{max-width:0;overflow:hidden;transition:max-width .22s var(--smooth),opacity .15s;}
+.flow-row:hover .dact,.flow-row:focus-within .dact{max-width:210px;overflow:visible;}
+@media (hover:none){.flow-row .dact{max-width:210px;overflow:visible;}}   /* на телефоне карточка во всю ширину */
+
 /* inputs in the new panels */
 .dinput{background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 14px;
   color:var(--text);font-size:13.5px;letter-spacing:-.15px;outline:none;font-family:var(--font);}
@@ -1312,6 +1321,18 @@ body::before{
   .dtr .cl-flows::before{content:'флоу';}
   .dtr .cl-money{margin-left:auto;font-size:13.5px!important;}
   .dtr .cl-acts{flex:1 1 100%;justify-content:flex-start!important;gap:6px!important;}
+
+  /* Строка флоу: на телефоне hover нет, поэтому кнопки (дедлайн, ✓, ✕) видны
+     всегда — но на своей строке, иначе они съедали название флоу */
+  .flow-row>div:first-child{flex-wrap:wrap;}
+  .flow-row .dact{max-width:none!important;overflow:visible!important;opacity:1;
+    flex:1 1 100%;justify-content:flex-end;margin-top:4px;}
+
+  /* Форма нового флоу: на телефоне поля в столбик (клиент и название на всю
+     ширину, «мейлов» и «дедлайн» рядом), иначе название сжималось до «Welc» */
+  .flow-add>div{flex:1 1 100%!important;width:auto!important;min-width:0!important;}
+  .flow-add>div.fa-half{flex:1 1 40%!important;}
+  .flow-add>button{flex:1 1 100%;}
 
   /* Сводные тройки («Флоу», «Инвойсы»): на 390px карточки сжимаются, и число
      28px ломалось на три строки («0 / 0») — уменьшаем цифру под ширину */

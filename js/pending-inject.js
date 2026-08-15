@@ -12,7 +12,7 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-08-15T0947';   // bumped by the Action on every sync
+  var INJECT_VERSION = '2026-08-15T1013';   // bumped by the Action on every sync
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
@@ -70,6 +70,14 @@
       "list": "Drinkretros.com",
       "start": "",
       "due": "1786827600000",
+      "prio": 0
+    },
+    {
+      "id": "869ejaekv",
+      "name": "BlockBlaster | Publish emails",
+      "list": "BlockBlaster",
+      "start": "",
+      "due": "1786914000000",
       "prio": 0
     }
   ]/*RAW_END*/;

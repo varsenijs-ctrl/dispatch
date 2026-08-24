@@ -569,9 +569,9 @@ function renderInvoices(){
     let rows='';
     list.forEach((i,idx)=>{
       const dt=new Date(i.date+'T00:00:00');
-      rows+=`<div class="drow" style="padding:9px 10px;margin:0 -10px">
-        <div style="width:62px;font-family:var(--mono);font-size:12px;color:var(--text2)">№${String(list.length-idx).padStart(3,'0')}</div>
-        <div style="flex:1;min-width:0;font-size:12.5px;letter-spacing:-.1px;color:rgba(255,255,255,.85)">${i.count} инвойсов${i.note?' · '+esc(i.note):''}</div>
+      rows+=`<div class="drow inv-row" style="padding:9px 10px;margin:0 -10px">
+        <div class="inv-no" style="width:62px;font-family:var(--mono);font-size:12px;color:var(--text2)">№${String(list.length-idx).padStart(3,'0')}</div>
+        <div class="inv-desc" style="flex:1;min-width:0;font-size:12.5px;letter-spacing:-.1px;color:rgba(255,255,255,.85)">${i.count} инвойсов${i.note?' · '+esc(i.note):''}</div>
         <button class="dbtn dbtn-sm${i.paid?' on':''}" onclick="event.stopPropagation();toggleInvoicePaid('${i.id}')" title="${i.paid?'Снять отметку об оплате':'Отметить оплаченным'}" style="padding:3px 9px;font-size:10.5px">${i.paid?'✓ оплачен':'не оплачен'}</button>
         <div class="dmeta">${dt.getDate()} ${_MSHORT[dt.getMonth()]}</div>
         <div style="font-family:var(--mono);font-size:12.5px;font-weight:600;width:54px;text-align:right">$${(i.count*INV_RATE).toFixed(2)}</div>
@@ -579,17 +579,17 @@ function renderInvoices(){
       </div>`;
     });
     h+=`<div class="dcard" style="overflow:hidden">
-      <div style="display:flex;align-items:center;gap:13px;padding:15px 18px;${open?'border-bottom:1px solid rgba(255,255,255,.06)':''}">
+      <div class="inv-head" style="display:flex;align-items:center;gap:13px;padding:15px 18px;${open?'border-bottom:1px solid rgba(255,255,255,.06)':''}">
         <button class="dcaret" onclick="toggleInvBatch('${mk}')" title="${open?'Свернуть':'Развернуть'}">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .2s ease;transform:rotate(${open?90:0}deg)"><path d="M9 6l6 6-6 6"/></svg>
         </button>
-        <div style="flex:1;min-width:0">
+        <div class="inv-title" style="flex:1;min-width:0">
           <div style="font-size:15px;font-weight:620;letter-spacing:-.3px">${(MONTHS_RU[m-1]||'').charAt(0).toUpperCase()+(MONTHS_RU[m-1]||'').slice(1)} ${y}</div>
           <div class="dmeta" style="margin-top:3px">${period} · пачка из ${list.length} · ${cnt} инвойсов</div>
         </div>
         ${chip}
-        <div class="dnum" style="font-size:17px;letter-spacing:-.5px;width:86px;text-align:right;color:${allPaid?'var(--green)':'var(--text)'}">$${sum.toFixed(2)}</div>
-        <button class="dbtn dbtn-sm ${allPaid?'':'dbtn-ok'}" onclick="markBatchPaid('${mk}')">${allPaid?'снять оплату':'отметить оплаченной'}</button>
+        <div class="dnum inv-sum" style="font-size:17px;letter-spacing:-.5px;width:86px;text-align:right;color:${allPaid?'var(--green)':'var(--text)'}">$${sum.toFixed(2)}</div>
+        <button class="dbtn dbtn-sm inv-payall ${allPaid?'':'dbtn-ok'}" onclick="markBatchPaid('${mk}')">${allPaid?'снять оплату':'отметить оплаченной'}</button>
       </div>
       ${open?`<div style="padding:6px 18px 12px">${rows}</div>`:''}
     </div>`;

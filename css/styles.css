@@ -1328,6 +1328,25 @@ body::before{
   .flow-row .dact{max-width:none!important;overflow:visible!important;opacity:1;
     flex:1 1 100%;justify-content:flex-end;margin-top:4px;}
 
+  /* «Инвойсы»: шапка пачки и строка инвойса — ряды с фиксированными колонками.
+     На 390px они сжимались, и текст сыпался по одному слову в строку («24– / 25 /
+     авг / · / пачка»). Раскладываем в два яруса: сверху название, снизу статус,
+     сумма и кнопки. */
+  .inv-head{flex-wrap:wrap;gap:9px!important;padding:14px 15px!important;}
+  .inv-title{flex:1 1 calc(100% - 46px)!important;}
+  .inv-title>div:last-child{white-space:normal;}
+  .inv-head>.dchip{order:8;}
+  .inv-sum{order:9;width:auto!important;flex:1 1 auto;text-align:left!important;}
+  .inv-payall{order:10;flex:none;}
+
+  .inv-row{flex-wrap:wrap;gap:8px 10px!important;}
+  .inv-no{width:auto!important;flex:none;}
+  .inv-desc{flex:1 1 calc(100% - 70px)!important;white-space:normal;}
+  .inv-row>.dbtn{order:8;}
+  .inv-row>.dmeta{order:9;}
+  .inv-row>div[style*="width:54px"]{order:10;width:auto!important;margin-left:auto;}
+  .inv-row>.dicon{order:11;}
+
   /* Форма нового флоу: на телефоне поля в столбик (клиент и название на всю
      ширину, «мейлов» и «дедлайн» рядом), иначе название сжималось до «Welc» */
   .flow-add>div{flex:1 1 100%!important;width:auto!important;min-width:0!important;}

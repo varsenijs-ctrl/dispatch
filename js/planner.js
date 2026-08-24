@@ -26,7 +26,7 @@ function renderPlanner(){
     const dIso=toISO(dt);
     const title=i===0?'Сегодня':i===1?'Завтра':(_DFULL[dt.getDay()].charAt(0).toUpperCase()+_DFULL[dt.getDay()].slice(1));
     const list=Object.values(tasks).filter(t=>{
-      if(t.flowId||_isTaskClientPaused(t)) return false;
+      if(t.flowId||t.gone||_isTaskClientPaused(t)) return false;   // gone = нет в ClickUp, лежит в «Архиве»
       if(t.startIso===dIso) return true;
       return !t.done&&t.startIso<dIso&&t.until&&t.until>=dIso;   // перенесённые с прошлых дней
     }).sort((a,b)=>(+b.prio||0)-(+a.prio||0)||((a.sortOrder==null?1e9:a.sortOrder)-(b.sortOrder==null?1e9:b.sortOrder)));
@@ -68,7 +68,7 @@ function renderPlanner(){
   const daysInMonth=new Date(y,m+1,0).getDate();
   const offset=(new Date(y,m,1).getDay()+6)%7;
   const byDate={};
-  Object.values(tasks).forEach(t=>{ if(_isTaskClientPaused(t))return; (byDate[t.startIso]=byDate[t.startIso]||[]).push(t); });
+  Object.values(tasks).forEach(t=>{ if(t.gone||_isTaskClientPaused(t))return; (byDate[t.startIso]=byDate[t.startIso]||[]).push(t); });
   let cal=`<div class="dcal" style="margin-bottom:6px">${['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС'].map(w=>`<div class="dcal-dow">${w}</div>`).join('')}</div><div class="dcal">`;
   for(let i=0;i<offset;i++) cal+='<div></div>';
   for(let d=1;d<=daysInMonth;d++){
@@ -157,7 +157,7 @@ function updateFlowSelect(){
 }
 
 function renderDayTasks(iso){
-  const tasks=load('dc_plantasks',{});const dayTasks=Object.values(tasks).filter(t=>!t.flowId&&!_isTaskClientPaused(t)&&(t.startIso===iso||(!t.done&&t.startIso<iso&&t.until&&t.until>=iso)))   // flows live in the Флоу tab
+  const tasks=load('dc_plantasks',{});const dayTasks=Object.values(tasks).filter(t=>!t.flowId&&!t.gone&&!_isTaskClientPaused(t)&&(t.startIso===iso||(!t.done&&t.startIso<iso&&t.until&&t.until>=iso)))   // flows live in the Флоу tab
   // split into tasks carried over from earlier days vs. tasks of this day
   const _pr=t=>+t.prio||0;   // priority DESC first
   const carried = dayTasks.filter(t=>t.startIso<iso).sort((a,b)=>_pr(b)-_pr(a) || a.startIso.localeCompare(b.startIso));
@@ -231,6 +231,15 @@ function toggleDayTask(id){
   }
   save('dc_plantasks',tasks);
   renderDayTasks(currentDayIso);render();
+}
+// Вернуть задачу из «Архива» в рабочий список. Метка keep защищает её от того,
+// чтобы синк снова убрал её в архив: в ClickUp этой задачи всё равно нет.
+function _unarchiveTask(id){
+  const tasks=load('dc_plantasks',{}); const t=tasks[id]; if(!t) return;
+  delete t.gone; delete t.goneAt; t.keep=true;
+  save('dc_plantasks',tasks); _sfx.play('click');
+  try{ showToast('↩ Задача вернулась в список'); }catch(e){}
+  render();
 }
 function removeDayTask(id){_sfx.play('delete');
   const tasks=load('dc_plantasks',{});

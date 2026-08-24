@@ -46,15 +46,24 @@ function _syncStatus(msg,cls){ const el=document.getElementById('sync-status'); 
 // ClickUp-injected tasks are re-derived locally on EVERY device (the RAW mirror), so
 // they must NOT travel through the cloud — a stale copy there would clobber the live
 // mirror (that's how tasks "went missing"). Only MANUAL (non-injected) tasks sync.
-function _plantasksShareable(json){
-  try{ var t=JSON.parse(json)||{}; var o={}; Object.keys(t).forEach(function(k){ if(t[k] && !t[k].injectId) o[k]=t[k]; }); return JSON.stringify(o); }catch(e){ return json; }
-}
 function _localInjectTasks(){
   var out={}; try{ var t=JSON.parse(localStorage.getItem('dc_plantasks')||'{}')||{}; Object.keys(t).forEach(function(k){ if(t[k]&&t[k].injectId) out[k]=t[k]; }); }catch(e){} return out;
 }
 function _applyPlantasks(incomingJson, injectBase, injStateJson){
   var out=Object.assign({}, injectBase || _localInjectTasks());   // keep this device's ClickUp tasks
-  try{ var inc=JSON.parse(incomingJson||'{}')||{}; Object.keys(inc).forEach(function(k){ if(inc[k]&&!inc[k].injectId) out[k]=inc[k]; }); }catch(e){}  // + synced manual tasks
+  var removed={};
+  try{ (JSON.parse(localStorage.getItem('dc_inject_removed')||'[]')||[]).forEach(function(x){ removed[x]=1; }); }catch(e){}
+  try{
+    var inc=JSON.parse(incomingJson||'{}')||{};
+    Object.keys(inc).forEach(function(k){
+      var t=inc[k]; if(!t) return;
+      if(!t.injectId){ out[k]=t; return; }                         // ручные задачи — как есть
+      // Задачи ClickUp ДОБАВЛЯЕМ, если их тут ещё нет (иначе телефон и компьютер
+      // копят разные списки: одно устройство видело задачу, другое — нет).
+      // Локальные никогда не затираются, удалённые вручную не воскресают.
+      if(!out[k] && !removed[t.injectId]) out[k]=t;
+    });
+  }catch(e){}
   out=_applyInjectState(out, injStateJson);                        // + прогресс по задачам ClickUp
   localStorage.setItem('dc_plantasks', JSON.stringify(out));
 }
@@ -94,8 +103,10 @@ function _syncCollect(){
   const data={};
   for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.indexOf('dc_')===0&&k.indexOf('dc_sync_')!==0) data[k]=localStorage.getItem(k); }
   if(data.dc_plantasks!=null){
-    data.dc_inject_state=JSON.stringify(_injectStateOf(data.dc_plantasks));   // прогресс по задачам ClickUp — едет
-    data.dc_plantasks=_plantasksShareable(data.dc_plantasks);                 // сам их список — нет
+    data.dc_inject_state=JSON.stringify(_injectStateOf(data.dc_plantasks));   // прогресс по задачам ClickUp
+    // Список задач ClickUp тоже едет — но на той стороне он ДОБАВЛЯЕТСЯ к
+    // локальному, а не заменяет его (см. _applyPlantasks), поэтому устаревшая
+    // копия в облаке ничего стереть не может — ровно от этого и защищались.
   }
   if(_syncShared()){ const s={}; SHARE_KEYS.forEach(function(k){ if(data[k]!=null) s[k]=data[k]; }); return s; }
   return data;

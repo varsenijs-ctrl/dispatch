@@ -158,6 +158,19 @@
     }
     added++; if(c) matched++;
   });
+  // Задачи, которых больше нет в ClickUp (закрыл, переназначили), уходят в архив:
+  // из «Сегодня» и планировщика они пропадают, но не удаляются — их видно в фильтре
+  // «Архив», откуда можно вернуть или удалить. Если задача снова появилась в
+  // ClickUp, метка снимается. Guard: пустой RAW (сбой синка) архив не наполняет.
+  if(RAW.length){
+    var live={}; RAW.forEach(function(r){ if(r&&r.id) live['inject_'+r.id]=1; });
+    Object.keys(tasks).forEach(function(k){
+      var t=tasks[k]; if(!t || !t.injectId) return;
+      if(live[k]){ if(t.gone){ delete t.gone; delete t.goneAt; } }
+      else if(!t.gone && !t.keep){ t.gone=true; t.goneAt=TODAY_ISO; }   // keep = возвращена вручную
+    });
+  }
+
   // Задачи, которых больше нет в ClickUp, НЕ удаляются: их переназначили,
   // закрыли или убрали в ClickUp, а работа за тобой всё равно записана — пусть
   // остаётся в планировщике, пока сам не удалишь. Раньше это был жёсткий mirror,

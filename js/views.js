@@ -209,8 +209,8 @@ function renderHome(){
     const hasHist=ac.some(c=>historyData[c.name]&&historyData[c.name][diso]==='yes');
     if(hasManual||hasHist) streak++; else if(i>0) break;
   }
-  const todayTasks=Object.values(_tasks).filter(t=>!t.flowId&&!_isTaskClientPaused(t)&&t.startIso===iso);
-  const overdueN=Object.values(_tasks).filter(t=>!t.flowId&&!_isTaskClientPaused(t)&&_overdue(t)).length;
+  const todayTasks=Object.values(_tasks).filter(t=>!t.flowId&&!t.gone&&!_isTaskClientPaused(t)&&t.startIso===iso);
+  const overdueN=Object.values(_tasks).filter(t=>!t.flowId&&!t.gone&&!_isTaskClientPaused(t)&&_overdue(t)).length;
   // мини-бары: последние 7 дней (отметки / деньги / активность)
   const last7=(function(){ const out=[]; for(let i=6;i>=0;i--){ const d=new Date(getTODAY()); d.setDate(d.getDate()-i); out.push(toISO(d)); } return out; })();
   const marksPerDay=last7.map(function(di){ return ac.filter(c=>{const v=(historyData[c.name]||{})[di];return v==='yes'||v==='draft';}).length; });
@@ -700,10 +700,11 @@ function renderDayToday(){
   const tasks=load('dc_plantasks',{});
   const todEmoji={morning:'🌅',day:'☀️',evening:'🌇',night:'🌙'};
   const due=t=>t.deadline||t.startIso;
-  const G={overdue:[],today:[],next:[]}; const done=[]; const withDeadline=[];
+  const G={overdue:[],today:[],next:[]}; const done=[]; const withDeadline=[]; const archived=[];
   Object.values(tasks).forEach(t=>{
     if(t.flowId) return;                               // flows live in the Флоу tab
     if(_isTaskClientPaused(t)) return;
+    if(t.gone){ archived.push(t); return; }            // закрыта/переназначена в ClickUp → в «Архив»
     if(t.done){ if(t.doneDate===iso||t.startIso===iso) done.push(t); return; }
     if(t.deadline) withDeadline.push(t);
     if(_overdue(t)) G.overdue.push(t);
@@ -723,7 +724,9 @@ function renderDayToday(){
     <button class="dbtn dbtn-primary dbtn-sm" onclick="openDayModal('${iso}')">+ задача</button>
   </div>`;
 
+  archived.sort((a,b)=>(b.goneAt||'').localeCompare(a.goneAt||''));
   const TF=[['all','Все',totalPending],['overdue','Просрочено',G.overdue.length],['today','Сегодня',G.today.length],['deadline','С дедлайном',withDeadline.length],['next','Следующие',G.next.length]];
+  if(archived.length) TF.push(['archive','Архив',archived.length]);
   if(!TF.some(f=>f[0]===todayFilter)) todayFilter='all';
   html+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">`+
     TF.map(f=>`<button class="dpill ${todayFilter===f[0]?'active':''}" onclick="todayFilter='${f[0]}';render()">${f[1]}${f[2]?`<span class="n">${f[2]}</span>`:''}</button>`).join('')+`</div>`;
@@ -792,6 +795,30 @@ function renderDayToday(){
     [[G.overdue,'⚠ Просрочено','var(--red)'],[G.today,'📌 Сегодня','var(--green)'],[G.next,'→ Следующие дни','var(--accent)']].forEach(g=>{
       if(g[0].length) html+=`<div class="dmeta" style="color:${g[2]};letter-spacing:.08em;text-transform:uppercase;margin:16px 0 8px">${g[1]} — ${g[0].length}</div>`+g[0].map(taskRow).join('');
     });
+  } else if(todayFilter==='archive'){
+    html+=`<div class="dmeta" style="margin:0 0 10px;line-height:1.6">Этих задач больше нет в ClickUp — их закрыли или переназначили. В рабочем списке они не мешают; отсюда можно вернуть задачу или удалить совсем.</div>`;
+    html+=archived.map(t=>{
+      const _cl=(t.cid&&clients.find(c=>c.id===t.cid))||null;
+      const when=t.goneAt?('пропала из ClickUp '+fmtDate(new Date(t.goneAt+'T00:00:00'))):'нет в ClickUp';
+      return `<div class="dhover" style="border:1px solid rgba(255,255,255,.06);border-radius:14px;margin-bottom:7px;background:rgba(255,255,255,.03);opacity:.75">
+        <div class="dtaskline" style="display:flex;align-items:flex-start;gap:11px;padding:11px 13px">
+          <span style="width:13px;flex:none"></span>
+          <div style="width:8px;height:8px;border-radius:980px;flex:none;margin-top:6px;background:rgba(255,255,255,.18)"></div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px">
+              <span style="font-size:13px;font-weight:540;letter-spacing:-.1px;${t.done?'text-decoration:line-through;color:var(--text3)':''}">${esc(t.text)}</span>
+              ${_cl?`<span class="dchip dchip-sms" style="font-weight:560;letter-spacing:0;flex:none">${esc(_cl.name)}</span>`:''}
+              ${t.done?'<span class="dchip dchip-ok">✓ сделана</span>':''}
+            </div>
+            <div class="dmeta" style="margin-top:4px">${when}</div>
+          </div>
+          <span class="dact" style="opacity:1">
+            <button class="dbtn dbtn-sm" onclick="event.stopPropagation();_unarchiveTask('${t.id}')" title="Вернуть в рабочий список">↩ вернуть</button>
+            <button class="dicon" onclick="event.stopPropagation();removeDayTask('${t.id}')" title="Удалить совсем">✕</button>
+          </span>
+        </div>
+      </div>`;
+    }).join('');
   } else {
     const arr=todayFilter==='deadline'?withDeadline:G[todayFilter];
     html+=(arr&&arr.length)?arr.map(taskRow).join(''):`<div class="dcard dcard-p" style="text-align:center;padding:26px;color:var(--text3);font-family:var(--mono);font-size:13px">Здесь пусто.</div>`;

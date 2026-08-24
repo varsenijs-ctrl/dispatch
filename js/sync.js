@@ -52,16 +52,51 @@ function _plantasksShareable(json){
 function _localInjectTasks(){
   var out={}; try{ var t=JSON.parse(localStorage.getItem('dc_plantasks')||'{}')||{}; Object.keys(t).forEach(function(k){ if(t[k]&&t[k].injectId) out[k]=t[k]; }); }catch(e){} return out;
 }
-function _applyPlantasks(incomingJson, injectBase){
+function _applyPlantasks(incomingJson, injectBase, injStateJson){
   var out=Object.assign({}, injectBase || _localInjectTasks());   // keep this device's ClickUp tasks
   try{ var inc=JSON.parse(incomingJson||'{}')||{}; Object.keys(inc).forEach(function(k){ if(inc[k]&&!inc[k].injectId) out[k]=inc[k]; }); }catch(e){}  // + synced manual tasks
+  out=_applyInjectState(out, injStateJson);                        // + прогресс по задачам ClickUp
   localStorage.setItem('dc_plantasks', JSON.stringify(out));
+}
+
+// ── Прогресс по задачам ClickUp ──────────────────────────────────────────────
+// Сами задачи через облако не ездят: их список каждое устройство строит из RAW
+// (иначе устаревшая копия в облаке затирала живой список — так задачи «пропадали»).
+// Но галочка «сделано», отложенный статус и перенос на другой день — это твоя
+// работа, и она должна быть одинаковой на телефоне и компе. Поэтому в облако
+// уезжает не список, а лёгкий слой состояния: ключ = id задачи в ClickUp.
+function _injectStateOf(tasksJson){
+  var out={};
+  try{
+    var t=JSON.parse(tasksJson||'{}')||{};
+    Object.keys(t).forEach(function(k){
+      var x=t[k]; if(!x||!x.injectId) return;
+      out[x.injectId]={done:!!x.done, status:x.status||'', doneDate:x.doneDate||'', startIso:x.startIso||''};
+    });
+  }catch(e){}
+  return out;
+}
+function _applyInjectState(tasks, stateJson){
+  var st; try{ st=JSON.parse(stateJson||'null'); }catch(e){ st=null; }
+  if(!st || typeof st!=='object') return tasks;
+  Object.keys(tasks).forEach(function(k){
+    var x=tasks[k]; if(!x||!x.injectId) return;
+    var s=st[x.injectId]; if(!s) return;
+    x.done=!!s.done;
+    if(s.status) x.status=s.status; else delete x.status;
+    if(s.doneDate) x.doneDate=s.doneDate; else delete x.doneDate;
+    if(s.startIso) x.startIso=s.startIso;      // перенос задачи на другой день
+  });
+  return tasks;
 }
 
 function _syncCollect(){
   const data={};
   for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.indexOf('dc_')===0&&k.indexOf('dc_sync_')!==0) data[k]=localStorage.getItem(k); }
-  if(data.dc_plantasks!=null) data.dc_plantasks=_plantasksShareable(data.dc_plantasks);   // never ship ClickUp tasks
+  if(data.dc_plantasks!=null){
+    data.dc_inject_state=JSON.stringify(_injectStateOf(data.dc_plantasks));   // прогресс по задачам ClickUp — едет
+    data.dc_plantasks=_plantasksShareable(data.dc_plantasks);                 // сам их список — нет
+  }
   if(_syncShared()){ const s={}; SHARE_KEYS.forEach(function(k){ if(data[k]!=null) s[k]=data[k]; }); return s; }
   return data;
 }
@@ -72,15 +107,15 @@ function _syncApply(data){
     if(_syncShared()){
       // touch ONLY the shared workspace keys — never wipe local progress
       SHARE_KEYS.forEach(function(k){
-        if(k==='dc_plantasks'){ _applyPlantasks(data[k]); return; }   // merge: keep local ClickUp tasks
+        if(k==='dc_plantasks'){ _applyPlantasks(data[k], null, data.dc_inject_state); return; }   // merge: keep local ClickUp tasks
         if(data[k]!=null) localStorage.setItem(k, data[k]); else localStorage.removeItem(k);
       });
     } else {
       const localInject=_localInjectTasks();
       const del=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.indexOf('dc_')===0&&k.indexOf('dc_sync_')!==0) del.push(k); }
       del.forEach(function(k){ localStorage.removeItem(k); });
-      Object.keys(data).forEach(function(k){ if(k.indexOf('dc_')!==0||k.indexOf('dc_sync_')===0) return; if(k==='dc_plantasks'){ _applyPlantasks(data[k], localInject); } else { localStorage.setItem(k, data[k]); } });
-      if(data.dc_plantasks==null){ localStorage.setItem('dc_plantasks', JSON.stringify(localInject)); }   // blob had none → keep our ClickUp tasks
+      Object.keys(data).forEach(function(k){ if(k.indexOf('dc_')!==0||k.indexOf('dc_sync_')===0) return; if(k==='dc_plantasks'){ _applyPlantasks(data[k], localInject, data.dc_inject_state); } else { localStorage.setItem(k, data[k]); } });
+      if(data.dc_plantasks==null){ localStorage.setItem('dc_plantasks', JSON.stringify(_applyInjectState(localInject, data.dc_inject_state))); }   // blob had none → keep our ClickUp tasks
     }
   } finally { _syncApplying=false; }
 }
@@ -186,6 +221,30 @@ async function syncConnect(){
   _syncSubscribe(); _syncStartPolling();
   render();
 }
+// Проверка связи: показывает, что реально лежит в облаке и когда его обновляли —
+// чтобы не гадать, почему «не синхронизируется» (выключено? другой код? тишина?).
+async function syncDiagnose(){
+  const box=document.getElementById('sync-diag');
+  const say=function(html){ if(box){ box.innerHTML=html; box.style.display='block'; } };
+  if(!SYNC.enabled()){ say('<b>Синхронизация выключена на этом устройстве.</b><br>Заполни URL, ключ и код — одинаковый код на телефоне и компьютере.'); return; }
+  say('проверяю…');
+  try{
+    const sb=await _sb(); if(!sb){ say('⚠ не удалось создать клиент Supabase'); return; }
+    const {data,error}=await sb.from('dispatch_sync').select('data,updated_at,device').eq('id',SYNC.code()).maybeSingle();
+    if(error){ say('⚠ облако ответило ошибкой: '+esc(error.message)+'<br>Проверь URL и ключ проекта.'); return; }
+    if(!data){ say('Связь есть, но по коду «'+esc(SYNC.code())+'» в облаке пусто.<br>Нажми «⬆ Выгрузить» здесь, потом на втором устройстве введи тот же код.'); return; }
+    const d=data.data||{};
+    const nClients=(function(){ try{ return (JSON.parse(d.dc_clients||'[]')||[]).length; }catch(e){ return '?'; } })();
+    const nManual=(function(){ try{ var t=JSON.parse(d.dc_plantasks||'{}')||{}; return Object.keys(t).length; }catch(e){ return '?'; } })();
+    const nInj=(function(){ try{ return Object.keys(JSON.parse(d.dc_inject_state||'{}')||{}).length; }catch(e){ return 0; } })();
+    const mine=data.device===SYNC.device();
+    say('<b>Связь есть.</b> Код «'+esc(SYNC.code())+'».<br>'
+      +'В облаке: '+nClients+' клиентов · '+nManual+' своих задач · прогресс по '+nInj+' задачам ClickUp.<br>'
+      +'Обновлено: '+new Date(data.updated_at).toLocaleString()+' — '+(mine?'этим устройством':'другим устройством')+'.<br>'
+      +(mine?'Если второе устройство ничего не присылало, введи на нём тот же код.':'Данные со второго устройства доходят — нажми «⬇ Загрузить», чтобы забрать их сейчас.'));
+  }catch(e){ say('⚠ '+esc(e.message||'нет сети')); }
+}
+
 function syncDisconnect(){
   ['dc_sync_url','dc_sync_key','dc_sync_code','dc_sync_mode'].forEach(function(k){ localStorage.removeItem(k); });
   _sbClient=null; if(_syncChan){ try{ _sbClient&&_sbClient.removeChannel(_syncChan); }catch(e){} _syncChan=null; }
@@ -220,8 +279,11 @@ function renderSyncPanel(){
       ${on?`<button class="toggle-btn" onclick="syncPushNow()">⬆ Выгрузить</button>
       <button class="toggle-btn" onclick="syncPullNow()">⬇ Загрузить</button>
       <button class="toggle-btn" onclick="syncDisconnect()" style="color:var(--red);border-color:rgba(251,113,133,.3)">Отключить</button>`:''}
+      <button class="toggle-btn" onclick="syncDiagnose()">🔎 Проверить связь</button>
       <span id="sync-status" style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-left:4px"></span>
     </div>
+    ${on?`<div class="dmeta" style="margin-top:8px;line-height:1.6">режим: ${_syncShared()?'общий доступ (только клиенты и задачи)':'полная — всё между твоими устройствами'} · это устройство: ${esc(SYNC.device())}${gload('dc_sync_ts','')?' · последний обмен: '+new Date(gload('dc_sync_ts','')).toLocaleString():' · обменов ещё не было'}</div>`:''}
+    <div id="sync-diag" style="display:none;margin-top:10px;padding:10px 12px;border-radius:14px;background:rgba(0,0,0,.26);border:1px solid rgba(255,255,255,.08);font-size:12px;line-height:1.6;color:var(--text2)"></div>
   </div>`;
 }
 

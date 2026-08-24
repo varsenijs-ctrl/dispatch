@@ -116,6 +116,12 @@
   var tasks; try{ tasks = JSON.parse(localStorage.getItem('dc_plantasks')||'{}')||{}; }catch(e){ tasks={}; }
   var gone = {};   // задачи, удалённые вручную — не возвращаем их при каждом синке
   try{ (JSON.parse(localStorage.getItem('dc_inject_removed')||'[]')||[]).forEach(function(x){ gone[x]=1; }); }catch(e){}
+  // Прогресс с другого устройства (галочка, отложено, перенос) — приезжает облаком
+  // отдельным слоем и накладывается на ЗАНОВО создаваемые задачи, чтобы на телефоне
+  // не пришлось отмечать всё второй раз. Уже существующие задачи не трогаем: их
+  // состояние на этом устройстве свежее.
+  var injState = {};
+  try{ injState = JSON.parse(localStorage.getItem('dc_inject_state')||'{}')||{}; }catch(e){}
   var added = 0, matched = 0, updated = 0;
   RAW.forEach(function(r){
     if(!r || !r.id) return;
@@ -143,6 +149,13 @@
       prio: newPrio,                                   // ClickUp priority (0-4)
       done: false, note: c ? 'ClickUp' : ('ClickUp: ' + hint)
     };
+    var st = injState[r.id];
+    if(st){
+      tasks[id].done = !!st.done;
+      if(st.status) tasks[id].status = st.status;
+      if(st.doneDate) tasks[id].doneDate = st.doneDate;
+      if(st.startIso) tasks[id].startIso = st.startIso;
+    }
     added++; if(c) matched++;
   });
   // Задачи, которых больше нет в ClickUp, НЕ удаляются: их переназначили,

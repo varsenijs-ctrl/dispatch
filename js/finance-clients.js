@@ -233,7 +233,9 @@ let clientsSort='alpha';
 // бэкап/экспорт, панели синхронизации, пул клиентов зоны, сортировки.
 let clientsShowImport=false;
 let clientsShowMore=false;
+let clientsShowSync=false;
 function toggleClientsImport(){ _sfx.play('click'); clientsShowImport=!clientsShowImport; render(); }
+function toggleClientsSync(){ _sfx.play('click'); clientsShowSync=!clientsShowSync; render(); }
 function toggleClientsMore(){ _sfx.play('click'); clientsShowMore=!clientsShowMore; render(); }
 function _newSmsToggle(el){ _iosSwitch(el); }
 function renderClients(){
@@ -263,6 +265,11 @@ function renderClients(){
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2M9 2h6v4H9z"/></svg>
       Импорт вставкой
     </button>
+    <button class="dbtn${clientsShowSync?' on':''}" onclick="toggleClientsSync()" style="padding:10px 15px" title="Синхронизация телефон ↔ компьютер">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M20 17.6A5 5 0 0018 8h-1.3A8 8 0 104 16.2"/><path d="M12 12v9M8.5 17.5L12 21l3.5-3.5"/></svg>
+      Синхронизация
+      <span style="font-family:var(--mono);font-size:10.5px;color:${(typeof SYNC!=='undefined'&&SYNC.enabled())?'var(--green)':'var(--text3)'}">${(typeof SYNC!=='undefined'&&SYNC.enabled())?'●':'○'}</span>
+    </button>
     <button class="dbtn${clientsShowMore?' on':''}" onclick="toggleClientsMore()" title="Расписание и прочее">⋯ ещё</button>
     ${clientsShowMore?`<div style="flex:1 1 100%;display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding-top:10px;border-top:1px solid rgba(255,255,255,.07)">
       <span class="dmeta">расписание:</span>
@@ -274,6 +281,7 @@ function renderClients(){
   </div>`;
 
   if(clientsShowImport) html+=`<div style="margin-bottom:12px">${renderImportBox()}</div>`;
+  if(clientsShowSync) html+=`<div class="import-box" style="margin-bottom:12px">${typeof renderSyncPanel==='function'?renderSyncPanel():''}</div>`;
 
   // ── sort + count ──
   const SORTS=[['alpha','А→Я'],['money','по деньгам'],['count','меньше отправлено'],['deadline','дедлайн']];

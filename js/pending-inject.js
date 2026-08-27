@@ -12,7 +12,7 @@
 // Already-injected ClickUp tasks (by their id) are never added twice.
 
 (function(){
-  var INJECT_VERSION = '2026-08-27T0553';   // bumped by the Action on every sync
+  var INJECT_VERSION = '2026-08-27T1708';   // bumped by the Action on every sync
 
   // Raw ClickUp tasks. Each: {id, name, list, due(ms)}. The Action overwrites this.
   var RAW = /*RAW_START*/[
@@ -25,41 +25,9 @@
       "prio": 0
     },
     {
-      "id": "869epygm8",
-      "name": "enhancedscents | Build campaigns ",
-      "list": "enhancedscents",
-      "start": "",
-      "due": "1787778000000",
-      "prio": 0
-    },
-    {
-      "id": "869eq533m",
-      "name": "Pluma Sleep | August | Publish emails",
-      "list": "Pluma Sleep",
-      "start": "",
-      "due": "1787864400000",
-      "prio": 0
-    },
-    {
       "id": "869eq3yh3",
       "name": "Equalize Labs | Publish emails",
       "list": "Equalize Labs",
-      "start": "",
-      "due": "1787864400000",
-      "prio": 0
-    },
-    {
-      "id": "869eq1agx",
-      "name": "Equalize Labs | Publish emails",
-      "list": "Equalize Labs",
-      "start": "",
-      "due": "1787864400000",
-      "prio": 0
-    },
-    {
-      "id": "869epajfn",
-      "name": "Revair | Publish emails",
-      "list": "Revair",
       "start": "",
       "due": "1787864400000",
       "prio": 0

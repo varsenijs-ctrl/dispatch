@@ -1,6 +1,6 @@
 // Build stamp — bump on each deploy so you can tell at a glance whether the
 // running app has the latest files (если метки нет — крутится старый JS из кэша).
-const BUILD='08.28 · ClickUp по кнопке';
+const BUILD='08.28 · ClickUp сам, каждые 5 минут';
 console.log('Dispatch build: '+BUILD+' — _overdue '+(typeof _overdue==='function'?'OK':'ОТСУТСТВУЕТ (старый код)'));
 try{ const _bt=document.getElementById('build-tag'); if(_bt) _bt.textContent=BUILD; }catch(e){}
 try{ const _td=document.getElementById('topbar-date'); if(_td) _td.textContent=fmtDate(getTODAY())+' '+DAYS_RU[getTODAY().getDay()]+' · '+MONTHS_RU[getTODAY().getMonth()]; }catch(e){}
@@ -215,6 +215,25 @@ try{localStorage.removeItem('dc_accent_color');}catch(e){}  // fixed teal accent
       .catch(()=>{})
       .then(()=>{ checking=false; });
   }
+  // Если задан токен ClickUp, приложение подтягивает задачи само: при запуске и
+  // при возврате в приложение, но не чаще раза в 5 минут. Бот остаётся страховкой
+  // на случай, когда приложение не открыто.
+  (function(){
+    let lastCu=0;
+    function cuTick(){
+      try{
+        if(typeof cuToken!=='function' || !cuToken()) return;
+        if(typeof clickupPullNow!=='function') return;
+        const now=Date.now(); if(now-lastCu<300000) return;
+        lastCu=now; clickupPullNow();
+      }catch(e){}
+    }
+    setTimeout(cuTick, 2500);
+    document.addEventListener('visibilitychange', function(){ if(!document.hidden) cuTick(); });
+    window.addEventListener('focus', cuTick);
+    setInterval(cuTick, 300000);
+  })();
+
   setTimeout(check,1500);                                            // при запуске
   document.addEventListener('visibilitychange',function(){ if(!document.hidden) check(); });  // при возврате в приложение
   window.addEventListener('focus',check);

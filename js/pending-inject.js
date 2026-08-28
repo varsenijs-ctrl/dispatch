@@ -113,6 +113,11 @@
   // Ничего не удаляется: задача, исчезнувшая из ClickUp (закрыли, переназначили),
   // остаётся в приложении — убрать её можно вручную. Одна и та же задача не
   // добавляется дважды (по её ClickUp id). РУЧНЫЕ задачи не трогаем вообще.
+  //
+  // Список приходит двумя путями: файлом от бота (RAW ниже) и прямым запросом к
+  // ClickUp из самого приложения (кнопка «Обновить сейчас») — обрабатываются они
+  // одинаково, поэтому вся логика лежит в одной функции.
+  function applyRaw(RAW, source){
   var tasks; try{ tasks = JSON.parse(localStorage.getItem('dc_plantasks')||'{}')||{}; }catch(e){ tasks={}; }
   var gone = {};   // задачи, удалённые вручную — не возвращаем их при каждом синке
   try{ (JSON.parse(localStorage.getItem('dc_inject_removed')||'[]')||[]).forEach(function(x){ gone[x]=1; }); }catch(e){}
@@ -178,9 +183,14 @@
   // Что именно приехало из ClickUp — чтобы приложение могло показать диагностику
   // («почему задача не появилась») и пересобрать список по кнопке.
   try{
-    window._injectInfo={version:INJECT_VERSION, list:RAW.map(function(r){ return {id:r.id, name:r.name}; })};
+    window._injectInfo={version:(source||INJECT_VERSION), list:RAW.map(function(r){ return {id:r.id, name:r.name}; })};
   }catch(e){}
   localStorage.setItem('dc_plantasks', JSON.stringify(tasks));
   try{ localStorage.removeItem('dc_inject_seen'); }catch(e){}   // legacy suppression list — no longer used
-  console.log('Dispatch ← ClickUp: ('+added+' added, '+updated+' synced, '+matched+' matched, старые сохранены) · '+INJECT_VERSION);
+  console.log('Dispatch ← ClickUp: ('+added+' added, '+updated+' synced, '+matched+' matched, старые сохранены) · '+(source||INJECT_VERSION));
+  return {added:added, updated:updated, matched:matched, total:RAW.length};
+  }
+
+  applyRaw(RAW);                       // список из файла бота — как раньше, при загрузке
+  window._applyInjectRaw=applyRaw;     // тем же путём применяется прямой ответ ClickUp
 })();

@@ -700,6 +700,70 @@ function _dayInlineCalendar(c){
 // блокировки и собирает список заново.
 let showClickupDiag=false;
 function toggleClickupDiag(){ _sfx.play('click'); showClickupDiag=!showClickupDiag; render(); }
+// ── Прямой запрос к ClickUp из приложения ──────────────────────────────────
+// Бот на серверах GitHub выкладывает список задач, но его расписание GitHub не
+// соблюдает: «каждые 15 минут» на практике превращается в раз в 2–6 часов, и
+// задача, созданная утром, до вечера не появляется. Поэтому приложение умеет
+// спросить ClickUp само — по кнопке, мгновенно. Токен хранится ТОЛЬКО на этом
+// устройстве (префикс dc_sync_ исключён из облачной синхронизации).
+const CU_DONE=['done','complete','completed','closed','cancelled','canceled'];
+const CU_DAYS=40;                                     // как у бота: дальше горизонта не тянем
+function cuToken(){ return gload('dc_sync_clickup_token',''); }
+function saveCuToken(){
+  const v=(document.getElementById('cu-token')||{}).value||'';
+  gsave('dc_sync_clickup_token', v.trim());
+  showToast(v.trim()?'✓ Токен ClickUp сохранён':'Токен убран');
+  if(v.trim()) clickupPullNow(); else render();
+}
+async function _cuGet(path, token){
+  const r=await fetch('https://api.clickup.com/api/v2'+path,{headers:{Authorization:token}});
+  if(!r.ok) throw new Error('ClickUp '+r.status+' '+(await r.text()).slice(0,120));
+  return r.json();
+}
+async function clickupPullNow(){
+  const token=cuToken();
+  if(!token){ showToast('Сначала вставь токен ClickUp'); return; }
+  if(typeof window._applyInjectRaw!=='function'){ showToast('Файл задач ещё не загрузился — обнови страницу'); return; }
+  const st=document.getElementById('cu-status');
+  const say=t=>{ if(st) st.textContent=t; };
+  say('спрашиваю ClickUp…');
+  try{
+    const me=await _cuGet('/user', token);
+    const uid=String(me.user.id);
+    const teams=await _cuGet('/team', token);
+    const teamId=(teams.teams&&teams.teams[0]&&teams.teams[0].id)||'';
+    if(!teamId) throw new Error('не нашёл рабочее пространство');
+    let all=[], page=0;
+    while(page<=20){
+      const q='page='+page+'&include_closed=false&subtasks=true&order_by=due_date&assignees%5B%5D='+encodeURIComponent(uid);
+      const data=await _cuGet('/team/'+teamId+'/task?'+q, token);
+      const arr=data.tasks||[];
+      all=all.concat(arr);
+      if(arr.length<100) break;
+      page++;
+    }
+    const horizon=Date.now()+CU_DAYS*24*3600*1000;
+    const raw=all.filter(t=>{
+      const stt=((t.status&&t.status.status)||'').toLowerCase();
+      const type=((t.status&&t.status.type)||'').toLowerCase();
+      if(CU_DONE.indexOf(stt)>=0||type==='closed'||type==='done') return false;
+      if(t.due_date&&Number(t.due_date)>horizon) return false;     // далёкое будущее не тянем
+      return true;
+    }).sort((a,b)=>Number(a.due_date||a.start_date||0)-Number(b.due_date||b.start_date||0))
+      .map(t=>({id:t.id, name:t.name, list:(t.list&&t.list.name)||'',
+                start:t.start_date?String(t.start_date):'', due:t.due_date?String(t.due_date):'',
+                prio:({urgent:4,high:3,normal:2,low:1})[String((t.priority&&t.priority.priority)||'').toLowerCase()]||0}));
+    const res=window._applyInjectRaw(raw, 'прямо из ClickUp · '+new Date().toLocaleTimeString());
+    gsave('dc_sync_clickup_ts', new Date().toISOString());
+    say('✓ '+raw.length+' '+_plural(raw.length,'задача','задачи','задач')+(res&&res.added?' · новых '+res.added:''));
+    _sfx.play('done');
+    render();
+  }catch(e){
+    say('⚠ '+(e.message||'не получилось'));
+    _sfx.play('error');
+  }
+}
+
 function _clickupDiagHtml(){
   const info=(typeof window!=='undefined'&&window._injectInfo)||null;
   const tasks=load('dc_plantasks',{});
@@ -726,6 +790,12 @@ function _clickupDiagHtml(){
       <div class="dmeta">список от ${esc(info.version)} · ${info.list.length} ${_plural(info.list.length,'задача','задачи','задач')}</div>
       <div style="flex:1"></div>
       <button class="dbtn dbtn-sm" onclick="rebuildClickupTasks()" title="Снять блокировки и собрать список заново">↻ Пересобрать</button>
+      <button class="dbtn dbtn-sm dbtn-ok" onclick="clickupPullNow()" title="Спросить ClickUp прямо сейчас, не ожидая бота">⤓ Обновить сейчас</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <input id="cu-token" class="dinput dinput-sm" type="password" placeholder="личный токен ClickUp (pk_…)" value="${esc(cuToken())}" style="flex:1;min-width:190px;font-family:var(--mono);font-size:11px">
+      <button class="dbtn dbtn-sm" onclick="saveCuToken()">Сохранить</button>
+      <span class="dmeta" id="cu-status">${gload('dc_sync_clickup_ts','')?'последний запрос: '+new Date(gload('dc_sync_clickup_ts','')).toLocaleString():(cuToken()?'токен есть — нажми «Обновить сейчас»':'без токена список приходит только от бота (раз в несколько часов)')}</span>
     </div>
     <div style="margin-top:10px;display:flex;flex-direction:column;gap:2px">${rows}</div>
     ${(nBlocked||nGone)?`<div class="dmeta" style="margin-top:10px;line-height:1.6">${nBlocked?nBlocked+' заблокировано ручным удалением. ':''}${nGone?nGone+' лежит в архиве. ':''}Нажми «Пересобрать» — вернутся все задачи, которые сейчас есть в ClickUp.</div>`:''}

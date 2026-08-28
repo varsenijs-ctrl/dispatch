@@ -720,13 +720,15 @@ async function _cuGet(path, token){
   if(!r.ok) throw new Error('ClickUp '+r.status+' '+(await r.text()).slice(0,120));
   return r.json();
 }
-async function clickupPullNow(){
+// silent=true — фоновое обновление: без звука и без всплывашек, иначе приложение
+// само по себе булькало «задача выполнена» каждые несколько минут.
+async function clickupPullNow(silent){
   const token=cuToken();
-  if(!token){ showToast('Сначала вставь токен ClickUp'); return; }
-  if(typeof window._applyInjectRaw!=='function'){ showToast('Файл задач ещё не загрузился — обнови страницу'); return; }
+  if(!token){ if(!silent) showToast('Сначала вставь токен ClickUp'); return; }
+  if(typeof window._applyInjectRaw!=='function'){ if(!silent) showToast('Файл задач ещё не загрузился — обнови страницу'); return; }
   const st=document.getElementById('cu-status');
   const say=t=>{ if(st) st.textContent=t; };
-  say('спрашиваю ClickUp…');
+  if(!silent) say('спрашиваю ClickUp…');
   try{
     const me=await _cuGet('/user', token);
     const uid=String(me.user.id);
@@ -755,12 +757,14 @@ async function clickupPullNow(){
                 prio:({urgent:4,high:3,normal:2,low:1})[String((t.priority&&t.priority.priority)||'').toLowerCase()]||0}));
     const res=window._applyInjectRaw(raw, 'прямо из ClickUp · '+new Date().toLocaleTimeString());
     gsave('dc_sync_clickup_ts', new Date().toISOString());
-    say('✓ '+raw.length+' '+_plural(raw.length,'задача','задачи','задач')+(res&&res.added?' · новых '+res.added:''));
-    _sfx.play('done');
+    const added=(res&&res.added)||0;
+    say('✓ '+raw.length+' '+_plural(raw.length,'задача','задачи','задач')+(added?' · новых '+added:''));
+    // звук только на ручное нажатие, и только когда реально что-то приехало
+    if(!silent && added) _sfx.play('done');
     render();
   }catch(e){
     say('⚠ '+(e.message||'не получилось'));
-    _sfx.play('error');
+    if(!silent) _sfx.play('error');
   }
 }
 

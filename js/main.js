@@ -1,6 +1,6 @@
 // Build stamp — bump on each deploy so you can tell at a glance whether the
 // running app has the latest files (если метки нет — крутится старый JS из кэша).
-const BUILD='08.28 · ClickUp сам, каждые 5 минут';
+const BUILD='08.28 · фоновый ClickUp без звука';
 console.log('Dispatch build: '+BUILD+' — _overdue '+(typeof _overdue==='function'?'OK':'ОТСУТСТВУЕТ (старый код)'));
 try{ const _bt=document.getElementById('build-tag'); if(_bt) _bt.textContent=BUILD; }catch(e){}
 try{ const _td=document.getElementById('topbar-date'); if(_td) _td.textContent=fmtDate(getTODAY())+' '+DAYS_RU[getTODAY().getDay()]+' · '+MONTHS_RU[getTODAY().getMonth()]; }catch(e){}
@@ -225,7 +225,7 @@ try{localStorage.removeItem('dc_accent_color');}catch(e){}  // fixed teal accent
         if(typeof cuToken!=='function' || !cuToken()) return;
         if(typeof clickupPullNow!=='function') return;
         const now=Date.now(); if(now-lastCu<300000) return;
-        lastCu=now; clickupPullNow();
+        lastCu=now; clickupPullNow(true);   // тихо: без звука и всплывашек
       }catch(e){}
     }
     setTimeout(cuTick, 2500);

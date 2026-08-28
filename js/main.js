@@ -1,6 +1,6 @@
 // Build stamp — bump on each deploy so you can tell at a glance whether the
 // running app has the latest files (если метки нет — крутится старый JS из кэша).
-const BUILD='08.28 · фоновый ClickUp без звука';
+const BUILD='08.28 · закреплённая шапка дат';
 console.log('Dispatch build: '+BUILD+' — _overdue '+(typeof _overdue==='function'?'OK':'ОТСУТСТВУЕТ (старый код)'));
 try{ const _bt=document.getElementById('build-tag'); if(_bt) _bt.textContent=BUILD; }catch(e){}
 try{ const _td=document.getElementById('topbar-date'); if(_td) _td.textContent=fmtDate(getTODAY())+' '+DAYS_RU[getTODAY().getDay()]+' · '+MONTHS_RU[getTODAY().getMonth()]; }catch(e){}
@@ -18,17 +18,18 @@ setTimeout(renderMonthBar, 0);
 (function(){
   const VIEWS = ['home','day_today','today','planner','history','clients','finance','flows','invoices'];
 
-  function ensureWrapper(){
+  // Обёртка #swipe-clip осталась от свайпов между вкладками — их убрали, а её
+  // overflow:hidden продолжал ломать position:sticky внутри контента (закреплённая
+  // строка дат в «Рассылках» просто не прилипала). Больше её не создаём, а если
+  // она осталась в уже открытой странице — распускаем.
+  function dropWrapper(){
+    const clip = document.getElementById('swipe-clip');
+    if(!clip) return;
     const main = document.getElementById('main-content');
-    if(!main || main.parentElement.id === 'swipe-clip') return;
-    const clip = document.createElement('div');
-    clip.id = 'swipe-clip';
-    clip.style.cssText = 'overflow:hidden;position:relative;width:100%;height:100%;isolation:isolate;';
-    main.parentNode.insertBefore(clip, main);
-    clip.appendChild(main);
-    main.style.cssText += 'will-change:transform;';
+    if(main && clip.parentNode){ clip.parentNode.insertBefore(main, clip); }
+    if(clip.parentNode) clip.parentNode.removeChild(clip);
   }
-  ensureWrapper();
+  dropWrapper();
 
   // ── Tab strip: a scroll is not a tap ──
   // The mobile nav is a horizontal scroll strip; lifting a finger after

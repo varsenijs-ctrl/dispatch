@@ -868,7 +868,9 @@ body::before{
   .tab svg{width:16px;height:16px;}
 
   /* Main — full width, no sideways scroll */
-  .main{padding:14px 12px 96px!important;max-width:100%;overflow-x:hidden;height:auto;}
+  /* clip, а не hidden: hidden делает .main контейнером прокрутки и убивает
+     position:sticky внутри (закреплённая строка дат в «Рассылках») */
+  .main{padding:14px 12px 96px!important;max-width:100%;overflow-x:clip;height:auto;}
   .section-header{margin-bottom:16px;}
   .section-header h2{font-size:21px;}
 
@@ -1347,6 +1349,10 @@ body::before{
   .inv-row>div[style*="width:54px"]{order:10;width:auto!important;margin-left:auto;}
   .inv-row>.dicon{order:11;}
 
+  /* «Рассылки» на телефоне: сама сетка прилипает к верху экрана, поэтому строка
+     с числами месяца видна при любой прокрутке — понятно, на какую дату ставишь. */
+  .dgwrap{position:sticky!important;top:6px!important;max-height:calc(100vh - 210px)!important;}
+
   /* Форма нового флоу: на телефоне поля в столбик (клиент и название на всю
      ширину, «мейлов» и «дедлайн» рядом), иначе название сжималось до «Welc» */
   .flow-add>div{flex:1 1 100%!important;width:auto!important;min-width:0!important;}
@@ -1425,3 +1431,26 @@ body::before{
 .dday-n{position:absolute;top:3px;right:4px;font-family:var(--mono);font-size:9px;font-weight:700;
   padding:0 4px;border-radius:7px;cursor:pointer;color:var(--acc-ink);
   background:linear-gradient(180deg,var(--accent),rgba(64,203,224,.82));box-shadow:0 1px 3px rgba(0,0,0,.4);}
+
+/* ── «Рассылки»: закреплённая шапка дат и колонка имён ──────────────────────
+   Сетка живёт в своём окне прокрутки: строка с числами месяца прилипает сверху,
+   колонка с именами — слева, поэтому при любой прокрутке видно, кому и на какое
+   число ставишь имейл. Фон у прилипающих частей непрозрачный — иначе клетки
+   просвечивают сквозь них. */
+.dgwrap{overflow:auto;max-height:min(72vh,660px);position:relative;}
+.dgrid-inner{min-width:max-content;padding:0 18px 18px!important;}
+.dghead{position:sticky;top:0;z-index:3;margin:0 0 7px;padding-top:16px;padding-bottom:6px;
+  background:#111114;box-shadow:0 1px 0 rgba(255,255,255,.09);}
+.dgday{width:26px;flex:none;text-align:center;font-family:var(--mono);line-height:1.15;color:var(--text3);}
+.dgday-n{display:block;font-size:10px;font-weight:600;}
+.dgday-w{display:block;font-size:7.5px;letter-spacing:.02em;opacity:.55;text-transform:uppercase;}
+.dgday.today{color:var(--accent);}
+.dgday.today .dgday-w{opacity:.9;}
+.dgname{position:sticky;left:0;z-index:2;background:#111114;}
+.dghead{padding-left:0;}
+/* угол пересечения: имя-колонка внутри прилипшей шапки должна быть выше клеток */
+.dghead>.dgday:first-child{margin-left:0;}
+/* число имейлов прямо в клетке — режим «имейлов» */
+.dgcell-nbig{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:11px;font-weight:700;color:#04222a;pointer-events:none;
+  text-shadow:0 1px 0 rgba(255,255,255,.25);}

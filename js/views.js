@@ -999,9 +999,12 @@ function _gridCellClick(ev, cid, dIso){
     const has=c0 && ((historyData[c0.name]||{})[dIso]);
     if(!has){ _dayCycleInline(cid,dIso); return; }          // пустой день: сначала отметка «отправлено»
     const cur=_dayN(cid,dIso);
-    const next=Math.max(1, Math.min(DAY_N_MAX, cur+((ev&&ev.shiftKey)?-1:1)));
-    if(next!==cur){ _setDayN(cid,dIso,next); _sfx.play('click'); render(); }
-    else _sfx.play('error');
+    // Тап прибавляет имейл и после 9 возвращается к 1 — на телефоне Shift не нажать,
+    // поэтому уменьшить можно, докрутив по кругу (мышью — Shift или правый клик).
+    let next;
+    if(ev&&(ev.shiftKey||ev.type==='contextmenu')) next=Math.max(1, cur-1);
+    else next=cur>=9?1:cur+1;
+    _setDayN(cid,dIso,next); _sfx.play('click'); render();
     return;
   }
   if(ev&&ev.shiftKey) return _gridToggleSms(cid,dIso);
@@ -1034,13 +1037,15 @@ function renderToday(){
       <div style="width:1px;height:14px;background:rgba(255,255,255,.1)"></div>
       <span style="font-size:12px;color:var(--text3)">${gridMode==='sms'
         ? 'Режим SMS: клик по ячейке добавляет/убирает SMS'
+        : gridMode==='count'
+        ? 'Режим «имейлов»: тап по дню прибавляет имейл (после 9 — снова 1). Число видно прямо в клетке'
         : (window.innerWidth<=720
-            ? 'Тап по ячейке меняет статус · для SMS включи режим «SMS»'
-            : 'Клик по ячейке меняет статус · Shift+клик — SMS')}</span>
+            ? 'Тап по ячейке меняет статус · для SMS включи режим «SMS», для количества — «имейлов»'
+            : 'Клик по ячейке меняет статус · Shift+клик — SMS · режим «имейлов» — сколько за день')}</span>
       <div style="flex:1"></div>
       <button class="dpill ${gridMode==='status'?'active':''}" onclick="gridMode='status';render()" title="Клик по ячейке меняет статус">статус</button>
       <button class="dpill ${gridMode==='sms'?'active':''}" onclick="gridMode='sms';render()" title="Клик по ячейке отмечает SMS за этот день">SMS</button>
-      <button class="dpill ${gridMode==='count'?'active':''}" onclick="gridMode='count';render()" title="Сколько имейлов выставлено в этот день: клик +1, Shift+клик −1">шт</button>
+      <button class="dpill ${gridMode==='count'?'active':''}" onclick="gridMode='count';render()" title="Сколько имейлов выставлено в этот день: тап прибавляет, после 9 — снова 1">имейлов</button>
       <span class="dmeta">${doneCount}/${ac.length} готово · ${pct}%</span>
       <button class="dbtn dbtn-sm" onclick="setView('day_today')" title="Отметки списком со статусами">☰ списком</button>
     </div>
@@ -1063,7 +1068,8 @@ function renderToday(){
   for(let d=1;d<=daysInMonth;d++){
     const dIso=y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
     const isT=dIso===iso;
-    head+=`<div style="width:26px;flex:none;text-align:center;font-family:var(--mono);font-size:10px;font-weight:600;color:${isT?'var(--accent)':'var(--text3)'}">${d}</div>`;
+    const dow=['вс','пн','вт','ср','чт','пт','сб'][new Date(dIso+'T00:00:00').getDay()];
+    head+=`<div class="dgday${isT?' today':''}" title="${dIso}"><span class="dgday-n">${d}</span><span class="dgday-w">${dow}</span></div>`;
   }
 
   let rows='';
@@ -1080,13 +1086,16 @@ function renderToday(){
       const cls='dgcell'+(v?' g-'+v:'')+(dIso===iso?' today':'')+(hasSms?' has-sms':'');
       const ring=dIso===iso?'box-shadow:0 0 0 1.5px var(--accent)':'';
       const nMail=v?_dayN(c.id,dIso):1;
-      const nBadge=(nMail>1)?`<span class="dgcell-n">${nMail}</span>`:'';
-      const hint=gridMode==='count'?'клик: +1 имейл, Shift+клик: −1':(gridMode==='sms'?'клик: SMS':'клик: статус, Shift+клик: SMS');
-      cells+=`<button class="${cls}" style="${ring}position:relative;overflow:visible" onclick="_gridCellClick(event,'${c.id}','${dIso}')" title="${dIso}${v?' · '+v:''}${nMail>1?' · '+nMail+' имейлов':''}${hasSms?' · SMS':''} — ${hint}">${nBadge}</button>`;
+      const countMode=(gridMode==='count');
+      const nBadge=countMode
+        ? (v?`<span class="dgcell-nbig">${nMail}</span>`:'')          // режим количества: число в клетке
+        : ((nMail>1)?`<span class="dgcell-n">${nMail}</span>`:'');    // обычный вид: уголок только если больше одного
+      const hint=countMode?'тап: +1 имейл (после 9 — снова 1), Shift/правый клик: −1':(gridMode==='sms'?'клик: SMS':'клик: статус, Shift+клик: SMS');
+      cells+=`<button class="${cls}" style="${ring}position:relative;overflow:visible" onclick="_gridCellClick(event,'${c.id}','${dIso}')" oncontextmenu="event.preventDefault();_gridCellClick(event,'${c.id}','${dIso}')" title="${dIso}${v?' · '+v:''}${nMail>1?' · '+nMail+' имейлов':''}${hasSms?' · SMS':''} — ${hint}">${nBadge}</button>`;
     }
     const isDone=!!manual[c.id];
     rows+=`<div style="display:flex;align-items:center;gap:${GAP}px;margin-bottom:${GAP}px">
-      <div style="width:${NAMECOL}px;flex:none;display:flex;align-items:center;gap:8px;padding-right:12px">
+      <div class="dgname" style="width:${NAMECOL}px;flex:none;display:flex;align-items:center;gap:8px;padding-right:12px">
         <button class="dgdone${isDone?' on':''}" onclick="${isDone?`undoDoneToday('${c.id}')`:`markDoneToday('${c.id}')`}" title="${isDone?'Снять отметку «сделано сегодня»':'Отметить сделанной'}">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
         </button>
@@ -1097,9 +1106,13 @@ function renderToday(){
     </div>`;
   });
 
-  html+=`<div class="dcard" data-keepscroll="grid" style="padding:18px;overflow-x:auto">
-    <div style="display:flex;gap:${GAP}px;padding-left:${NAMECOL+GAP}px;margin-bottom:7px">${head}</div>
-    ${rows}
+  // Строка с числами месяца закреплена сверху, а колонка с именами — слева:
+  // при прокрутке всегда видно, кому и на какое число ставишь имейл.
+  html+=`<div class="dcard dgwrap" data-keepscroll="grid" style="padding:0">
+    <div class="dgrid-inner" style="padding:18px">
+      <div class="dghead" style="display:flex;gap:${GAP}px;padding-left:${NAMECOL+GAP}px">${head}</div>
+      ${rows}
+    </div>
   </div></div>`;
   return html;
 }

@@ -175,6 +175,11 @@
   // закрыли или убрали в ClickUp, а работа за тобой всё равно записана — пусть
   // остаётся в планировщике, пока сам не удалишь. Раньше это был жёсткий mirror,
   // и такие задачи молча исчезали из приложения.
+  // Что именно приехало из ClickUp — чтобы приложение могло показать диагностику
+  // («почему задача не появилась») и пересобрать список по кнопке.
+  try{
+    window._injectInfo={version:INJECT_VERSION, list:RAW.map(function(r){ return {id:r.id, name:r.name}; })};
+  }catch(e){}
   localStorage.setItem('dc_plantasks', JSON.stringify(tasks));
   try{ localStorage.removeItem('dc_inject_seen'); }catch(e){}   // legacy suppression list — no longer used
   console.log('Dispatch ← ClickUp: ('+added+' added, '+updated+' synced, '+matched+' matched, старые сохранены) · '+INJECT_VERSION);

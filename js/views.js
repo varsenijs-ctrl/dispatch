@@ -694,6 +694,60 @@ function _dayInlineCalendar(c){
     </div>
   </div>`;
 }
+// ── «Почему задача из ClickUp не появилась» ────────────────────────────────
+// Показывает, что лежит в свежем файле от бота и что приложение сделало с каждой
+// задачей: показана, в архиве или заблокирована ручным удалением. Кнопка снимает
+// блокировки и собирает список заново.
+let showClickupDiag=false;
+function toggleClickupDiag(){ _sfx.play('click'); showClickupDiag=!showClickupDiag; render(); }
+function _clickupDiagHtml(){
+  const info=(typeof window!=='undefined'&&window._injectInfo)||null;
+  const tasks=load('dc_plantasks',{});
+  let removed=[]; try{ removed=JSON.parse(localStorage.getItem('dc_inject_removed')||'[]')||[]; }catch(e){}
+  if(!info) return `<div class="dcard dcard-p" style="margin-bottom:12px"><div class="dcard-t">Задачи из ClickUp</div>
+    <div class="dmeta" style="margin-top:6px">Файл со списком задач не загрузился. Обнови страницу — если не поможет, значит бот не смог выложить список.</div></div>`;
+  const rows=info.list.map(r=>{
+    const t=tasks['inject_'+r.id];
+    const blocked=removed.indexOf(r.id)>=0 && !t;
+    const state=blocked?['удалена вручную','#ff8078']
+      :(!t?['не добавлена','#ffe066']
+      :(t.gone?['в архиве','#ffe066']
+      :(t.done?['сделана','var(--green)']:['в списке','var(--green)'])));
+    return `<div class="drow">
+      <div style="flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)}</div>
+      <div class="dmeta" style="color:${state[1]}">${state[0]}</div>
+    </div>`;
+  }).join('');
+  const nBlocked=info.list.filter(r=>removed.indexOf(r.id)>=0 && !tasks['inject_'+r.id]).length;
+  const nGone=info.list.filter(r=>{const t=tasks['inject_'+r.id];return t&&t.gone;}).length;
+  return `<div class="dcard dcard-p" style="margin-bottom:12px">
+    <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+      <div class="dcard-t">Задачи из ClickUp</div>
+      <div class="dmeta">список от ${esc(info.version)} · ${info.list.length} ${_plural(info.list.length,'задача','задачи','задач')}</div>
+      <div style="flex:1"></div>
+      <button class="dbtn dbtn-sm" onclick="rebuildClickupTasks()" title="Снять блокировки и собрать список заново">↻ Пересобрать</button>
+    </div>
+    <div style="margin-top:10px;display:flex;flex-direction:column;gap:2px">${rows}</div>
+    ${(nBlocked||nGone)?`<div class="dmeta" style="margin-top:10px;line-height:1.6">${nBlocked?nBlocked+' заблокировано ручным удалением. ':''}${nGone?nGone+' лежит в архиве. ':''}Нажми «Пересобрать» — вернутся все задачи, которые сейчас есть в ClickUp.</div>`:''}
+  </div>`;
+}
+// Снять «удалено вручную» и архив для задач, которые ЕСТЬ в ClickUp сейчас,
+// и собрать список заново из свежего файла.
+function rebuildClickupTasks(){
+  const info=(typeof window!=='undefined'&&window._injectInfo)||null;
+  if(!info){ showToast('Список из ClickUp ещё не загрузился'); return; }
+  const live={}; info.list.forEach(r=>{ live[r.id]=1; });
+  let removed=[]; try{ removed=JSON.parse(localStorage.getItem('dc_inject_removed')||'[]')||[]; }catch(e){}
+  const kept=removed.filter(id=>!live[id]);                 // блокировки на задачи вне ClickUp оставляем
+  localStorage.setItem('dc_inject_removed', JSON.stringify(kept));
+  const tasks=load('dc_plantasks',{});
+  Object.keys(tasks).forEach(k=>{ const t=tasks[k]; if(t&&t.injectId&&live[t.injectId]&&t.gone){ delete t.gone; delete t.goneAt; } });
+  save('dc_plantasks',tasks);
+  _sfx.play('done');
+  showToast('↻ Собираю список из ClickUp заново…');
+  setTimeout(()=>location.reload(), 500);
+}
+
 function renderDayToday(){
   const iso=isoToday(), d=getTODAY();
   const ac=_zac().sort((a,b)=>a.name.localeCompare(b.name,'ru'));   // only THIS zone's clients
@@ -731,8 +785,10 @@ function renderDayToday(){
     <div class="dcard-t" style="font-size:16px">Задачи</div>
     <div class="dmeta">${fmtDate(d)} · ${DAYS_RU[d.getDay()]}</div>
     <div style="flex:1"></div>
+    <button class="dbtn dbtn-sm${showClickupDiag?' on':''}" onclick="toggleClickupDiag()" title="Что приехало из ClickUp и почему задача могла не появиться">⟳ ClickUp</button>
     <button class="dbtn dbtn-primary dbtn-sm" onclick="openDayModal('${iso}')">+ задача</button>
   </div>`;
+  if(showClickupDiag) html+=_clickupDiagHtml();
 
   archived.sort((a,b)=>(b.goneAt||'').localeCompare(a.goneAt||''));
   const TF=[['all','Все',totalPending],['overdue','Просрочено',G.overdue.length],['today','Сегодня',G.today.length],['deadline','С дедлайном',withDeadline.length],['next','Следующие',G.next.length]];

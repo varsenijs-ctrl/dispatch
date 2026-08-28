@@ -17,8 +17,9 @@ function updateSidebar(){
     Object.entries(hist).forEach(([iso,v])=>{
       if(!_markInActiveZone(c.id, iso)) return;   // same zone rule as Finance — counts agree, don't jump
       if(v==='yes'||v==='draft'){                 // ONLY sent + drafts (never 'no') — matches build "сайдбар-как-финансы" (446)
-        em++;
-        if(cidSms[iso]) sm++;
+        const n=_dayN(c.id,iso);                    // за один день может быть несколько имейлов
+        em+=n;
+        if(cidSms[iso]) sm+=n;
       }
     });
   });
@@ -144,7 +145,7 @@ function _zoneEarned(mk){
       if(iso.slice(0,7)!==mk) return;
       const v=hist[iso]; if(v!=='yes'&&v!=='draft') return;
       if(cd[iso]) return;
-      sum+=cs[iso]?SMS_DAY_RATE:EMAIL_RATE;
+      sum+=_dayPay(cid,iso,!!cs[iso]);
     });
     (getFlows(cid)||[]).forEach(function(f){
       const done=Object.values(tasks).some(t=>t.cid===cid&&t.flowId===f.id&&t.done&&(t.startIso||'').slice(0,7)===mk);
@@ -183,7 +184,7 @@ function renderHome(){
       const v=hist[k]; if(v!=='yes'&&v!=='draft') return;
       if(cd[k]) return;
       const d=+k.slice(8,10);
-      if(d>=1&&d<=daysInMonth) byDay[d-1]+=cs[k]?SMS_DAY_RATE:EMAIL_RATE;
+      if(d>=1&&d<=daysInMonth) byDay[d-1]+=_dayPay(c.id,k,!!cs[k]);
     });
   });
   const workedDays=byDay.filter(v=>v>0).length;
@@ -644,8 +645,12 @@ function _dayToggleSmsInline(cid,iso){
   save('dc_sms_days',smsDays); _sfx.play('click'); render();
 }
 // The month calendar shown under an expanded client row (active zone's month).
+// Листание встроенного календаря: сдвиг в месяцах от месяца зоны.
+let dayCalShift=0;
+function shiftDayCal(delta){ if(delta===0) dayCalShift=0; else dayCalShift+=delta; _sfx.play('click'); render(); }
 function _dayInlineCalendar(c){
-  const parts=activeMonth.split('-'); const y=+parts[0], m=+parts[1];
+  const calMk=_shiftMonthKey(activeMonth, dayCalShift);
+  const parts=calMk.split('-'); const y=+parts[0], m=+parts[1];
   const daysInMonth=new Date(y,m,0).getDate();
   const offset=(new Date(y,m-1,1).getDay()+6)%7;      // ПН-first
   const hist=historyData[c.name]||{};
@@ -654,9 +659,9 @@ function _dayInlineCalendar(c){
   const tIso=isoToday();
   let marks=0, money=0;
   Object.keys(hist).forEach(function(k){
-    if(k.slice(0,7)!==activeMonth) return;
-    const v=hist[k]; if(!v) return; marks++;
-    if((v==='yes'||v==='draft')&&!cidDis[k]) money+=cidSms[k]?SMS_DAY_RATE:EMAIL_RATE;
+    if(k.slice(0,7)!==calMk) return;
+    const v=hist[k]; if(!v) return; marks+=_dayN(c.id,k);
+    if((v==='yes'||v==='draft')&&!cidDis[k]) money+=_dayPay(c.id,k,!!cidSms[k]);
   });
   let cells='';
   for(let i=0;i<offset;i++) cells+='<div class="dday empty"></div>';
@@ -667,8 +672,10 @@ function _dayInlineCalendar(c){
     const sms=!!cidSms[iso];
     // Вместо тумблера — понятный бейдж: серый «SMS» = нет, синий залитый = есть.
     const smsToggle=v?`<span class="dday-sms${sms?' on':''}" onclick="event.stopPropagation();_dayToggleSmsInline('${c.id}','${iso}')" title="${sms?'SMS есть — нажми, чтобы убрать (день станет $'+EMAIL_RATE.toFixed(2)+')':'SMS нет — нажми, чтобы добавить (день станет $'+SMS_DAY_RATE.toFixed(2)+')'}">SMS</span>`:'';
-    cells+=`<button class="${cls}" onclick="_dayCycleInline('${c.id}','${iso}')" title="${iso}${v?' · '+v:''}">
-      <span class="dday-num">${d}</span><span class="dday-dot"></span>${smsToggle}</button>`;
+    const nMail=v?_dayN(c.id,iso):1;
+    const nBadge=v?`<span class="dday-n" onclick="event.stopPropagation();bumpDayN('${c.id}','${iso}',event.shiftKey?-1:1)" title="Имейлов за день: ${nMail} · клик +1, Shift-клик −1">×${nMail}</span>`:'';
+    cells+=`<button class="${cls}" onclick="_dayCycleInline('${c.id}','${iso}')" title="${iso}${v?' · '+v:''}${nMail>1?' · '+nMail+' имейлов':''}" style="position:relative">
+      <span class="dday-num">${d}</span><span class="dday-dot"></span>${nBadge}${smsToggle}</button>`;
   }
   return `<div style="padding:4px 17px 20px">
     <div class="dsunk" style="padding:16px 18px 18px">
@@ -676,8 +683,11 @@ function _dayInlineCalendar(c){
         <div style="font-size:13px;font-weight:620;letter-spacing:-.2px">${(MONTHS_RU[m-1]||'').charAt(0).toUpperCase()+(MONTHS_RU[m-1]||'').slice(1)} ${y} · ${esc(c.name)}</div>
         <div class="dmeta">${marks} отправлено · $${money.toFixed(2)}</div>
         <div style="flex:1"></div>
-        <span class="dact"><button class="dicon neutral" onclick="event.stopPropagation();openCal('${c.id}')" title="Открыть полный календарь (3 месяца)" style="width:22px;height:22px;font-size:12px">📅</button></span>
-        <div style="font-size:11.5px;color:var(--text3)">Клик по дню: да → черновик → нет → пусто</div>
+        <button class="dbtn dbtn-sm" onclick="event.stopPropagation();shiftDayCal(-1)" title="Предыдущий месяц">‹</button>
+        <button class="dbtn dbtn-sm${dayCalShift?'':' on'}" onclick="event.stopPropagation();shiftDayCal(0)" title="Вернуться к месяцу зоны">зона</button>
+        <button class="dbtn dbtn-sm" onclick="event.stopPropagation();shiftDayCal(1)" title="Следующий месяц">›</button>
+        <span class="dact"><button class="dicon neutral" onclick="event.stopPropagation();openCal('${c.id}')" title="Открыть полный календарь" style="width:22px;height:22px;font-size:12px">📅</button></span>
+        <div style="font-size:11.5px;color:var(--text3)">Клик по дню: да → черновик → нет · «×N» — сколько имейлов</div>
       </div>
       <div class="dcal" style="margin-bottom:6px">${['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС'].map(w=>`<div class="dcal-dow">${w}</div>`).join('')}</div>
       <div class="dcal">${cells}</div>
@@ -689,7 +699,7 @@ function renderDayToday(){
   const ac=_zac().sort((a,b)=>a.name.localeCompare(b.name,'ru'));   // only THIS zone's clients
   const smsDays=load('dc_sms_days',{}), disAll=load('dc_pay_disabled',{});
   const markOf=c=>((historyData[c.name]||{})[iso]||'');
-  const rateOf=c=>{ const s=(smsDays[c.id]||{})[iso], dis=(disAll[c.id]||{})[iso]; return dis?0:(s?SMS_DAY_RATE:EMAIL_RATE); };
+  const rateOf=c=>{ const dis=(disAll[c.id]||{})[iso]; return dis?0:_dayPay(c.id,iso,!!((smsDays[c.id]||{})[iso])); };
   const overdueCl=ac.filter(c=>c.deadline&&c.deadline<iso);
   const leftCl=ac.filter(c=>!markOf(c));
   const doneCl=ac.filter(c=>{const m=markOf(c);return m==='yes'||m==='draft';});
@@ -844,12 +854,26 @@ function renderDayToday(){
 // ── Рассылки — сетка клиенты × дни месяца (по макету) ─────────
 // Клик по ячейке циклит статус, галочка слева отмечает клиента сделанным за сегодня
 // (та же кнопка «готово», что была на старой вкладке), справа — деньги за месяц.
-// Режим отметок в сетке «Рассылки»: 'status' (да → черновик → нет → пусто) или 'sms'.
+// Режим отметок в сетке «Рассылки»: 'status' (да → черновик → нет → пусто), 'sms'
+// или 'count' (сколько имейлов выставлено в этот день: клик +1, Shift-клик −1).
 let gridMode='status';
+// Сетка листается по месяцам: сдвиг от месяца зоны (можно отмечать вперёд).
+let gridShift=0;
+function shiftGridMonth(delta){ if(delta===0) gridShift=0; else gridShift+=delta; _sfx.play('click'); render(); }
 // Клик по ячейке сетки: в режиме SMS (или с Shift) переключает SMS этого дня,
 // иначе циклит статус. SMS можно ставить и на пустой день — отметка появится
 // сама, когда поставишь статус.
 function _gridCellClick(ev, cid, dIso){
+  if(gridMode==='count'){                                  // сколько имейлов за день
+    const c0=clients.find(x=>x.id===cid);
+    const has=c0 && ((historyData[c0.name]||{})[dIso]);
+    if(!has){ _dayCycleInline(cid,dIso); return; }          // пустой день: сначала отметка «отправлено»
+    const cur=_dayN(cid,dIso);
+    const next=Math.max(1, Math.min(DAY_N_MAX, cur+((ev&&ev.shiftKey)?-1:1)));
+    if(next!==cur){ _setDayN(cid,dIso,next); _sfx.play('click'); render(); }
+    else _sfx.play('error');
+    return;
+  }
   if(ev&&ev.shiftKey) return _gridToggleSms(cid,dIso);
   if(gridMode==='sms') return _gridToggleSms(cid,dIso);
   _dayCycleInline(cid,dIso);
@@ -865,7 +889,8 @@ function _gridToggleSms(cid, dIso){
 function renderToday(){
   const iso=isoToday();
   const ac=_zac().sort((a,b)=>a.name.localeCompare(b.name,'ru'));   // only THIS zone's clients
-  const parts=activeMonth.split('-'); const y=+parts[0], m=+parts[1];
+  const gridMk=_shiftMonthKey(activeMonth, gridShift);
+  const parts=gridMk.split('-'); const y=+parts[0], m=+parts[1];
   const daysInMonth=new Date(y,m,0).getDate();
   const smsDays=load('dc_sms_days',{}), disAll=load('dc_pay_disabled',{}), manual=load('dc_manual_done',{});
   const doneCount=ac.filter(c=>manual[c.id]).length;
@@ -885,8 +910,16 @@ function renderToday(){
       <div style="flex:1"></div>
       <button class="dpill ${gridMode==='status'?'active':''}" onclick="gridMode='status';render()" title="Клик по ячейке меняет статус">статус</button>
       <button class="dpill ${gridMode==='sms'?'active':''}" onclick="gridMode='sms';render()" title="Клик по ячейке отмечает SMS за этот день">SMS</button>
+      <button class="dpill ${gridMode==='count'?'active':''}" onclick="gridMode='count';render()" title="Сколько имейлов выставлено в этот день: клик +1, Shift+клик −1">шт</button>
       <span class="dmeta">${doneCount}/${ac.length} готово · ${pct}%</span>
       <button class="dbtn dbtn-sm" onclick="setView('day_today')" title="Отметки списком со статусами">☰ списком</button>
+    </div>
+    <!-- сетка листается по месяцам: отмечать можно и вперёд -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <button class="dbtn dbtn-sm" onclick="shiftGridMonth(-1)">‹ назад</button>
+      <button class="dbtn dbtn-sm${gridShift?'':' on'}" onclick="shiftGridMonth(0)">зона</button>
+      <button class="dbtn dbtn-sm" onclick="shiftGridMonth(1)">вперёд ›</button>
+      <span class="dmeta">${(MONTHS_RU[m-1]||'').charAt(0).toUpperCase()+(MONTHS_RU[m-1]||'').slice(1)} ${y}${gridShift?'':' · зона'}</span>
     </div>`;
 
   if(!ac.length){
@@ -911,12 +944,15 @@ function renderToday(){
     for(let d=1;d<=daysInMonth;d++){
       const dIso=y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
       const v=hist[dIso]||'';
-      if((v==='yes'||v==='draft')&&!cidDis[dIso]) money+=cidSms[dIso]?SMS_DAY_RATE:EMAIL_RATE;
+      if((v==='yes'||v==='draft')&&!cidDis[dIso]) money+=_dayPay(c.id,dIso,!!cidSms[dIso]);
       // SMS: синяя обводка ячейки + уголок. Клик — статус, Shift+клик (или режим SMS) — SMS.
       const hasSms=!!cidSms[dIso];
       const cls='dgcell'+(v?' g-'+v:'')+(dIso===iso?' today':'')+(hasSms?' has-sms':'');
       const ring=dIso===iso?'box-shadow:0 0 0 1.5px var(--accent)':'';
-      cells+=`<button class="${cls}" style="${ring}" onclick="_gridCellClick(event,'${c.id}','${dIso}')" title="${dIso}${v?' · '+v:''}${hasSms?' · SMS':''} — ${gridMode==='sms'?'клик: SMS':'клик: статус, Shift+клик: SMS'}"></button>`;
+      const nMail=v?_dayN(c.id,dIso):1;
+      const nBadge=(nMail>1)?`<span class="dgcell-n">${nMail}</span>`:'';
+      const hint=gridMode==='count'?'клик: +1 имейл, Shift+клик: −1':(gridMode==='sms'?'клик: SMS':'клик: статус, Shift+клик: SMS');
+      cells+=`<button class="${cls}" style="${ring}position:relative;overflow:visible" onclick="_gridCellClick(event,'${c.id}','${dIso}')" title="${dIso}${v?' · '+v:''}${nMail>1?' · '+nMail+' имейлов':''}${hasSms?' · SMS':''} — ${hint}">${nBadge}</button>`;
     }
     const isDone=!!manual[c.id];
     rows+=`<div style="display:flex;align-items:center;gap:${GAP}px;margin-bottom:${GAP}px">
@@ -1051,7 +1087,7 @@ function renderHistory(){
       const sms=c?!!((smsAll[c.id]||{})[d]):false;
       const off=c?!!((disAll[c.id]||{})[d]):false;
       if(sms) withSms++;
-      if((g.s==='yes'||g.s==='draft')&&!off) val+=sms?SMS_DAY_RATE:EMAIL_RATE;
+      if((g.s==='yes'||g.s==='draft')&&!off) val+=c?_dayPay(c.id,d,sms):(sms?SMS_DAY_RATE:EMAIL_RATE);
     });
     const n=g.dates.length;
     const what=g.s==='yes'

@@ -164,18 +164,43 @@ function buildCalDay(cls,isToday,cid,iso,d,dot,smsBtn,flowDay,flowInfo,flows,val
   parts.push(dot);
   if(flowInfo) parts.push('<div style="font-size:8px;color:var(--amber);text-align:center;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 2px">'+flowInfo.name.slice(0,8)+'</div>');
   parts.push(smsBtn);
+  // Сколько имейлов выставлено в этот день. Показываем всегда, когда есть статус:
+  // «1» можно нажать и превратить в 2, 3 … (Shift или правый клик — на один меньше).
+  if(val && !flowDay){
+    var n=_dayN(cid,iso);
+    parts.push('<div class="cal-day-n'+(n>1?' many':'')+'"'
+      +' onclick="event.stopPropagation();bumpDayN(\''+cid+'\',\''+iso+'\',event.shiftKey?-1:1)"'
+      +' oncontextmenu="event.preventDefault();event.stopPropagation();bumpDayN(\''+cid+'\',\''+iso+'\',-1)"'
+      +' title="Имейлов за этот день: '+n+' · клик +1, Shift-клик −1">×'+n+'</div>');
+  }
 
   parts.push('</div>');
   return parts.join('');
 }
 
+// Листание календаря клиента: сдвиг в месяцах от базы (месяц зоны).
+let _calShift=0, _calCid=null;
+function _calMonths(){
+  const base=_shiftMonthKey(activeMonth, _calShift);
+  return [base, _nextMonthKey(base)];
+}
+function shiftCalMonths(delta){
+  if(delta===0) _calShift=0; else _calShift+=delta;
+  _sfx.play('click');
+  if(_calCid) renderCalModal(_calCid);
+}
+
 function renderCalModal(cid){
   const c=clients.find(x=>x.id===cid);if(!c)return;
+  _calCid=cid;
   const allDates=collectAllDates(cid);
   const vals=Object.values(allDates);
   document.getElementById('cal-stats').textContent=`✓ ${vals.filter(v=>v==='yes').length} отправлено  ✗ ${vals.filter(v=>v==='no').length} не отправлено  ~ ${vals.filter(v=>v==='draft').length} черновик`;
-  // Текущая зона + следующий месяц — ровно те месяцы, которые эта зона и считает.
-  const months=_zoneMonths();
+  // Зона считает свой месяц и следующий — их и показываем по умолчанию. Кнопками
+  // ‹ › календарь листается дальше вперёд и назад (отмечать можно в любом месяце).
+  const months=_calMonths();
+  const _rg=document.getElementById('cal-range');
+  if(_rg) _rg.textContent=(_calShift?'':'зона · ')+months.map(function(mk){ var p=mk.split('-'); return MONTHS_RU[+p[1]-1]+' '+p[0]; }).join(' · ');
   let html='';
   months.forEach(mk=>{
     const [y,m]=mk.split('-').map(Number);
@@ -232,8 +257,23 @@ function cycleCalDay(cid,iso){ _sfx.play('click');
   try{ _logAct(c.name, iso, next); }catch(e){}                                         // → action log (История)
   try{ if(typeof _sheetPush==='function') _sheetPush(c.name, iso, next); }catch(e){}   // → Google Sheet
   renderCalModal(cid);updateSidebar();
+  render();                     // ← вкладка под модалкой («Рассылки», «Финансы»…) тоже обновляется
 }
-function closeCal(){ _sfx.play('close');document.getElementById('cal-modal').style.display='none';}
+// Несколько имейлов за один день: меняем количество, статус дня не трогаем.
+// Отражается сразу везде — календарь, «Рассылки», «Финансы», сайдбар, история.
+function bumpDayN(cid, iso, delta){
+  const c=clients.find(x=>x.id===cid); if(!c) return;
+  const cur=_dayN(cid,iso);
+  const next=Math.max(1, Math.min(DAY_N_MAX, cur+(+delta||1)));
+  if(next===cur){ _sfx.play('error'); return; }
+  _setDayN(cid, iso, next);
+  _sfx.play('click');
+  try{ showToast(c.name+' · '+fmtDate(new Date(iso+'T00:00:00'))+': '+next+' '+_plural(next,'имейл','имейла','имейлов')); }catch(e){}
+  if(document.getElementById('cal-modal').style.display!=='none') renderCalModal(cid);
+  updateSidebar(); render();
+}
+
+function closeCal(){ _sfx.play('close');document.getElementById('cal-modal').style.display='none'; render(); }
 
 function bindEvents(){
   document.querySelectorAll('[data-action="toggle-email"]').forEach(b=>{b.onclick=()=>{const e=getLog(todayKey(),b.dataset.id);e.email=!e.email;saveAll();render();};});

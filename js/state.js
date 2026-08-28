@@ -353,7 +353,8 @@ function lastDoneInfo(c){
 }
 function clientSentCount(c){
   const hist=historyData[c.name]||{};
-  let count=Object.values(hist).filter(v=>v==='yes').length;
+  // один день = столько имейлов, сколько отмечено (_dayN), а не всегда один
+  let count=Object.keys(hist).reduce((n,iso)=>hist[iso]==='yes'?n+_dayN(c.id,iso):n,0);
   Object.entries(log).forEach(([ds,entries])=>{const e=entries[c.id];if(e&&e.email)count++;});
   return count;
 }

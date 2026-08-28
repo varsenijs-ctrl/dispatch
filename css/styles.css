@@ -1404,3 +1404,24 @@ body::before{
   .navlist .tab:nth-of-type(n+5){display:none;}
   .navlist .tab.tab-more{display:flex!important;}
 }
+
+/* Количество имейлов за один день. Статус дня один, а имейлов может быть несколько:
+   бейдж в углу ячейки календаря — клик +1, Shift-клик (или правый клик) −1. */
+.cal-day-n{position:absolute;bottom:3px;left:3px;min-width:19px;height:16px;padding:0 4px;
+  display:flex;align-items:center;justify-content:center;border-radius:8px;cursor:pointer;
+  font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:-.2px;
+  background:rgba(0,0,0,.42);border:1px solid rgba(255,255,255,.16);color:rgba(255,255,255,.55);
+  transition:all .15s ease;}
+.cal-day-n:hover{background:rgba(0,0,0,.6);color:#fff;border-color:rgba(255,255,255,.3);transform:scale(1.08);}
+.cal-day-n.many{background:linear-gradient(180deg,var(--accent),rgba(64,203,224,.8));
+  border-color:transparent;color:var(--acc-ink);font-weight:700;
+  box-shadow:0 1px 0 rgba(255,255,255,.4) inset,0 2px 8px rgba(64,203,224,.3);}
+/* то же в ячейке сетки «Рассылок» и в дне inline-календаря «Сегодня» */
+.dgcell-n{position:absolute;top:-4px;right:-4px;min-width:14px;height:14px;padding:0 3px;
+  display:flex;align-items:center;justify-content:center;border-radius:7px;pointer-events:none;
+  font-family:var(--mono);font-size:8.5px;font-weight:700;color:var(--acc-ink);
+  background:linear-gradient(180deg,var(--accent),rgba(64,203,224,.82));
+  box-shadow:0 1px 3px rgba(0,0,0,.45);}
+.dday-n{position:absolute;top:3px;right:4px;font-family:var(--mono);font-size:9px;font-weight:700;
+  padding:0 4px;border-radius:7px;cursor:pointer;color:var(--acc-ink);
+  background:linear-gradient(180deg,var(--accent),rgba(64,203,224,.82));box-shadow:0 1px 3px rgba(0,0,0,.4);}

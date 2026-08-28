@@ -19,7 +19,7 @@
 
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css?v=20260825dg">
+<link rel="stylesheet" href="css/styles.css?v=20260825dj">
 </head>
 <body>
 <!-- Liquid-glass refraction filter: warps the backdrop behind .month-bar like glass bending light -->
@@ -282,22 +282,29 @@
       <button class="modal-close" onclick="closeCal()">✕</button>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap" id="cal-legend"></div>
+    <!-- листание календаря по месяцам: отмечать можно и в будущих месяцах -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <button class="dbtn dbtn-sm" onclick="shiftCalMonths(-1)">‹ назад</button>
+      <button class="dbtn dbtn-sm" onclick="shiftCalMonths(0)">зона</button>
+      <button class="dbtn dbtn-sm" onclick="shiftCalMonths(1)">вперёд ›</button>
+      <span class="dmeta" id="cal-range"></span>
+    </div>
     <div id="cal-body"></div>
   </div>
 </div>
 
 <!-- ?v= is bumped on every deploy so browsers/PWA never serve a stale js/*.js.
      Keep this in sync with BUILD in js/main.js. -->
-<script src="js/core.js?v=20260825dg"></script>
-<script src="js/state.js?v=20260825dg"></script>
-<script src="js/views.js?v=20260825dg"></script>
-<script src="js/planner.js?v=20260825dg"></script>
-<script src="js/finance-clients.js?v=20260825dg"></script>
-<script src="js/flows.js?v=20260825dg"></script>
-<script src="js/clients-calendar.js?v=20260825dg"></script>
-<script src="js/sync.js?v=20260825dg"></script>
-<script src="js/ui.js?v=20260825dg"></script>
+<script src="js/core.js?v=20260825dj"></script>
+<script src="js/state.js?v=20260825dj"></script>
+<script src="js/views.js?v=20260825dj"></script>
+<script src="js/planner.js?v=20260825dj"></script>
+<script src="js/finance-clients.js?v=20260825dj"></script>
+<script src="js/flows.js?v=20260825dj"></script>
+<script src="js/clients-calendar.js?v=20260825dj"></script>
+<script src="js/sync.js?v=20260825dj"></script>
+<script src="js/ui.js?v=20260825dj"></script>
 <script src="js/pending-inject.js?v=20260828T0128"></script>
-<script src="js/main.js?v=20260825dg"></script>
+<script src="js/main.js?v=20260825dj"></script>
 </body>
 </html>

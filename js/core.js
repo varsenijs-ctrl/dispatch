@@ -167,6 +167,13 @@ function _prevMonthKey(mk){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
 }
 function _zoneMonths(mk){ mk=mk||activeMonth; return [mk, _nextMonthKey(mk)]; }
+// Сдвиг ключа месяца на N месяцев (для листания календарей вперёд/назад)
+function _shiftMonthKey(mk, delta){
+  var p=(mk||'').split('-').map(Number);
+  if(!p[0]||!p[1]) return mk||'';
+  var d=new Date(p[0], p[1]-1+(+delta||0), 1);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
 function _markInActiveZone(cid, iso){
   var m=(iso||'').slice(0,7);
   if(!m) return false;
@@ -342,6 +349,30 @@ function _findClientZone(cid){
 const EMAIL_RATE = 0.50;                        // email = 50¢
 const SMS_EXTRA  = 0.10;                        // SMS adds 10¢
 const SMS_DAY_RATE = EMAIL_RATE + SMS_EXTRA;    // 0.60 (email + SMS)
+
+// ── сколько имейлов выставлено за один день ─────────────────────────────────
+// Статус дня (yes/draft/no) один, а имейлов в этот день может быть несколько.
+// Количество живёт отдельным ключом: {cid:{iso:N}}, причём N=1 не хранится — так
+// старые данные читаются как «один имейл» без миграции. Деньги, счётчики и
+// календари умножают ставку дня на это число.
+const DAY_N_MAX = 99;
+function _dayN(cid, iso){
+  if(!cid || !iso) return 1;
+  try{ var m=load('dc_day_count',{})[cid]; var n=+((m&&m[iso])||1); return n>=1?Math.min(n,DAY_N_MAX):1; }
+  catch(e){ return 1; }
+}
+function _setDayN(cid, iso, n){
+  if(!cid || !iso) return 1;
+  n=Math.max(1, Math.min(DAY_N_MAX, +n||1));
+  var all=load('dc_day_count',{});
+  if(!all[cid]) all[cid]={};
+  if(n<=1) delete all[cid][iso]; else all[cid][iso]=n;
+  if(!Object.keys(all[cid]).length) delete all[cid];
+  save('dc_day_count', all);
+  return n;
+}
+// Ставка дня с учётом количества: N имейлов, каждый со своей SMS-надбавкой.
+function _dayPay(cid, iso, hasSms){ return _dayN(cid,iso) * (hasSms ? SMS_DAY_RATE : EMAIL_RATE); }
 
 // ── action log ── records WHEN each status mark was made, so History can show
 // "on <day> I set <client> for <target date> = <status>". Global, going-forward.

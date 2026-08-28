@@ -12,8 +12,9 @@ function _clientFinanceParts(c){
   Object.entries(hist).forEach(([d,v])=>{
     if(!_markInActiveZone(c.id,d))return;
     const isSms=!!cidSms[d], disabled=!!cidDis[d];
-    if(v==='yes'||v==='draft'){ doneN++;totalN++; if(!disabled){ email+=EMAIL_RATE;emailPot+=EMAIL_RATE; if(isSms){sms+=SMS_EXTRA;smsPot+=SMS_EXTRA;} } }
-    else if(v==='no'){ totalN++; if(!disabled){ emailPot+=EMAIL_RATE; if(isSms)smsPot+=SMS_EXTRA; } }
+    const n=_dayN(c.id,d);                       // сколько имейлов выставлено в этот день
+    if(v==='yes'||v==='draft'){ doneN+=n;totalN+=n; if(!disabled){ email+=EMAIL_RATE*n;emailPot+=EMAIL_RATE*n; if(isSms){sms+=SMS_EXTRA*n;smsPot+=SMS_EXTRA*n;} } }
+    else if(v==='no'){ totalN+=n; if(!disabled){ emailPot+=EMAIL_RATE*n; if(isSms)smsPot+=SMS_EXTRA*n; } }
   });
   const fe=getFlowEarnings(c.id,'month');
   return {email:{e:email,p:emailPot}, sms:{e:sms,p:smsPot}, flows:{e:fe.earned,p:fe.potential}, doneN:doneN, totalN:totalN};
@@ -49,7 +50,7 @@ function _clientEntries(name){
   const cidSms=(cid&&sms[cid])||{}, cidDis=(cid&&dis[cid])||{};
   Object.keys(days).forEach(iso=>{
     if(!_markInActiveZone(cid, iso)) return;   // all of this zone's earnings (incl. "July for August"), no cross-zone bleed
-    res.push({iso, v:days[iso], sms:!!cidSms[iso], disabled:!!cidDis[iso], cid, rate:cidSms[iso]?SMS_DAY_RATE:EMAIL_RATE});
+    res.push({iso, v:days[iso], sms:!!cidSms[iso], disabled:!!cidDis[iso], cid, n:_dayN(cid,iso), rate:_dayPay(cid,iso,!!cidSms[iso])});
   });
   return res;
 }
@@ -97,7 +98,7 @@ function renderFinance(){
     Object.keys(hist).forEach(d=>{
       if(!_markInActiveZone(c.id,d))return;
       const v=hist[d]; if(v!=='yes'&&v!=='draft')return; if(cidDis[d])return;
-      byDay[d]=(byDay[d]||0)+(cidSms[d]?SMS_DAY_RATE:EMAIL_RATE);
+      byDay[d]=(byDay[d]||0)+_dayPay(c.id,d,!!cidSms[d]);
     });
   });
   const dayKeys=Object.keys(byDay).sort((a,b)=>b.localeCompare(a));

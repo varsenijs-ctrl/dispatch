@@ -19,7 +19,7 @@
 
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css?v=20260828du">
+<link rel="stylesheet" href="css/styles.css?v=20260828dy">
 </head>
 <body>
 <!-- Liquid-glass refraction filter: warps the backdrop behind .month-bar like glass bending light -->
@@ -112,13 +112,18 @@
       <button class="tab tab-more" id="tab-more" onclick="toggleMoreSheet()" title="Ещё"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg>Ещё</button>
     </nav>
     <div class="sidebar-cards">
-    <div class="sidebar-section">
-      <div class="sidebar-label">Сегодня</div>
-      <div class="today-split">
-        <div class="today-cell"><div class="today-num" style="color:var(--amber)" id="s-pending">0</div><div class="today-cap">Осталось</div></div>
-        <div class="today-div"></div>
-        <div class="today-cell"><div class="today-num" style="color:var(--green)" id="s-done">0</div><div class="today-cap">Готово</div></div>
+    <!-- Вместо «Осталось / Готово» (при 60 клиентах это всегда «осталось много»)
+         — стрик: сколько дней подряд не сорван ни один срок, и что горит сейчас. -->
+    <div class="sidebar-section streak-box" id="streak-box">
+      <div class="sidebar-label">Без просрочек</div>
+      <div class="streak-row">
+        <div class="streak-flame" id="s-flame">🔥</div>
+        <div>
+          <div class="streak-num" id="s-streak">0</div>
+          <div class="today-cap" id="s-streak-cap">дней подряд</div>
+        </div>
       </div>
+      <div class="streak-risk" id="s-streak-risk" style="display:none"></div>
       <div class="today-bar"><div class="today-bar-fill" id="s-today-bar" style="width:0%"></div></div>
     </div>
     <div class="sidebar-section">
@@ -295,16 +300,16 @@
 
 <!-- ?v= is bumped on every deploy so browsers/PWA never serve a stale js/*.js.
      Keep this in sync with BUILD in js/main.js. -->
-<script src="js/core.js?v=20260828du"></script>
-<script src="js/state.js?v=20260828du"></script>
-<script src="js/views.js?v=20260828du"></script>
-<script src="js/planner.js?v=20260828du"></script>
-<script src="js/finance-clients.js?v=20260828du"></script>
-<script src="js/flows.js?v=20260828du"></script>
-<script src="js/clients-calendar.js?v=20260828du"></script>
-<script src="js/sync.js?v=20260828du"></script>
-<script src="js/ui.js?v=20260828du"></script>
+<script src="js/core.js?v=20260828dy"></script>
+<script src="js/state.js?v=20260828dy"></script>
+<script src="js/views.js?v=20260828dy"></script>
+<script src="js/planner.js?v=20260828dy"></script>
+<script src="js/finance-clients.js?v=20260828dy"></script>
+<script src="js/flows.js?v=20260828dy"></script>
+<script src="js/clients-calendar.js?v=20260828dy"></script>
+<script src="js/sync.js?v=20260828dy"></script>
+<script src="js/ui.js?v=20260828dy"></script>
 <script src="js/pending-inject.js?v=20260828T0128c"></script>
-<script src="js/main.js?v=20260828du"></script>
+<script src="js/main.js?v=20260828dy"></script>
 </body>
 </html>

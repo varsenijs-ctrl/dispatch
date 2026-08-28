@@ -162,3 +162,65 @@ function syncMoreTab(v){
   const m=document.getElementById('tab-more');
   if(m) m.classList.toggle('active', MORE_VIEWS.indexOf(v)>=0);
 }
+
+// ── Стрик: навязчивые напоминания ────────────────────────────────────────────
+// Правило простое: стрик держится, пока не сорван ни один срок. Поэтому пока есть
+// незакрытый дедлайн, приложение не даёт об этом забыть — полоса поверх интерфейса,
+// пульсирующий счётчик в сайдбаре и системное уведомление (если разрешено).
+function _streakBanner(streak, risk){
+  let el=document.getElementById('streak-banner');
+  if(!risk.length){ if(el) el.remove(); document.body.classList.remove('has-streak-banner'); return; }
+  if(!el){
+    el=document.createElement('div');
+    el.id='streak-banner';
+    document.body.appendChild(el);
+  }
+  document.body.classList.add('has-streak-banner');
+  const first=risk[0];
+  const what=(first.clientName?first.clientName+' — ':'')+(first.text||'задача');
+  const head=streak>0
+    ? '<b>'+streak+' '+_plural(streak,'день','дня','дней')+' без просрочек сгорит</b>'
+    : '<b>Стрик сброшен — закрой сроки и начни заново</b>';
+  el.innerHTML='<span class="sb-flame">🔥</span>'
+    +'<span class="sb-txt">'+head+' · '
+    +risk.length+' '+_plural(risk.length,'срок','срока','сроков')+' горит: '+esc(what).slice(0,70)+'</span>'
+    +'<button class="sb-go" onclick="setView(\'day_today\')">Закрыть</button>'
+    +'<button class="sb-mute" onclick="_streakSnooze()" title="Скрыть до завтра">×</button>';
+}
+function _streakSnooze(){
+  _markStreakNudge('banner');
+  const el=document.getElementById('streak-banner');
+  if(el) el.remove();
+  document.body.classList.remove('has-streak-banner');
+  showToast('Ок, напомню завтра — но стрик всё равно сгорит');
+}
+// Разрешение на уведомления просим только по кнопке — иначе браузер откажет молча
+function streakNotifyAsk(){
+  if(!('Notification' in window)){ showToast('Этот браузер не умеет уведомления'); return; }
+  Notification.requestPermission().then(function(p){
+    gsave('dc_streak_notify', p==='granted'?'1':'0');
+    showToast(p==='granted'?'🔔 Буду напоминать про сроки':'Уведомления запрещены в браузере');
+    render();
+  });
+}
+function _streakNotify(streak, risk){
+  try{
+    if(!('Notification' in window) || Notification.permission!=='granted') return;
+    if(!risk.length) return;
+    const now=new Date();
+    // утром (после 10) и вечером (после 18) — по одному разу за день
+    const slot=now.getHours()>=18?'evening':(now.getHours()>=10?'morning':'');
+    if(!slot || _streakNudgeShown(slot)) return;
+    _markStreakNudge(slot);
+    const first=risk[0];
+    new Notification('🔥 Стрик '+streak+' '+_plural(streak,'день','дня','дней')+' под угрозой', {
+      body: risk.length+' '+_plural(risk.length,'срок','срока','сроков')+' горит. '
+            +((first.clientName?first.clientName+' — ':'')+(first.text||'')).slice(0,80),
+      tag: 'dc-streak', renotify: true
+    });
+  }catch(e){}
+}
+function _streakNudge(streak, risk){
+  if(!_streakNudgeShown('banner')) _streakBanner(streak, risk);
+  _streakNotify(streak, risk);
+}

@@ -1454,3 +1454,38 @@ body::before{
 .dgcell-nbig{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   font-family:var(--mono);font-size:11px;font-weight:700;color:#04222a;pointer-events:none;
   text-shadow:0 1px 0 rgba(255,255,255,.25);}
+
+/* ── Стрик: виджет в сайдбаре и полоса-напоминание ───────────────────────────
+   Стрик = дни подряд без сорванных сроков. Пока срок горит, приложение мигает
+   этим на каждом экране: полоса сверху, оранжевая рамка виджета, пульс огонька. */
+.streak-row{display:flex;align-items:center;gap:12px;}
+.streak-flame{font-size:26px;line-height:1;filter:saturate(1.1);}
+.streak-num{font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:-1px;color:#ffd60a;line-height:1;}
+.streak-box.at-risk{border-color:rgba(255,69,58,.34)!important;
+  background:linear-gradient(180deg,rgba(255,69,58,.16),rgba(255,69,58,.06))!important;}
+.streak-box.at-risk .streak-num{color:#ff8078;}
+.streak-box.at-risk .streak-flame{animation:streakPulse 1.4s ease-in-out infinite;}
+@keyframes streakPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.18);opacity:.7}}
+.streak-risk{margin-top:10px;padding:9px 11px;border-radius:13px;font-size:11.5px;line-height:1.5;
+  background:rgba(255,69,58,.14);border:1px solid rgba(255,69,58,.24);color:#ff8078;}
+.streak-go{display:block;margin-top:7px;width:100%;padding:6px 10px;border-radius:980px;cursor:pointer;
+  font-family:var(--font);font-size:11.5px;font-weight:640;border:none;
+  background:linear-gradient(180deg,#ff6b60,#e0342a);color:#fff;}
+
+#streak-banner{position:fixed;left:0;right:0;top:0;z-index:400;display:flex;align-items:center;gap:10px;
+  padding:9px 14px;font-family:var(--font);font-size:12.5px;color:#fff;
+  background:linear-gradient(180deg,rgba(224,52,42,.97),rgba(160,26,20,.97));
+  box-shadow:0 6px 24px rgba(0,0,0,.45);animation:sbDrop .3s var(--spring);}
+@keyframes sbDrop{from{transform:translateY(-100%)}to{transform:none}}
+#streak-banner .sb-flame{font-size:16px;animation:streakPulse 1.4s ease-in-out infinite;}
+#streak-banner .sb-txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#streak-banner .sb-go{border:none;cursor:pointer;font:inherit;font-weight:700;padding:5px 13px;border-radius:980px;
+  background:#fff;color:#a01a14;flex:none;}
+#streak-banner .sb-mute{border:none;cursor:pointer;background:rgba(255,255,255,.18);color:#fff;
+  width:24px;height:24px;border-radius:980px;font-size:14px;line-height:1;flex:none;}
+body.has-streak-banner .topbar{margin-top:40px;}
+@media (max-width:720px){
+  #streak-banner{font-size:11.5px;padding:8px 10px;gap:7px;}
+  #streak-banner .sb-txt{white-space:normal;line-height:1.35;}
+  body.has-streak-banner .topbar{margin-top:52px;}
+}

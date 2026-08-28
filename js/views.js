@@ -4,9 +4,27 @@ function updateSidebar(){
   const manual2=load('dc_manual_done',{});
   const doneToday=activeCl2.filter(c=>manual2[c.id]).length;
   const pendingToday=activeCl2.length-doneToday;
-  const _sp=document.getElementById('s-pending'); if(_sp)_sp.textContent=pendingToday;
-  const _sd=document.getElementById('s-done'); if(_sd)_sd.textContent=doneToday;
-  const _tb=document.getElementById('s-today-bar'); if(_tb){const _tt=doneToday+pendingToday; _tb.style.width=(_tt?Math.round(doneToday/_tt*100):0)+'%';}
+
+  // ── стрик в сайдбаре: дни без сорванных сроков + что горит сейчас ──
+  const _streak=_streakDays(), _risk=_streakRisk();
+  const _sn=document.getElementById('s-streak'); if(_sn)_sn.textContent=_streak;
+  const _sc=document.getElementById('s-streak-cap');
+  if(_sc)_sc.textContent=_risk.length?'стрик под угрозой':(_streak===1?'день подряд':_plural(_streak,'день подряд','дня подряд','дней подряд'));
+  const _sf=document.getElementById('s-flame'); if(_sf)_sf.textContent=_risk.length?'⚠️':(_streak?'🔥':'💤');
+  const _box=document.getElementById('streak-box'); if(_box)_box.classList.toggle('at-risk', !!_risk.length);
+  const _sr=document.getElementById('s-streak-risk');
+  if(_sr){
+    if(_risk.length){
+      const first=_risk[0];
+      _sr.style.display='';
+      _sr.innerHTML='<b>'+_risk.length+' '+_plural(_risk.length,'срок','срока','сроков')+' горит</b><br>'
+        +esc((first.clientName?first.clientName+' — ':'')+(first.text||'')).slice(0,64)
+        +'<button class="streak-go" onclick="setView(\'day_today\')">закрыть сейчас</button>';
+    } else _sr.style.display='none';
+  }
+  const _tb=document.getElementById('s-today-bar');
+  if(_tb){ const _tt=doneToday+pendingToday; _tb.style.width=(_risk.length?0:(_tt?Math.round(doneToday/_tt*100):0))+'%'; }
+  try{ _streakNudge(_streak,_risk); }catch(e){}
   const _sb=document.getElementById('s-blocked'); if(_sb)_sb.textContent=0;
   const _sdSms=load('dc_sms_days',{});
   const activeCl=_zac();
@@ -201,15 +219,9 @@ function renderHome(){
   })();
 
   // ── стат-карточки ──
-  let streak=0;
-  for(let i=0;i<60;i++){
-    const d=new Date(getTODAY()); d.setDate(d.getDate()-i);
-    const diso=toISO(d);
-    const dman=load('dc_manual_done',{})[diso];
-    const hasManual=dman&&Object.keys(dman).length>0;
-    const hasHist=ac.some(c=>historyData[c.name]&&historyData[c.name][diso]==='yes');
-    if(hasManual||hasHist) streak++; else if(i>0) break;
-  }
+  // Стрик — дни подряд, когда ни один срок не был сорван (см. _streakDays в core.js)
+  const streak=_streakDays();
+  const streakRisk=_streakRisk();
   const todayTasks=Object.values(_tasks).filter(t=>!t.flowId&&!t.gone&&!_isTaskClientPaused(t)&&t.startIso===iso);
   const overdueN=Object.values(_tasks).filter(t=>!t.flowId&&!t.gone&&!_isTaskClientPaused(t)&&_overdue(t)).length;
   // мини-бары: последние 7 дней (отметки / деньги / активность)
@@ -228,7 +240,7 @@ function renderHome(){
   const statCards=[
     {label:'Рассылки', value:_T.sentCount, sub:'за '+_MSHORT[zm-1], color:'var(--accent)', bg:'rgba(64,203,224,.14)', d:IC.send,  bars:bars(marksPerDay), go:"setView('today')"},
     {label:'Заработано', value:'$'+earned.toFixed(2), sub:'этот месяц', color:'var(--green)', bg:'rgba(48,209,88,.14)', d:IC.money, bars:bars(moneyPerDay), go:"setView('finance')"},
-    {label:'Стрик', value:streak, sub:'дней подряд', color:'#ffd60a', bg:'rgba(255,214,10,.14)', d:IC.flame, bars:bars(marksPerDay), go:''},
+    {label:'Стрик', value:streak, sub:streakRisk.length?('⚠ под угрозой: '+streakRisk.length):'дней без просрочек', color:streakRisk.length?'#ff8078':'#ffd60a', bg:streakRisk.length?'rgba(255,69,58,.14)':'rgba(255,214,10,.14)', d:IC.flame, bars:bars(marksPerDay), go:streakRisk.length?"setView('day_today')":''},
     {label:'Задачи сегодня', value:todayTasks.length, sub:overdueN?(overdueN+' просрочено'):(todayTasks.filter(t=>t.done).length+' выполнено'), color:overdueN?'#ff8078':'var(--accent)', bg:overdueN?'rgba(255,69,58,.14)':'rgba(64,203,224,.14)', d:IC.check, bars:bars(tasksPerDay), go:"setView('day_today')"}
   ];
   const statHtml=statCards.map(s=>`
@@ -264,21 +276,29 @@ function renderHome(){
     </div>`).join('');
 
   // ── дедлайны ──
-  const deadlines=ac.filter(c=>c.deadline).map(function(c){
-    const dl=new Date(c.deadline+'T00:00:00');
-    const diff=Math.ceil((dl-new Date(getTODAY().toDateString()))/86400000);
-    return {c:c, diff:diff, dl:dl};
-  }).filter(x=>x.diff>=-14&&x.diff<=21).sort((a,b)=>a.diff-b.diff);
+  // Дедлайны: и сроки задач (в том числе из ClickUp), и дедлайны клиентов. Раньше
+  // виджет смотрел только на поле у клиента, а оно почти всегда пустое — поэтому
+  // показывал «0», хотя срок горел у задач.
+  const _dlDiff=iso2=>Math.ceil((new Date(iso2+'T00:00:00')-new Date(getTODAY().toDateString()))/86400000);
+  const deadlines=[]
+    .concat(Object.values(_tasks).filter(t=>t.deadline&&!t.gone&&!t.done&&!_isTaskClientPaused(t)).map(function(t){
+      const _cl=(t.cid&&clients.find(c=>c.id===t.cid))||null;
+      return {kind:'task', t:t, c:_cl, name:t.text, sub:(_cl&&_cl.name)||t.clientName||'задача', diff:_dlDiff(t.deadline), dl:new Date(t.deadline+'T00:00:00')};
+    }))
+    .concat(ac.filter(c=>c.deadline).map(function(c){
+      return {kind:'client', c:c, name:c.name, sub:(getFlows(c.id).length?getFlows(c.id).length+' флоу':'дедлайн клиента'), diff:_dlDiff(c.deadline), dl:new Date(c.deadline+'T00:00:00')};
+    }))
+    .filter(x=>x.diff>=-14&&x.diff<=21).sort((a,b)=>a.diff-b.diff);
   const hotN=deadlines.filter(x=>x.diff<=1).length;
   const dlRows=deadlines.slice(0,6).map(function(x){
     const col=x.diff<0?'var(--red)':x.diff===0?'var(--red)':x.diff<=3?'#ffd60a':'rgba(255,255,255,.3)';
     const txt=x.diff<0?(Math.abs(x.diff)+'д назад'):x.diff===0?'сегодня':x.diff===1?'завтра':(x.dl.getDate()+' '+_MSHORT[x.dl.getMonth()]);
-    const nF=getFlows(x.c.id).length;
-    return `<div class="drow2" onclick="openCal('${x.c.id}')" style="cursor:pointer">
+    const go=x.kind==='task'?`setView('day_today')`:(x.c?`openCal('${x.c.id}')`:'');
+    return `<div class="drow2" ${go?`onclick="${go}" style="cursor:pointer"`:''}>
       <span style="width:3px;height:26px;border-radius:980px;flex:none;background:${col}"></span>
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;letter-spacing:-.1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(x.c.name)}</div>
-        <div style="font-family:var(--mono);font-size:10.5px;color:rgba(255,255,255,.28);margin-top:3px">${nF?nF+' флоу':'дедлайн клиента'}</div>
+        <div style="font-size:13px;letter-spacing:-.1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(x.name)}</div>
+        <div style="font-family:var(--mono);font-size:10.5px;color:rgba(255,255,255,.28);margin-top:3px">${esc(x.sub)}</div>
       </div>
       <div style="font-family:var(--mono);font-size:11.5px;font-weight:600;color:${col}">${txt}</div>
     </div>`;
@@ -331,7 +351,10 @@ function renderHome(){
       </div>
       <div style="display:flex;align-items:center;gap:8px;padding:8px 13px;border-radius:980px;background:linear-gradient(180deg,rgba(255,214,10,.16),rgba(255,214,10,.06));border:1px solid rgba(255,214,10,.22)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffd60a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="${IC.flame}"/></svg>
-        <span style="font-family:var(--mono);font-size:12px;font-weight:600;color:#ffe066">${streak} ${_plural(streak,'день','дня','дней')} стрик</span>
+        <span style="font-family:var(--mono);font-size:12px;font-weight:600;color:${streakRisk.length?'#ff8078':'#ffe066'}">${streak} ${_plural(streak,'день','дня','дней')} без просрочек${streakRisk.length?' · ⚠ '+streakRisk.length+' горит':''}</span>
+      </div>
+      ${(typeof Notification!=='undefined'&&Notification.permission!=='granted')?`<button class="dbtn dbtn-sm" onclick="streakNotifyAsk()" title="Напоминать о горящих сроках, чтобы стрик не сгорел">🔔 напоминать</button>`:''}
+      <div style="display:none">
       </div>
     </div>
 
@@ -1003,7 +1026,7 @@ function _gridCellClick(ev, cid, dIso){
     // поэтому уменьшить можно, докрутив по кругу (мышью — Shift или правый клик).
     let next;
     if(ev&&(ev.shiftKey||ev.type==='contextmenu')) next=Math.max(1, cur-1);
-    else next=cur>=9?1:cur+1;
+    else next=cur>=5?1:cur+1;
     _setDayN(cid,dIso,next); _sfx.play('click'); render();
     return;
   }
@@ -1038,14 +1061,14 @@ function renderToday(){
       <span style="font-size:12px;color:var(--text3)">${gridMode==='sms'
         ? 'Режим SMS: клик по ячейке добавляет/убирает SMS'
         : gridMode==='count'
-        ? 'Режим «имейлов»: тап по дню прибавляет имейл (после 9 — снова 1). Число видно прямо в клетке'
+        ? 'Режим «имейлов»: тап по дню прибавляет имейл (после 5 — снова 1). Число видно прямо в клетке'
         : (window.innerWidth<=720
             ? 'Тап по ячейке меняет статус · для SMS включи режим «SMS», для количества — «имейлов»'
             : 'Клик по ячейке меняет статус · Shift+клик — SMS · режим «имейлов» — сколько за день')}</span>
       <div style="flex:1"></div>
       <button class="dpill ${gridMode==='status'?'active':''}" onclick="gridMode='status';render()" title="Клик по ячейке меняет статус">статус</button>
       <button class="dpill ${gridMode==='sms'?'active':''}" onclick="gridMode='sms';render()" title="Клик по ячейке отмечает SMS за этот день">SMS</button>
-      <button class="dpill ${gridMode==='count'?'active':''}" onclick="gridMode='count';render()" title="Сколько имейлов выставлено в этот день: тап прибавляет, после 9 — снова 1">имейлов</button>
+      <button class="dpill ${gridMode==='count'?'active':''}" onclick="gridMode='count';render()" title="Сколько имейлов выставлено в этот день: тап прибавляет, после 5 — снова 1">имейлов</button>
       <span class="dmeta">${doneCount}/${ac.length} готово · ${pct}%</span>
       <button class="dbtn dbtn-sm" onclick="setView('day_today')" title="Отметки списком со статусами">☰ списком</button>
     </div>
@@ -1090,7 +1113,7 @@ function renderToday(){
       const nBadge=countMode
         ? (v?`<span class="dgcell-nbig">${nMail}</span>`:'')          // режим количества: число в клетке
         : ((nMail>1)?`<span class="dgcell-n">${nMail}</span>`:'');    // обычный вид: уголок только если больше одного
-      const hint=countMode?'тап: +1 имейл (после 9 — снова 1), Shift/правый клик: −1':(gridMode==='sms'?'клик: SMS':'клик: статус, Shift+клик: SMS');
+      const hint=countMode?'тап: +1 имейл (после 5 — снова 1), Shift/правый клик: −1':(gridMode==='sms'?'клик: SMS':'клик: статус, Shift+клик: SMS');
       cells+=`<button class="${cls}" style="${ring}position:relative;overflow:visible" onclick="_gridCellClick(event,'${c.id}','${dIso}')" oncontextmenu="event.preventDefault();_gridCellClick(event,'${c.id}','${dIso}')" title="${dIso}${v?' · '+v:''}${nMail>1?' · '+nMail+' имейлов':''}${hasSms?' · SMS':''} — ${hint}">${nBadge}</button>`;
     }
     const isDone=!!manual[c.id];

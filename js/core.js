@@ -579,3 +579,70 @@ function _rememberRemovedInject(t){
   var l=_injectRemovedList();
   if(l.indexOf(t.injectId)<0){ l.push(t.injectId); try{ localStorage.setItem('dc_inject_removed', JSON.stringify(l)); }catch(e){} }
 }
+
+// ── Стрик: дни подряд без проваленных сроков ─────────────────────────────────
+// Провален день, у которого был дедлайн (задача с deadline на этот день), а задача
+// к его концу не была сделана. Сегодняшний день ещё идёт: незакрытый дедлайн на
+// сегодня — не провал, а «стрик под угрозой» (см. _streakRisk).
+function _deadlineTasks(){
+  var out=[];
+  try{
+    var t=JSON.parse(localStorage.getItem('dc_plantasks')||'{}')||{};
+    Object.keys(t).forEach(function(k){
+      var x=t[k]; if(!x||x.gone||!x.deadline) return;
+      out.push(x);
+    });
+  }catch(e){}
+  return out;
+}
+// Сколько дедлайнов этого дня осталось незакрытыми (0 = день чистый)
+function _missedOn(iso, tasks){
+  tasks=tasks||_deadlineTasks();
+  var n=0;
+  tasks.forEach(function(x){
+    if(x.deadline!==iso) return;
+    if(!x.done) { n++; return; }                       // не сделана вовсе
+    if(x.doneDate && x.doneDate>iso) n++;              // сделана позже срока
+  });
+  return n;
+}
+// Задачи, которые сегодня ещё держат стрик: дедлайн сегодня или раньше и не сделаны
+function _streakRisk(){
+  var today=isoToday(), tasks=_deadlineTasks(), risk=[];
+  tasks.forEach(function(x){
+    if(x.done) return;
+    if(x.deadline<=today) risk.push(x);
+  });
+  return risk;
+}
+// Дни подряд без провалов. Идём назад от сегодня; сегодня учитывается только если
+// на сегодня нет незакрытых дедлайнов. Пустой день (дедлайнов не было) стрик не рвёт.
+function _streakDays(){
+  var tasks=_deadlineTasks();
+  if(!tasks.length) return 0;                       // сроков не было — стрику неоткуда начаться
+  // Раньше самого первого срока считать нечего, иначе «чистыми» выглядят все дни
+  // до начала работы и стрик упирался в предел цикла.
+  var first=tasks.reduce(function(m,x){ return (!m||x.deadline<m)?x.deadline:m; }, '');
+  var streak=0, d=new Date(getTODAY());
+  var todayIso=isoToday();
+  for(var i=0;i<400;i++){
+    var iso=toISO(d);
+    if(iso<first) break;
+    if(iso===todayIso){
+      if(_missedOn(iso,tasks)===0 && _streakRisk().length===0) streak++;
+      // если сегодня под угрозой — сегодня не считаем, но серию не рвём
+    } else {
+      if(_missedOn(iso,tasks)>0) break;
+      streak++;
+    }
+    d.setDate(d.getDate()-1);
+  }
+  return streak;
+}
+// Показывали ли уже сегодня напоминание про стрик (чтобы не долбить)
+function _streakNudgeShown(kind){
+  try{ return localStorage.getItem('dc_streak_nudge_'+kind)===isoToday(); }catch(e){ return false; }
+}
+function _markStreakNudge(kind){
+  try{ localStorage.setItem('dc_streak_nudge_'+kind, isoToday()); }catch(e){}
+}

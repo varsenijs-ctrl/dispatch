@@ -595,25 +595,40 @@ function _deadlineTasks(){
   }catch(e){}
   return out;
 }
+// Задача со статусом «Later» (отложено) срок не срывает — ты сам решил перенести
+function _postponed(x){ return !!x && x.status==='draft'; }
+
 // Сколько дедлайнов этого дня осталось незакрытыми (0 = день чистый)
 function _missedOn(iso, tasks){
   tasks=tasks||_deadlineTasks();
   var n=0;
   tasks.forEach(function(x){
     if(x.deadline!==iso) return;
+    if(_postponed(x)) return;                          // отложено — не провал
     if(!x.done) { n++; return; }                       // не сделана вовсе
     if(x.doneDate && x.doneDate>iso) n++;              // сделана позже срока
   });
   return n;
 }
-// Задачи, которые сегодня ещё держат стрик: дедлайн сегодня или раньше и не сделаны
+// Что реально угрожает стрику: сроки, которые УЖЕ прошли и не закрыты. Сегодняшний
+// день ещё идёт, поэтому сроки на сегодня в угрозу не идут — их показываем отдельно
+// (_dueToday) как обычную работу на день.
 function _streakRisk(){
   var today=isoToday(), tasks=_deadlineTasks(), risk=[];
   tasks.forEach(function(x){
-    if(x.done) return;
-    if(x.deadline<=today) risk.push(x);
+    if(x.done || _postponed(x)) return;
+    if(x.deadline<today) risk.push(x);
   });
   return risk;
+}
+// Сроки, которые истекают сегодня: ещё не провал, но закрыть надо до конца дня
+function _dueToday(){
+  var today=isoToday(), out=[];
+  _deadlineTasks().forEach(function(x){
+    if(x.done || _postponed(x)) return;
+    if(x.deadline===today) out.push(x);
+  });
+  return out;
 }
 // Дни подряд без провалов. Идём назад от сегодня; сегодня учитывается только если
 // на сегодня нет незакрытых дедлайнов. Пустой день (дедлайнов не было) стрик не рвёт.
@@ -629,8 +644,9 @@ function _streakDays(){
     var iso=toISO(d);
     if(iso<first) break;
     if(iso===todayIso){
-      if(_missedOn(iso,tasks)===0 && _streakRisk().length===0) streak++;
-      // если сегодня под угрозой — сегодня не считаем, но серию не рвём
+      // сегодня засчитывается, если нет просроченных хвостов; сроки, истекающие
+      // сегодня, серию не портят — день ещё не кончился
+      if(_streakRisk().length===0) streak++;
     } else {
       if(_missedOn(iso,tasks)>0) break;
       streak++;

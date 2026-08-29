@@ -1489,3 +1489,8 @@ body.has-streak-banner .topbar{margin-top:40px;}
   #streak-banner .sb-txt{white-space:normal;line-height:1.35;}
   body.has-streak-banner .topbar{margin-top:52px;}
 }
+/* сроки, истекающие сегодня: жёлтое предупреждение, а не красная тревога */
+.streak-box.due-today{border-color:rgba(255,214,10,.3)!important;
+  background:linear-gradient(180deg,rgba(255,214,10,.12),rgba(255,214,10,.04))!important;}
+.streak-box.due-today .streak-risk{background:rgba(255,214,10,.13);border-color:rgba(255,214,10,.26);color:#ffe066;}
+.streak-box.due-today .streak-go{background:linear-gradient(180deg,#ffd60a,#e0b400);color:#3a2c00;}

@@ -6,20 +6,29 @@ function updateSidebar(){
   const pendingToday=activeCl2.length-doneToday;
 
   // ── стрик в сайдбаре: дни без сорванных сроков + что горит сейчас ──
-  const _streak=_streakDays(), _risk=_streakRisk();
+  const _streak=_streakDays(), _risk=_streakRisk(), _today=_dueToday();
   const _sn=document.getElementById('s-streak'); if(_sn)_sn.textContent=_streak;
   const _sc=document.getElementById('s-streak-cap');
-  if(_sc)_sc.textContent=_risk.length?'стрик под угрозой':(_streak===1?'день подряд':_plural(_streak,'день подряд','дня подряд','дней подряд'));
+  if(_sc)_sc.textContent=_risk.length
+    ? 'стрик под угрозой'
+    : (_today.length? ('сегодня закрыть '+_today.length) : _plural(_streak,'день подряд','дня подряд','дней подряд'));
   const _sf=document.getElementById('s-flame'); if(_sf)_sf.textContent=_risk.length?'⚠️':(_streak?'🔥':'💤');
+  const _box2=document.getElementById('streak-box'); if(_box2)_box2.classList.toggle('due-today', !_risk.length && !!_today.length);
   const _box=document.getElementById('streak-box'); if(_box)_box.classList.toggle('at-risk', !!_risk.length);
   const _sr=document.getElementById('s-streak-risk');
   if(_sr){
     if(_risk.length){
       const first=_risk[0];
       _sr.style.display='';
-      _sr.innerHTML='<b>'+_risk.length+' '+_plural(_risk.length,'срок','срока','сроков')+' горит</b><br>'
+      _sr.innerHTML='<b>'+_risk.length+' '+_plural(_risk.length,'срок','срока','сроков')+' просрочено</b><br>'
         +esc((first.clientName?first.clientName+' — ':'')+(first.text||'')).slice(0,64)
         +'<button class="streak-go" onclick="setView(\'day_today\')">закрыть сейчас</button>';
+    } else if(_today.length){
+      const first=_today[0];
+      _sr.style.display='';
+      _sr.innerHTML='<b>'+_today.length+' '+_plural(_today.length,'срок','срока','сроков')+' истекает сегодня</b><br>'
+        +esc((first.clientName?first.clientName+' — ':'')+(first.text||'')).slice(0,64)
+        +'<button class="streak-go" onclick="setView(\'day_today\')">закрыть сегодня</button>';
     } else _sr.style.display='none';
   }
   const _tb=document.getElementById('s-today-bar');
@@ -221,7 +230,8 @@ function renderHome(){
   // ── стат-карточки ──
   // Стрик — дни подряд, когда ни один срок не был сорван (см. _streakDays в core.js)
   const streak=_streakDays();
-  const streakRisk=_streakRisk();
+  const streakRisk=_streakRisk();     // просроченные — они рвут стрик
+  const dueToday=_dueToday();         // истекают сегодня — ещё не провал
   const todayTasks=Object.values(_tasks).filter(t=>!t.flowId&&!t.gone&&!_isTaskClientPaused(t)&&t.startIso===iso);
   const overdueN=Object.values(_tasks).filter(t=>!t.flowId&&!t.gone&&!_isTaskClientPaused(t)&&_overdue(t)).length;
   // мини-бары: последние 7 дней (отметки / деньги / активность)
@@ -240,7 +250,11 @@ function renderHome(){
   const statCards=[
     {label:'Рассылки', value:_T.sentCount, sub:'за '+_MSHORT[zm-1], color:'var(--accent)', bg:'rgba(64,203,224,.14)', d:IC.send,  bars:bars(marksPerDay), go:"setView('today')"},
     {label:'Заработано', value:'$'+earned.toFixed(2), sub:'этот месяц', color:'var(--green)', bg:'rgba(48,209,88,.14)', d:IC.money, bars:bars(moneyPerDay), go:"setView('finance')"},
-    {label:'Стрик', value:streak, sub:streakRisk.length?('⚠ под угрозой: '+streakRisk.length):'дней без просрочек', color:streakRisk.length?'#ff8078':'#ffd60a', bg:streakRisk.length?'rgba(255,69,58,.14)':'rgba(255,214,10,.14)', d:IC.flame, bars:bars(marksPerDay), go:streakRisk.length?"setView('day_today')":''},
+    {label:'Стрик', value:streak,
+      sub:streakRisk.length?('⚠ просрочено: '+streakRisk.length):(dueToday.length?('сегодня закрыть '+dueToday.length):'дней без просрочек'),
+      color:streakRisk.length?'#ff8078':'#ffd60a',
+      bg:streakRisk.length?'rgba(255,69,58,.14)':'rgba(255,214,10,.14)',
+      d:IC.flame, bars:bars(marksPerDay), go:(streakRisk.length||dueToday.length)?"setView('day_today')":''},
     {label:'Задачи сегодня', value:todayTasks.length, sub:overdueN?(overdueN+' просрочено'):(todayTasks.filter(t=>t.done).length+' выполнено'), color:overdueN?'#ff8078':'var(--accent)', bg:overdueN?'rgba(255,69,58,.14)':'rgba(64,203,224,.14)', d:IC.check, bars:bars(tasksPerDay), go:"setView('day_today')"}
   ];
   const statHtml=statCards.map(s=>`
@@ -283,15 +297,18 @@ function renderHome(){
   const deadlines=[]
     .concat(Object.values(_tasks).filter(t=>t.deadline&&!t.gone&&!t.done&&!_isTaskClientPaused(t)).map(function(t){
       const _cl=(t.cid&&clients.find(c=>c.id===t.cid))||null;
-      return {kind:'task', t:t, c:_cl, name:t.text, sub:(_cl&&_cl.name)||t.clientName||'задача', diff:_dlDiff(t.deadline), dl:new Date(t.deadline+'T00:00:00')};
+      const post=_postponed(t);
+      return {kind:'task', t:t, c:_cl, name:t.text, post:post,
+        sub:((_cl&&_cl.name)||t.clientName||'задача')+(post?' · отложено':''),
+        diff:_dlDiff(t.deadline), dl:new Date(t.deadline+'T00:00:00')};
     }))
     .concat(ac.filter(c=>c.deadline).map(function(c){
       return {kind:'client', c:c, name:c.name, sub:(getFlows(c.id).length?getFlows(c.id).length+' флоу':'дедлайн клиента'), diff:_dlDiff(c.deadline), dl:new Date(c.deadline+'T00:00:00')};
     }))
     .filter(x=>x.diff>=-14&&x.diff<=21).sort((a,b)=>a.diff-b.diff);
-  const hotN=deadlines.filter(x=>x.diff<=1).length;
+  const hotN=deadlines.filter(x=>x.diff<=1&&!x.post).length;   // отложенные не «горят»
   const dlRows=deadlines.slice(0,6).map(function(x){
-    const col=x.diff<0?'var(--red)':x.diff===0?'var(--red)':x.diff<=3?'#ffd60a':'rgba(255,255,255,.3)';
+    const col=x.post?'rgba(255,255,255,.22)':x.diff<0?'var(--red)':x.diff===0?'var(--red)':x.diff<=3?'#ffd60a':'rgba(255,255,255,.3)';
     const txt=x.diff<0?(Math.abs(x.diff)+'д назад'):x.diff===0?'сегодня':x.diff===1?'завтра':(x.dl.getDate()+' '+_MSHORT[x.dl.getMonth()]);
     const go=x.kind==='task'?`setView('day_today')`:(x.c?`openCal('${x.c.id}')`:'');
     return `<div class="drow2" ${go?`onclick="${go}" style="cursor:pointer"`:''}>
@@ -351,7 +368,7 @@ function renderHome(){
       </div>
       <div style="display:flex;align-items:center;gap:8px;padding:8px 13px;border-radius:980px;background:linear-gradient(180deg,rgba(255,214,10,.16),rgba(255,214,10,.06));border:1px solid rgba(255,214,10,.22)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffd60a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="${IC.flame}"/></svg>
-        <span style="font-family:var(--mono);font-size:12px;font-weight:600;color:${streakRisk.length?'#ff8078':'#ffe066'}">${streak} ${_plural(streak,'день','дня','дней')} без просрочек${streakRisk.length?' · ⚠ '+streakRisk.length+' горит':''}</span>
+        <span style="font-family:var(--mono);font-size:12px;font-weight:600;color:${streakRisk.length?'#ff8078':'#ffe066'}">${streak} ${_plural(streak,'день','дня','дней')} без просрочек${streakRisk.length?' · ⚠ '+streakRisk.length+' просрочено':(dueToday.length?' · сегодня '+dueToday.length:'')}</span>
       </div>
       ${(typeof Notification!=='undefined'&&Notification.permission!=='granted')?`<button class="dbtn dbtn-sm" onclick="streakNotifyAsk()" title="Напоминать о горящих сроках, чтобы стрик не сгорел">🔔 напоминать</button>`:''}
       <div style="display:none">

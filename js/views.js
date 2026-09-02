@@ -134,6 +134,7 @@ function togglePayDisabled(cid,iso){
 }
 
 function toggleDaySms(cid,iso){
+  if(_claimAlienDay(cid,iso)){ renderCalModal(cid); return; }
   const smsDays=load('dc_sms_days',{});
   if(!smsDays[cid])smsDays[cid]={};
   if(smsDays[cid][iso])delete smsDays[cid][iso];else smsDays[cid][iso]=true;
@@ -664,6 +665,7 @@ function _setTaskStatus(tid, st){
 // calendar modal: history + undo + action log + Google Sheet.
 function _setDayMark(cid,iso,val){
   const c=clients.find(x=>x.id===cid); if(!c) return;
+  if(_claimAlienDay(cid,iso)) return;      // отметку другой зоны не стираем — забираем день себе
   _sfx.play('click');
   if(!historyData[c.name]) historyData[c.name]={};
   const prev=historyData[c.name][iso]||'';
@@ -682,6 +684,7 @@ function _dayCycleInline(cid,iso){
   _setDayMark(cid,iso,{'':'yes','yes':'draft','draft':'no','no':''}[prev]);
 }
 function _dayToggleSmsInline(cid,iso){
+  if(_claimAlienDay(cid,iso)) return;      // сначала день переходит в эту зону
   const smsDays=load('dc_sms_days',{});
   if(!smsDays[cid])smsDays[cid]={};
   if(smsDays[cid][iso])delete smsDays[cid][iso];else smsDays[cid][iso]=true;
@@ -721,7 +724,7 @@ function _dayInlineCalendar(c){
     const smsToggle=v?`<span class="dday-sms${sms?' on':''}" onclick="event.stopPropagation();_dayToggleSmsInline('${c.id}','${iso}')" title="${sms?'SMS есть — нажми, чтобы убрать (день станет $'+EMAIL_RATE.toFixed(2)+')':'SMS нет — нажми, чтобы добавить (день станет $'+SMS_DAY_RATE.toFixed(2)+')'}">SMS</span>`:'';
     const nMail=v?_dayN(c.id,iso):1;
     const nBadge=v?`<span class="dday-n" onclick="event.stopPropagation();bumpDayN('${c.id}','${iso}',event.shiftKey?-1:1)" title="Имейлов за день: ${nMail} · клик +1, Shift-клик −1">×${nMail}</span>`:'';
-    cells+=`<button class="${cls}" onclick="_dayCycleInline('${c.id}','${iso}')" title="${iso}${v?' · '+v:''}${nMail>1?' · '+nMail+' имейлов':''}${alien?' · деньги в зоне «'+_mkLabel(_markZone(c.id,iso))+'»':''}" style="position:relative">
+    cells+=`<button class="${cls}" onclick="_dayCycleInline('${c.id}','${iso}')" title="${iso}${v?' · '+v:''}${nMail>1?' · '+nMail+' имейлов':''}${alien?' · деньги в зоне «'+_mkLabel(_markZone(c.id,iso))+'», стереть отсюда нельзя — клик ставит свою отметку поверх':''}" style="position:relative">
       <span class="dday-num">${d}</span><span class="dday-dot"></span>${nBadge}${smsToggle}</button>`;
   }
   return `<div style="padding:4px 17px 20px">
@@ -1045,6 +1048,7 @@ function _gridCellClick(ev, cid, dIso){
     const c0=clients.find(x=>x.id===cid);
     const has=c0 && ((historyData[c0.name]||{})[dIso]);
     if(!has){ _dayCycleInline(cid,dIso); return; }          // пустой день: сначала отметка «отправлено»
+    if(_claimAlienDay(cid,dIso)) return;                    // чужой день: сначала забираем его в эту зону
     const cur=_dayN(cid,dIso);
     // Тап прибавляет имейл и после 9 возвращается к 1 — на телефоне Shift не нажать,
     // поэтому уменьшить можно, докрутив по кругу (мышью — Shift или правый клик).
@@ -1059,6 +1063,7 @@ function _gridCellClick(ev, cid, dIso){
   _dayCycleInline(cid,dIso);
 }
 function _gridToggleSms(cid, dIso){
+  if(_claimAlienDay(cid,dIso)) return;
   const smsDays=load('dc_sms_days',{});
   if(!smsDays[cid]) smsDays[cid]={};
   if(smsDays[cid][dIso]) delete smsDays[cid][dIso]; else smsDays[cid][dIso]=true;
@@ -1142,7 +1147,9 @@ function renderToday(){
       const nBadge=countMode
         ? (v?`<span class="dgcell-nbig">${nMail}</span>`:'')          // режим количества: число в клетке
         : ((nMail>1)?`<span class="dgcell-n">${nMail}</span>`:'');    // обычный вид: уголок только если больше одного
-      const hint=countMode?'тап: +1 имейл (после 5 — снова 1), Shift/правый клик: −1':(gridMode==='sms'?'клик: SMS':'клик: статус, Shift+клик: SMS');
+      const hint=alien
+        ? ('стереть отсюда нельзя · клик ставит свою отметку поверх, день переходит в зону «'+_mkLabel(activeMonth)+'»')
+        : (countMode?'тап: +1 имейл (после 5 — снова 1), Shift/правый клик: −1':(gridMode==='sms'?'клик: SMS':'клик: статус, Shift+клик: SMS'));
       cells+=`<button class="${cls}" style="${ring}position:relative;overflow:visible" onclick="_gridCellClick(event,'${c.id}','${dIso}')" oncontextmenu="event.preventDefault();_gridCellClick(event,'${c.id}','${dIso}')" title="${dIso}${v?' · '+v:''}${nMail>1?' · '+nMail+' имейлов':''}${hasSms?' · SMS':''}${alien?' · деньги в зоне «'+_mkLabel(_markZone(c.id,dIso))+'»':''} — ${hint}">${nBadge}</button>`;
     }
     const isDone=!!manual[c.id];
@@ -1160,7 +1167,7 @@ function renderToday(){
 
   // Строка с числами месяца закреплена сверху, а колонка с именами — слева:
   // при прокрутке всегда видно, кому и на какое число ставишь имейл.
-  const alienNote=alienN?`<div class="dmeta" style="margin-bottom:10px;color:var(--text3)">Бледные клетки — ${alienN} ${_plural(alienN,'отметка','отметки','отметок')} зоны ${Object.keys(alienZones).map(z=>'«'+_mkLabel(z)+'»').join(', ')}: их деньги считаются там, зоны независимы</div>`:'';
+  const alienNote=alienN?`<div class="dmeta" style="margin-bottom:10px;color:var(--text3)">Бледные клетки — ${alienN} ${_plural(alienN,'отметка','отметки','отметок')} зоны ${Object.keys(alienZones).map(z=>'«'+_mkLabel(z)+'»').join(', ')}: их деньги считаются там. Стереть их отсюда нельзя — клик ставит свою отметку поверх, и день переходит в эту зону</div>`:'';
   html+=alienNote+`<div class="dcard dgwrap" data-keepscroll="grid" style="padding:0">
     <div class="dgrid-inner" style="padding:18px">
       <div class="dghead" style="display:flex;gap:${GAP}px;padding-left:${NAMECOL+GAP}px">${head}</div>
@@ -1194,6 +1201,8 @@ let historySelectedClient = null;
 let historySelectedDate = null;   // История: selected action-day (Finance-style master/detail)
 
 function setLog(clientName, iso, val){
+  const _c=clients.find(x=>x.name===clientName);
+  if(_c && _claimAlienDay(_c.id,iso)) return;                // отметку другой зоны не стираем
   if(!historyData[clientName]) historyData[clientName]={};   // current work space (active zone)
   if(historyData[clientName][iso]===val) delete historyData[clientName][iso];
   else historyData[clientName][iso]=val;

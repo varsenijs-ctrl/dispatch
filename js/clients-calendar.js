@@ -164,7 +164,7 @@ function buildCalDay(cls,isToday,cid,iso,d,dot,smsBtn,flowDay,flowInfo,flows,val
   // Отметка, поставленная в другой зоне: день занят, но деньги за него там —
   // показываем бледной, чтобы не искать, почему в этой зоне за неё не платят.
   var alien=!!val && !flowDay && !_markInActiveZone(cid, iso);
-  var title=iso+(flowDay?' · flow':val?' · '+val:'')+(alien?' · деньги в зоне «'+_mkLabel(_markZone(cid,iso))+'»':'');
+  var title=iso+(flowDay?' · flow':val?' · '+val:'')+(alien?' · деньги в зоне «'+_mkLabel(_markZone(cid,iso))+'», стереть отсюда нельзя — клик ставит свою отметку поверх':'');
   parts.push('<div class="'+cls+(isToday?' today-marker':'')+(alien?' cal-day-alien':'')+'" onclick="'+onclick+'" title="'+title+'">');
   parts.push('<div class="cal-day-num">'+d+'</div>');
   parts.push(dot);
@@ -242,6 +242,7 @@ function undoLastCalendarChange(){ _sfx.play('undo');
   else if(entry.type==='delete_client'){clients.push(entry.snapshot);if(entry.histSnapshot)historyData[entry.snapshot.name]=entry.histSnapshot;saveAll();showToast('↩ Клиент восстановлен');}
   else{const{cid,name,iso,prev}=entry;const restore=(prev===''||prev===undefined)?'':prev;
     if(!historyData[name])historyData[name]={};if(restore==='')delete historyData[name][iso];else historyData[name][iso]=restore;saveAll();
+    if(entry.prevZone) _forceMarkZone(cid, iso, entry.prevZone);   // день вернулся своей зоне
     try{ _logAct(name, iso, restore); }catch(e){}try{ if(typeof _sheetPush==='function') _sheetPush(name, iso, restore); }catch(e){}if(calCurrentCid===cid)renderCalModal(cid);showToast('↩ Отменено');}
   updateSidebar();render();
 }
@@ -251,8 +252,10 @@ function showToast(msg){
   t.textContent=msg;t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';
   clearTimeout(t._timer);t._timer=setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(-50%) translateY(10px)';},1800);
 }
-function cycleCalDay(cid,iso){ _sfx.play('click');
+function cycleCalDay(cid,iso){
   const c=clients.find(x=>x.id===cid);if(!c)return;
+  if(_claimAlienDay(cid,iso)){ renderCalModal(cid); return; }   // отметку другой зоны не стираем
+  _sfx.play('click');
   // marks go into the CURRENT work space (active zone), regardless of the date's month
   if(!historyData[c.name])historyData[c.name]={};
   const prev=historyData[c.name][iso]||'';
@@ -269,6 +272,7 @@ function cycleCalDay(cid,iso){ _sfx.play('click');
 // Отражается сразу везде — календарь, «Рассылки», «Финансы», сайдбар, история.
 function bumpDayN(cid, iso, delta){
   const c=clients.find(x=>x.id===cid); if(!c) return;
+  if(_claimAlienDay(cid,iso)){ if(document.getElementById('cal-modal').style.display!=='none') renderCalModal(cid); return; }
   const cur=_dayN(cid,iso);
   const next=Math.max(1, Math.min(DAY_N_MAX, cur+(+delta||1)));
   if(next===cur){ _sfx.play('error'); return; }

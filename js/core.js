@@ -251,6 +251,45 @@ function _stampMarkZoneByName(name, iso, status){
     if(cid) _stampMarkZone(cid, iso, status);
   }catch(e){}
 }
+// Есть ли на этом дне отметка ДРУГОЙ зоны.
+function _alienMark(cid, iso){
+  if(!cid || !iso) return false;
+  var c=(typeof clients!=='undefined'?clients:[]).find(function(x){ return x&&x.id===cid; });
+  if(!c) return false;
+  var v=((typeof historyData!=='undefined'&&historyData[c.name])||{})[iso];
+  return !!v && !_markInActiveZone(cid, iso);
+}
+// Клик по отметке другой зоны. Стереть её отсюда НЕЛЬЗЯ — это её заработок, и один
+// случайный тап не должен уносить деньги августа. Поэтому первый клик просто
+// забирает день в активную зону: статус остаётся как был, меняется только хозяин —
+// «поставил свою отметку поверх». Дальше день ведёт себя как обычная своя отметка
+// (можно менять статус, SMS, количество и снимать). Отмена возвращает и зону.
+// true = день забрали, вызывающему делать больше нечего.
+function _claimAlienDay(cid, iso){
+  try{
+    if(!_alienMark(cid, iso)) return false;
+    var was=_markZone(cid, iso);
+    var c=(typeof clients!=='undefined'?clients:[]).find(function(x){ return x&&x.id===cid; });
+    var map=_markZoneMap(); map[cid+'|'+iso]=activeMonth; save('dc_mark_zone', map);
+    try{
+      _undoStack.push({cid:cid, name:c?c.name:'', iso:iso, prev:((historyData[c.name]||{})[iso]||''), prevZone:was});
+      if(_undoStack.length>MAX_UNDO) _undoStack.shift();
+    }catch(e){}
+    try{ _sfx.play('click'); }catch(e){}
+    try{ showToast(fmtDate(new Date(iso+'T00:00:00'))+' теперь в зоне «'+_mkLabel(activeMonth)+'» — деньги за этот день считаются здесь'); }catch(e){}
+    try{ updateSidebar(); }catch(e){}
+    try{ render(); }catch(e){}
+    return true;
+  }catch(e){ return false; }
+}
+// Принудительно вернуть отметке её зону (отмена «забрал день»).
+function _forceMarkZone(cid, iso, zone){
+  try{
+    var map=_markZoneMap(), k=cid+'|'+iso;
+    if(zone) map[k]=zone; else delete map[k];
+    save('dc_mark_zone', map);
+  }catch(e){}
+}
 // Флоу принадлежит зоне, в которой его выставили: у новых задач есть метка doneZone,
 // у старых остаётся прежнее правило окна.
 function _flowDoneInZone(t){

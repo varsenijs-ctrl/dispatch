@@ -18,7 +18,7 @@ function renderFlows(){
   // созданный в другой зоне и ещё не выставленный, остаётся в своей.
   function _flowOfZone(cid, f){
     const ft=Object.values(tasks).filter(t=>t.cid===cid&&t.flowId===f.id);
-    if(ft.some(t=>t.done&&_markInActiveZone(cid,t.startIso))) return true;   // выставлен здесь
+    if(ft.some(t=>_flowDoneInZone(t))) return true;                          // выставлен здесь
     if(ft.some(t=>t.done)) return false;                                     // выставлен в другой зоне
     return !f.zone || f.zone===activeMonth;                                  // без метки — из старых данных
   }
@@ -28,7 +28,7 @@ function renderFlows(){
   ac.forEach(c=>{
     zoneFlows(c.id).forEach(f=>{
       const ft=Object.values(tasks).filter(t=>t.cid===c.id&&t.flowId===f.id);
-      const doneInZone=ft.some(t=>t.done&&_markInActiveZone(c.id,t.startIso));
+      const doneInZone=ft.some(t=>_flowDoneInZone(t));
       const val=f.count*0.60;
       if(doneInZone){ totalDone++; totalPlanned++; totalEarned+=val; totalPotential+=val; }
       else { totalPlanned++; totalPotential+=val; }
@@ -143,7 +143,7 @@ function renderFlows(){
 
   } else {
     const hm=(typeof _flowsHistoryMode!=='undefined'&&_flowsHistoryMode)||'date';
-    const doneTasks=Object.values(tasks).filter(t=>t.flowId&&t.done&&_markInActiveZone(t.cid,t.startIso)&&_inRoster(t.cid)).sort((a,b)=>b.startIso.localeCompare(a.startIso));
+    const doneTasks=Object.values(tasks).filter(t=>t.flowId&&_flowDoneInZone(t)&&_inRoster(t.cid)).sort((a,b)=>b.startIso.localeCompare(a.startIso));
     h+=`<div style="display:flex;gap:8px;margin-bottom:14px">
       <button class="dpill ${hm!=='client'?'active':''}" onclick="_flowsHistoryMode='date';render()">По дате</button>
       <button class="dpill ${hm==='client'?'active':''}" onclick="_flowsHistoryMode='client';render()">По клиентам</button>
@@ -264,10 +264,11 @@ function _markAllFlowsDone(el){
   var added=0;
   flows.forEach(function(f){
     var existing=Object.values(tasks).find(function(t){return t.cid===cid&&t.flowId===f.id;});
-    if(existing){ if(!existing.done){ existing.done=true; existing.doneDate=iso; added++; } }
+    // doneZone — зона, в которой флоу выставили: деньги за него считает только она
+    if(existing){ if(!existing.done){ existing.done=true; existing.doneDate=iso; existing.doneZone=activeMonth; added++; } }
     else {
       var id='pt_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
-      tasks[id]={id:id,text:f.name,startIso:iso,until:iso,note:'',done:true,doneDate:iso,
+      tasks[id]={id:id,text:f.name,startIso:iso,until:iso,note:'',done:true,doneDate:iso,doneZone:activeMonth,
         cid:cid,clientName:c?c.name:'',flowId:f.id};
       added++;
     }
@@ -293,10 +294,10 @@ function _markFlowDone(el){
   var iso=isoToday();
   var tasks=load('dc_plantasks',{});
   var existing=Object.values(tasks).find(function(t){return t.cid===cid&&t.flowId===fid;});
-  if(existing){ existing.done=true; existing.doneDate=iso; }
+  if(existing){ existing.done=true; existing.doneDate=iso; existing.doneZone=activeMonth; }
   else {
     var id='pt_'+Date.now();
-    tasks[id]={id:id,text:flow.name,startIso:iso,until:iso,note:'',done:true,doneDate:iso,cid:cid,clientName:c?c.name:'',flowId:fid};
+    tasks[id]={id:id,text:flow.name,startIso:iso,until:iso,note:'',done:true,doneDate:iso,doneZone:activeMonth,cid:cid,clientName:c?c.name:'',flowId:fid};
   }
   save('dc_plantasks',tasks);
   _sfx.play('done');
@@ -415,7 +416,7 @@ function getFlowEarnings(cid, scope){
   flows.forEach(f=>{
     const val=f.count*0.60;
     const ft=Object.values(tasks).filter(t=>t.cid===cid && t.flowId===f.id);
-    const doneInZone=ft.some(t=>t.done && _markInActiveZone(cid, t.startIso));
+    const doneInZone=ft.some(t=>_flowDoneInZone(t));
     const doneAnywhere=ft.some(t=>t.done);
     if(scope==='month'){
       if(doneInZone){ earned+=val; potential+=val; list.push({flow:f, val, done:true, task:ft.find(t=>t.done)||null}); }

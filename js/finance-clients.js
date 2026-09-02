@@ -128,6 +128,28 @@ function renderFinance(){
       ${FL.map(f=>`<button class="dpill ${financeFilter===f[0]?'active':''}" onclick="setFinanceFilter('${f[0]}')">${f[1]}<span class="n">$${(f[2]||0).toFixed(2)}</span></button>`).join('')}
     </div>`;
 
+  // Отметки, стоящие в числах этой зоны, но сделанные в другой (числа сентября,
+  // отмеченные в августе). Деньги за них считает та зона — иначе один имейл платил
+  // бы дважды. Пишем это прямо здесь, чтобы «$0.00 при отмеченных днях» не пугало.
+  const _alienZ={}; let _alienN=0;
+  ac.forEach(c=>{
+    const h=historyData[c.name]||{};
+    Object.keys(h).forEach(d=>{
+      if(!h[d]) return;
+      const mm=d.slice(0,7);
+      if(mm!==activeMonth && mm!==_nextMonthKey(activeMonth)) return;
+      const z=_markZone(c.id,d);
+      if(z===activeMonth) return;
+      _alienN+=_dayN(c.id,d); _alienZ[z]=1;
+    });
+  });
+  if(_alienN){
+    html+=`<div class="dcard" style="padding:12px 16px;margin-bottom:14px;font-size:12.5px;color:var(--text2);line-height:1.65">
+      В этих числах есть ${_alienN} ${_plural(_alienN,'имейл','имейла','имейлов')}, отмеченных в ${Object.keys(_alienZ).map(z=>'зоне «'+_mkLabel(z)+'»').join(', ')} — деньги за них считаются там.
+      <span style="color:var(--text3)">Зоны независимы: один имейл платит один раз, в той зоне, где ты его отметил.</span>
+    </div>`;
+  }
+
   // ── по клиентам + по дням ──
   let clientRows='';
   if(financeFilter==='invoices'){
@@ -287,14 +309,10 @@ function renderClients(){
   // ── sort + count ──
   const SORTS=[['alpha','А→Я'],['money','по деньгам'],['count','меньше отправлено'],['deadline','дедлайн']];
   const _unused=_zoneUnusedClients().length;
-  const _futureN=_futureMarks().n;
-  const _crossN=_crossZoneMarks().n;
   html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
     ${SORTS.map(s=>`<button class="dpill ${clientsSort===s[0]?'active':''}" onclick="setClientsSort('${s[0]}')">${s[1]}</button>`).join('')}
     <div style="flex:1"></div>
     ${_unused?`<button class="dbtn dbtn-sm" onclick="cleanZoneRoster()" title="Убрать из этой зоны клиентов, по которым в ней нет ни одной отметки. Сами клиенты и их данные остаются в базе.">🧹 без отметок: ${_unused}</button>`:''}
-    ${_crossN?`<button class="dbtn dbtn-sm" onclick="clearCrossZoneMarks()" title="Убрать отметки, которые были поставлены, когда ты находился в другом месяце (старый календарь показывал сразу три месяца). Отметки своей зоны не тронутся.">🧯 из чужой зоны: ${_crossN}</button>`:''}
-    ${_futureN?`<button class="dbtn dbtn-sm" onclick="clearFutureMarks()" title="Убрать отметки за даты позже сегодняшнего дня — обычно их занёс импорт из таблицы. Прошлые отметки не тронутся.">🧽 будущие отметки: ${_futureN}</button>`:''}
     <span class="dmeta">${active.length} в зоне «${_finZoneLabel()}»</span>
   </div>`;
 

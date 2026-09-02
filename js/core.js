@@ -174,10 +174,143 @@ function _shiftMonthKey(mk, delta){
   var d=new Date(p[0], p[1]-1+(+delta||0), 1);
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
 }
-function _markInActiveZone(cid, iso){
+// ── Чья это отметка: зона, в которой её ПОСТАВИЛИ ──────────────────────────
+// Окно зоны — свой месяц и следующий, поэтому 22 сентября видно и из августовской
+// зоны, и из сентябрьской. Из-за одного этого окна отметка, поставленная в августе
+// на сентябрь, приносила деньги ДВА раза: и в августе, и в сентябре. Зоны
+// независимы — один имейл не может стоить $1.00. Поэтому у каждой отметки есть
+// метка зоны, в которой её сделали, и деньги за неё считает ТОЛЬКО эта зона.
+// Хранилище одно общее: { "<cid>|<iso>": "<ключ зоны>" }.
+// Строку из localStorage парсим только когда она изменилась: функция зовётся на
+// каждую клетку сетки (клиенты × дни), тысяча JSON.parse на рендер — это заметно.
+var _mzRaw=null, _mzMap={};
+function _markZoneMap(){
+  var raw=localStorage.getItem('dc_mark_zone')||'';
+  if(raw===_mzRaw) return _mzMap;
+  try{ _mzMap=JSON.parse(raw)||{}; }catch(e){ _mzMap={}; }
+  _mzRaw=raw;
+  return _mzMap;
+}
+// Список зон с тем же кэшем — getMonths() перебирает всю историю.
+var _zlRaw=null, _zlList=null;
+function _zoneList(){
+  var raw=(localStorage.getItem('dc_months')||'')+'|'+(localStorage.getItem('dc_history')||'').length;
+  if(raw===_zlRaw && _zlList) return _zlList;
+  _zlList=(typeof getMonths==='function'?getMonths():[])||[];
+  _zlRaw=raw;
+  return _zlList;
+}
+// Зона, которая показывает этот месяц: сам месяц, если такая зона есть, иначе
+// предыдущая (для неё этот месяц — «следующий»). Так отметка без метки, оставшаяся
+// от старых данных, ни из какой зоны не пропадает.
+function _zoneOwningMonth(mk){
+  var ms=_zoneList();
+  if(ms.indexOf(mk)>=0) return mk;
+  var prev=_prevMonthKey(mk);
+  return ms.indexOf(prev)>=0 ? prev : mk;
+}
+function _markZone(cid, iso){
+  var m=(iso||'').slice(0,7);
+  if(!m) return '';
+  var st=cid?_markZoneMap()[cid+'|'+iso]:'';
+  return st || _zoneOwningMonth(m);
+}
+// Считает ли активная зона деньги за эту отметку.
+function _markInActiveZone(cid, iso){ return _markZone(cid, iso)===activeMonth; }
+// Дата попадает в ОКНО зоны (свой месяц + следующий). Этим правилом живут
+// календари и задачи: отмечать вперёд можно как раньше, а деньги делит правило выше.
+function _dateInActiveZone(iso){
   var m=(iso||'').slice(0,7);
   if(!m) return false;
   return m===activeMonth || m===_nextMonthKey(activeMonth);
+}
+// Название зоны для подписей: "2026-08" → "август 2026".
+function _mkLabel(mk){
+  var p=(mk||'').split('-');
+  if(p.length<2) return mk||'';
+  return (MONTHS_RU[parseInt(p[1],10)-1]||'')+' '+p[0];
+}
+// Метку ставим в момент отметки: поставил сейчас — деньги активной зоны. У уже
+// существующей отметки зону НЕ переписываем: смена статуса (да → черновик → нет) —
+// это правка той же работы, а не перенос денег в другой месяц. Снял отметку — метка
+// уходит вместе с ней, и следующая отметка на этот день будет уже «своя».
+function _stampMarkZone(cid, iso, status){
+  try{
+    if(!cid || !iso) return;
+    var map=_markZoneMap(), k=cid+'|'+iso;
+    if(status){ if(map[k]) return; map[k]=activeMonth; }
+    else { if(!(k in map)) return; delete map[k]; }
+    save('dc_mark_zone', map);
+  }catch(e){}
+}
+// То же по имени клиента — журнал действий знает имя, а не id.
+function _stampMarkZoneByName(name, iso, status){
+  try{
+    var key=_normName(name), cid='';
+    (typeof clients!=='undefined'?clients:[]).forEach(function(c){ if(!cid&&c&&_normName(c.name)===key) cid=c.id; });
+    if(cid) _stampMarkZone(cid, iso, status);
+  }catch(e){}
+}
+// Флоу принадлежит зоне, в которой его выставили: у новых задач есть метка doneZone,
+// у старых остаётся прежнее правило окна.
+function _flowDoneInZone(t){
+  if(!t || !t.done) return false;
+  return t.doneZone ? t.doneZone===activeMonth : _dateInActiveZone(t.startIso);
+}
+function _flowDoneZoneOf(t){
+  if(!t || !t.done) return '';
+  return t.doneZone || (t.startIso||'').slice(0,7);
+}
+// Разовая разметка старых отметок. Журнал действий помнит день, когда отметка была
+// поставлена (w), а с этой версии — и саму зону (z): по ним и восстанавливаем, кому
+// принадлежат деньги. Чего в журнале нет — отдаём зоне, показывающей этот месяц.
+function _backfillMarkZones(){
+  try{
+    if(localStorage.getItem('dc_markzone_v1')) return {n:0};
+    var hist=load('dc_history',{})||{};
+    var map=load('dc_mark_zone',{})||{};
+    var months=(typeof getMonths==='function'?getMonths():[])||[];
+    var cidOf={};
+    (load('dc_clients',[])||[]).forEach(function(c){ if(c&&c.name) cidOf[_normName(c.name)]=c.id; });
+    var last={};
+    (gload('dc_actlog',[])||[]).forEach(function(e){
+      if(!e || !e.c || !e.d || !e.s) return;
+      var k=_normName(e.c)+'|'+e.d, p=last[k];
+      if(!p || (e.t||0)>=(p.t||0)) last[k]=e;
+    });
+    function zoneOnDay(iso){                        // какая зона была активна в этот день
+      var m=(iso||'').slice(0,7);
+      if(!m) return activeMonth;
+      if(months.indexOf(m)>=0) return m;
+      var best=''; months.forEach(function(z){ if(z<m && z>best) best=z; });
+      return best||m;
+    }
+    var n=0;
+    Object.keys(hist).forEach(function(name){
+      var cid=cidOf[_normName(name)]; if(!cid) return;
+      var days=hist[name]||{};
+      Object.keys(days).forEach(function(iso){
+        if(!days[iso]) return;
+        var k=cid+'|'+iso; if(map[k]) return;
+        var e=last[_normName(name)+'|'+iso];
+        map[k]=(e&&e.z) ? e.z : zoneOnDay((e&&e.w)||iso);
+        n++;
+      });
+    });
+    if(n){ save('dc_mark_zone', map); console.log('Dispatch: отметки разнесены по зонам — '+n); }
+    // Флоу — та же история: выставленный в августе флоу не должен платить ещё и в
+    // сентябре. У задачи есть день, когда её отметили выполненной (doneDate) — по
+    // нему и определяем зону; если дня нет, берём день самой задачи.
+    var tasks=load('dc_plantasks',{})||{}, tn=0;
+    Object.keys(tasks).forEach(function(k){
+      var t=tasks[k];
+      if(!t || !t.flowId || !t.done || t.doneZone) return;
+      t.doneZone=zoneOnDay(t.doneDate||t.startIso); tn++;
+    });
+    if(tn){ save('dc_plantasks', tasks); console.log('Dispatch: флоу разнесены по зонам — '+tn); }
+    localStorage.setItem('dc_markzone_v1','1');
+    return {n:n, flows:tn};
+  }catch(e){ return {n:0}; }
 }
 // Ни один месяц с отметками не должен пропасть из вида. Но зона и так показывает
 // свой месяц И следующий, поэтому отметки, выставленные «наперёд» (в августе на
@@ -190,27 +323,22 @@ function _ensureZonesForData(){
     var hist=load('dc_history',{});
     var months=getMonths()||[];
     var map=_rosterMap();
-    var byMonth={}, addedZones=[], addedRoster=0;
+    var byZone={}, addedZones=[], addedRoster=0;
     (load('dc_clients',[])||[]).forEach(function(c){
       var days=hist[c.name]||{};
       Object.keys(days).forEach(function(iso){
         if(!days[iso]) return;
-        var mk=iso.slice(0,7);
-        if(!/^\d{4}-\d{2}$/.test(mk)) return;
-        (byMonth[mk]=byMonth[mk]||{})[c.id]=1;
+        var zone=_markZone(c.id, iso);              // зона, в которой отметку поставили
+        if(!/^\d{4}-\d{2}$/.test(zone)) return;
+        (byZone[zone]=byZone[zone]||{})[c.id]=1;
       });
     });
-    // какая зона показывает этот месяц: он сам или предыдущая (её «следующий месяц»)
-    function _zoneShowing(mk){
-      if(months.indexOf(mk)>=0) return mk;
-      var prev=_prevMonthKey(mk);
-      return months.indexOf(prev)>=0 ? prev : '';
-    }
-    Object.keys(byMonth).forEach(function(mk){
-      var zone=_zoneShowing(mk);
-      if(!zone){ months.push(mk); addedZones.push(mk); zone=mk; }
+    // Зона нужна только для отметок, которые ей и принадлежат. Сентябрьские числа,
+    // отмеченные в августе, — августовские деньги, и сентябрьскую зону они не заводят.
+    Object.keys(byZone).forEach(function(zone){
+      if(months.indexOf(zone)<0){ months.push(zone); addedZones.push(zone); }
       if(!Array.isArray(map[zone])) map[zone]=[];
-      Object.keys(byMonth[mk]).forEach(function(cid){
+      Object.keys(byZone[zone]).forEach(function(cid){
         if(map[zone].indexOf(cid)<0){ map[zone].push(cid); addedRoster++; }
       });
     });
@@ -381,9 +509,13 @@ function _logAct(client, targetIso, status){
   try{
     if(!client || !targetIso) return;
     var log = gload('dc_actlog', []);
-    log.push({ t: Date.now(), w: isoToday(), c: client, d: targetIso, s: status||'' });
+    log.push({ t: Date.now(), w: isoToday(), c: client, d: targetIso, s: status||'', z: activeMonth });
     if(log.length > 4000) log = log.slice(log.length-4000);
     gsave('dc_actlog', log);
+    // Отметку поставили СЕЙЧАС — значит деньги за неё принадлежат активной зоне.
+    // Через журнал проходят все пути отметки (сетка «Рассылок», список «Сегодня»,
+    // календарь клиента, отмена), поэтому метка ставится в одном месте.
+    _stampMarkZoneByName(client, targetIso, status);
   }catch(e){}
 }
 // One-time seed from existing marks. Real action-day is unknown for old data, so

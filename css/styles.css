@@ -1494,3 +1494,12 @@ body.has-streak-banner .topbar{margin-top:40px;}
   background:linear-gradient(180deg,rgba(255,214,10,.12),rgba(255,214,10,.04))!important;}
 .streak-box.due-today .streak-risk{background:rgba(255,214,10,.13);border-color:rgba(255,214,10,.26);color:#ffe066;}
 .streak-box.due-today .streak-go{background:linear-gradient(180deg,#ffd60a,#e0b400);color:#3a2c00;}
+
+/* ── Отметка, поставленная в ДРУГОЙ зоне ────────────────────────────────────
+   Окно зоны — свой месяц и следующий, поэтому числа сентября видны и из
+   августовской зоны. Деньги за отметку считает только та зона, в которой её
+   сделали (иначе один имейл платил бы дважды), а сама клетка остаётся видимой —
+   бледной, чтобы не искать, куда пропала оплата за отмеченный день. */
+.dgcell.dgcell-alien{opacity:.45;filter:grayscale(.5);outline:1px dashed rgba(255,255,255,.22);outline-offset:-2px}
+.dday.dday-alien{opacity:.5;filter:grayscale(.5);outline:1px dashed rgba(255,255,255,.2);outline-offset:-3px}
+.cal-day.cal-day-alien{opacity:.5;filter:grayscale(.5);outline:1px dashed rgba(255,255,255,.18);outline-offset:-3px}

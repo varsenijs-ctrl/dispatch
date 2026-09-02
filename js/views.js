@@ -169,13 +169,13 @@ function _zoneEarned(mk){
     const c=clients.find(x=>x.id===cid); if(!c) return;
     const hist=historyData[c.name]||{}, cs=smsDays[cid]||{}, cd=dis[cid]||{};
     Object.keys(hist).forEach(function(iso){
-      if(iso.slice(0,7)!==mk) return;
+      if(_markZone(cid,iso)!==mk) return;          // деньги зоны, а не просто числа месяца
       const v=hist[iso]; if(v!=='yes'&&v!=='draft') return;
       if(cd[iso]) return;
       sum+=_dayPay(cid,iso,!!cs[iso]);
     });
     (getFlows(cid)||[]).forEach(function(f){
-      const done=Object.values(tasks).some(t=>t.cid===cid&&t.flowId===f.id&&t.done&&(t.startIso||'').slice(0,7)===mk);
+      const done=Object.values(tasks).some(t=>t.cid===cid&&t.flowId===f.id&&_flowDoneZoneOf(t)===mk);
       if(done) sum+=f.count*0.60;
     });
   });
@@ -208,6 +208,7 @@ function renderHome(){
     const hist=historyData[c.name]||{}, cs=smsDays[c.id]||{}, cd=disAll[c.id]||{};
     Object.keys(hist).forEach(function(k){
       if(k.slice(0,7)!==mk) return;
+      if(!_markInActiveZone(c.id,k)) return;       // отметка чужой зоны — её деньги там
       const v=hist[k]; if(v!=='yes'&&v!=='draft') return;
       if(cd[k]) return;
       const d=+k.slice(8,10);
@@ -652,7 +653,9 @@ function _setTaskStatus(tid, st){
   const next=(cur===st)?'':st;
   t.status=next;
   t.done=(next==='yes');
-  if(t.done) t.doneDate=isoToday(); else delete t.doneDate;
+  // doneZone — зона, в которой задачу закрыли: деньги за флоу считает только она
+  if(t.done){ t.doneDate=isoToday(); t.doneZone=activeMonth; }
+  else { delete t.doneDate; delete t.doneZone; }
   save('dc_plantasks',tasks);
   _sfx.play(next==='yes'?'done':'click');
   render();
@@ -698,9 +701,12 @@ function _dayInlineCalendar(c){
   const cidDis=(load('dc_pay_disabled',{})[c.id])||{};
   const tIso=isoToday();
   let marks=0, money=0;
+  let alienN=0, alienZone='';
   Object.keys(hist).forEach(function(k){
     if(k.slice(0,7)!==calMk) return;
-    const v=hist[k]; if(!v) return; marks+=_dayN(c.id,k);
+    const v=hist[k]; if(!v) return;
+    if(!_markInActiveZone(c.id,k)){ alienN++; alienZone=alienZone||_markZone(c.id,k); return; }  // деньги чужой зоны
+    marks+=_dayN(c.id,k);
     if((v==='yes'||v==='draft')&&!cidDis[k]) money+=_dayPay(c.id,k,!!cidSms[k]);
   });
   let cells='';
@@ -708,20 +714,21 @@ function _dayInlineCalendar(c){
   for(let d=1;d<=daysInMonth;d++){
     const iso=y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
     const v=hist[iso]||'';
-    const cls='dday'+(v?' st-'+v:'')+(iso===tIso?' today':'');
+    const alien=!!v&&!_markInActiveZone(c.id,iso);
+    const cls='dday'+(v?' st-'+v:'')+(iso===tIso?' today':'')+(alien?' dday-alien':'');
     const sms=!!cidSms[iso];
     // Вместо тумблера — понятный бейдж: серый «SMS» = нет, синий залитый = есть.
     const smsToggle=v?`<span class="dday-sms${sms?' on':''}" onclick="event.stopPropagation();_dayToggleSmsInline('${c.id}','${iso}')" title="${sms?'SMS есть — нажми, чтобы убрать (день станет $'+EMAIL_RATE.toFixed(2)+')':'SMS нет — нажми, чтобы добавить (день станет $'+SMS_DAY_RATE.toFixed(2)+')'}">SMS</span>`:'';
     const nMail=v?_dayN(c.id,iso):1;
     const nBadge=v?`<span class="dday-n" onclick="event.stopPropagation();bumpDayN('${c.id}','${iso}',event.shiftKey?-1:1)" title="Имейлов за день: ${nMail} · клик +1, Shift-клик −1">×${nMail}</span>`:'';
-    cells+=`<button class="${cls}" onclick="_dayCycleInline('${c.id}','${iso}')" title="${iso}${v?' · '+v:''}${nMail>1?' · '+nMail+' имейлов':''}" style="position:relative">
+    cells+=`<button class="${cls}" onclick="_dayCycleInline('${c.id}','${iso}')" title="${iso}${v?' · '+v:''}${nMail>1?' · '+nMail+' имейлов':''}${alien?' · деньги в зоне «'+_mkLabel(_markZone(c.id,iso))+'»':''}" style="position:relative">
       <span class="dday-num">${d}</span><span class="dday-dot"></span>${nBadge}${smsToggle}</button>`;
   }
   return `<div style="padding:4px 17px 20px">
     <div class="dsunk" style="padding:16px 18px 18px">
       <div class="dhover" style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
         <div style="font-size:13px;font-weight:620;letter-spacing:-.2px">${(MONTHS_RU[m-1]||'').charAt(0).toUpperCase()+(MONTHS_RU[m-1]||'').slice(1)} ${y} · ${esc(c.name)}</div>
-        <div class="dmeta">${marks} отправлено · $${money.toFixed(2)}</div>
+        <div class="dmeta">${marks} отправлено · $${money.toFixed(2)}${alienN?` · <span style="color:var(--text3)">${alienN} ${_plural(alienN,'отметка','отметки','отметок')} зоны «${_mkLabel(alienZone)}»</span>`:''}</div>
         <div style="flex:1"></div>
         <button class="dbtn dbtn-sm" onclick="event.stopPropagation();shiftDayCal(-1)" title="Предыдущий месяц">‹</button>
         <button class="dbtn dbtn-sm${dayCalShift?'':' on'}" onclick="event.stopPropagation();shiftDayCal(0)" title="Вернуться к месяцу зоны">зона</button>
@@ -1113,6 +1120,9 @@ function renderToday(){
   }
 
   let rows='';
+  // Отметки, поставленные в ДРУГОЙ зоне (числа сентября, отмеченные в августе):
+  // клетку показываем бледной, а деньги за неё считает та зона, где её сделали.
+  const alienZones={}; let alienN=0;
   ac.forEach(c=>{
     const hist=historyData[c.name]||{};
     const cidSms=smsDays[c.id]||{}, cidDis=disAll[c.id]||{};
@@ -1120,10 +1130,12 @@ function renderToday(){
     for(let d=1;d<=daysInMonth;d++){
       const dIso=y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
       const v=hist[dIso]||'';
-      if((v==='yes'||v==='draft')&&!cidDis[dIso]) money+=_dayPay(c.id,dIso,!!cidSms[dIso]);
+      const alien=!!v&&!_markInActiveZone(c.id,dIso);
+      if(alien){ alienN++; alienZones[_markZone(c.id,dIso)]=1; }
+      if((v==='yes'||v==='draft')&&!cidDis[dIso]&&!alien) money+=_dayPay(c.id,dIso,!!cidSms[dIso]);
       // SMS: синяя обводка ячейки + уголок. Клик — статус, Shift+клик (или режим SMS) — SMS.
       const hasSms=!!cidSms[dIso];
-      const cls='dgcell'+(v?' g-'+v:'')+(dIso===iso?' today':'')+(hasSms?' has-sms':'');
+      const cls='dgcell'+(v?' g-'+v:'')+(dIso===iso?' today':'')+(hasSms?' has-sms':'')+(alien?' dgcell-alien':'');
       const ring=dIso===iso?'box-shadow:0 0 0 1.5px var(--accent)':'';
       const nMail=v?_dayN(c.id,dIso):1;
       const countMode=(gridMode==='count');
@@ -1131,7 +1143,7 @@ function renderToday(){
         ? (v?`<span class="dgcell-nbig">${nMail}</span>`:'')          // режим количества: число в клетке
         : ((nMail>1)?`<span class="dgcell-n">${nMail}</span>`:'');    // обычный вид: уголок только если больше одного
       const hint=countMode?'тап: +1 имейл (после 5 — снова 1), Shift/правый клик: −1':(gridMode==='sms'?'клик: SMS':'клик: статус, Shift+клик: SMS');
-      cells+=`<button class="${cls}" style="${ring}position:relative;overflow:visible" onclick="_gridCellClick(event,'${c.id}','${dIso}')" oncontextmenu="event.preventDefault();_gridCellClick(event,'${c.id}','${dIso}')" title="${dIso}${v?' · '+v:''}${nMail>1?' · '+nMail+' имейлов':''}${hasSms?' · SMS':''} — ${hint}">${nBadge}</button>`;
+      cells+=`<button class="${cls}" style="${ring}position:relative;overflow:visible" onclick="_gridCellClick(event,'${c.id}','${dIso}')" oncontextmenu="event.preventDefault();_gridCellClick(event,'${c.id}','${dIso}')" title="${dIso}${v?' · '+v:''}${nMail>1?' · '+nMail+' имейлов':''}${hasSms?' · SMS':''}${alien?' · деньги в зоне «'+_mkLabel(_markZone(c.id,dIso))+'»':''} — ${hint}">${nBadge}</button>`;
     }
     const isDone=!!manual[c.id];
     rows+=`<div style="display:flex;align-items:center;gap:${GAP}px;margin-bottom:${GAP}px">
@@ -1148,7 +1160,8 @@ function renderToday(){
 
   // Строка с числами месяца закреплена сверху, а колонка с именами — слева:
   // при прокрутке всегда видно, кому и на какое число ставишь имейл.
-  html+=`<div class="dcard dgwrap" data-keepscroll="grid" style="padding:0">
+  const alienNote=alienN?`<div class="dmeta" style="margin-bottom:10px;color:var(--text3)">Бледные клетки — ${alienN} ${_plural(alienN,'отметка','отметки','отметок')} зоны ${Object.keys(alienZones).map(z=>'«'+_mkLabel(z)+'»').join(', ')}: их деньги считаются там, зоны независимы</div>`:'';
+  html+=alienNote+`<div class="dcard dgwrap" data-keepscroll="grid" style="padding:0">
     <div class="dgrid-inner" style="padding:18px">
       <div class="dghead" style="display:flex;gap:${GAP}px;padding-left:${NAMECOL+GAP}px">${head}</div>
       ${rows}

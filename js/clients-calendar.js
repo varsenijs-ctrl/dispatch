@@ -84,7 +84,7 @@ function importFromPaste(){
   for(let i=0;i<Math.min(5,rows.length);i++){const cols=rows[i].slice(1).filter(c=>c&&c.trim());if(cols.length>0&&!rows[i][0].match(/^\d{4}-\d{2}-\d{2}$/)&&!rows[i][0].match(/^\d{1,2}\.\d{1,2}/)){headerRow=i;break;}}
   const headers=rows[headerRow];const colClients=headers.slice(1).map(h=>h.trim()).filter(h=>h);
   if(!colClients.length){statusEl.className='import-status err';statusEl.textContent='Не нашёл имена клиентов';return;}
-  let totalDates=0;let skipped=0;let future=0;const newClientNames=new Set();
+  let totalDates=0;let skipped=0;let future=0;const newClientNames=new Set();const _impMarks=[];
   const _todayIso=isoToday();   // строки за будущие даты — это план из таблицы, а не сделанная работа
   // Map each pasted column name \u2192 canonical client name: if a client with the same
   // normalized name already exists, reuse ITS exact name so history & the client
@@ -100,7 +100,7 @@ function importFromPaste(){
     if(!_inZone(iso)){ skipped++; continue; }   // import only THIS zone's month \u2014 don't fill other months
     if(iso>_todayIso){ future++; continue; }    // \u0431\u0443\u0434\u0443\u0449\u0438\u0435 \u0434\u043d\u0438 \u043d\u0435 \u0438\u043c\u043f\u043e\u0440\u0442\u0438\u0440\u0443\u0435\u043c \u2014 \u0438\u043d\u0430\u0447\u0435 \u043a\u0430\u043b\u0435\u043d\u0434\u0430\u0440\u044c \u0438 \u0418\u0441\u0442\u043e\u0440\u0438\u044f
                                                 // \u0437\u0430\u043f\u043e\u043b\u043d\u044f\u044e\u0442\u0441\u044f \u043e\u0442\u043c\u0435\u0442\u043a\u0430\u043c\u0438, \u043a\u043e\u0442\u043e\u0440\u044b\u0445 \u0442\u044b \u043d\u0435 \u0434\u0435\u043b\u0430\u043b
-    for(let c=0;c<colClients.length;c++){const clientName=canonical[colClients[c]];if(!clientName)continue;const val=(row[c+1]||'').trim().toLowerCase().replace(/\u200b/g,'');if(!val||!['yes','no','draft'].includes(val))continue;if(!historyData[clientName])historyData[clientName]={};historyData[clientName][iso]=val;newClientNames.add(clientName);totalDates++;}
+    for(let c=0;c<colClients.length;c++){const clientName=canonical[colClients[c]];if(!clientName)continue;const val=(row[c+1]||'').trim().toLowerCase().replace(/\u200b/g,'');if(!val||!['yes','no','draft'].includes(val))continue;if(!historyData[clientName])historyData[clientName]={};historyData[clientName][iso]=val;newClientNames.add(clientName);_impMarks.push({n:clientName,d:iso,v:val});totalDates++;}
   }
   if(!totalDates){
     statusEl.className='import-status err';
@@ -121,6 +121,9 @@ function importFromPaste(){
   const _rm=_rosterMap(); if(!Array.isArray(_rm[activeMonth])) _rm[activeMonth]=[];
   importedCids.forEach(id=>{ if(_rm[activeMonth].indexOf(id)<0) _rm[activeMonth].push(id); });
   save('dc_zone_roster', _rm);
+  // Импорт — работа этой зоны: помечаем отметки её ключом, чтобы деньги за них
+  // считались здесь и только здесь (клиенты созданы выше, id уже есть).
+  _impMarks.forEach(function(x){ _stampMarkZoneByName(x.n, x.d, x.v); });
   const _n=newClientNames.size;
   var _msg=`✓ ${totalDates} ${_plural(totalDates,'запись','записи','записей')}, ${_n} ${_plural(_n,'клиент','клиента','клиентов')} в зону «${_finZoneLabel()}»`
     +`${added?' (+'+added+' '+_plural(added,'новый','новых','новых')+')':''}`
@@ -158,8 +161,11 @@ function openCalByName(name){
 function buildCalDay(cls,isToday,cid,iso,d,dot,smsBtn,flowDay,flowInfo,flows,val){
   var parts=[];
   var onclick=flowDay?'':'cycleCalDay(\''+cid+'\',\''+iso+'\')';
-  var title=iso+(flowDay?' · flow':val?' · '+val:'');
-  parts.push('<div class="'+cls+(isToday?' today-marker':'')+'" onclick="'+onclick+'" title="'+title+'">');
+  // Отметка, поставленная в другой зоне: день занят, но деньги за него там —
+  // показываем бледной, чтобы не искать, почему в этой зоне за неё не платят.
+  var alien=!!val && !flowDay && !_markInActiveZone(cid, iso);
+  var title=iso+(flowDay?' · flow':val?' · '+val:'')+(alien?' · деньги в зоне «'+_mkLabel(_markZone(cid,iso))+'»':'');
+  parts.push('<div class="'+cls+(isToday?' today-marker':'')+(alien?' cal-day-alien':'')+'" onclick="'+onclick+'" title="'+title+'">');
   parts.push('<div class="cal-day-num">'+d+'</div>');
   parts.push(dot);
   if(flowInfo) parts.push('<div style="font-size:8px;color:var(--amber);text-align:center;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 2px">'+flowInfo.name.slice(0,8)+'</div>');
